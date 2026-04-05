@@ -142,7 +142,6 @@ class MatrixStore {
         pendingInvites = []
         reactionEvents = [:]
         redactedEventIds = []
-        eventIdsByRoom = [:]
         clearCredentials()
     }
 

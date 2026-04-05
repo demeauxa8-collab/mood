@@ -527,7 +527,7 @@ struct UserStatusPanel: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 // Avatar circle (clickable for status)
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) {
@@ -536,19 +536,19 @@ struct UserStatusPanel: View {
                 } label: {
                     ZStack(alignment: .bottomTrailing) {
                         Text(user.avatarEmoji)
-                            .font(.system(size: 20))
+                            .font(.system(size: 18))
                             .frame(width: 32, height: 32)
                             .background(MoodTheme.glassBg)
                             .clipShape(Circle())
 
-                        StatusIndicator(status: .online, size: 10, borderColor: MoodTheme.serverBar)
-                            .offset(x: 3, y: 3)
+                        StatusIndicator(status: .online, size: 8, borderColor: MoodTheme.serverBar)
+                            .offset(x: 2, y: 2)
                     }
                 }
                 .buttonStyle(.plain)
                 .help("Changer le statut")
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(user.displayName)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(MoodTheme.textPrimary)
@@ -557,28 +557,28 @@ struct UserStatusPanel: View {
                         .font(.system(size: 11))
                         .foregroundStyle(MoodTheme.textSecondary)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                Spacer()
-
-                HStack(spacing: 6) {
-                    MuteButton(isMuted: $isMicMuted, iconOn: "mic", iconOff: "mic.slash", tooltip: "Micro")
-                    MuteButton(isMuted: $isDeafened, iconOn: "headphones", iconOff: "speaker.slash", tooltip: "Casque")
+                HStack(spacing: 4) {
+                    StatusPanelIcon(isMuted: $isMicMuted, iconOn: "mic.fill", iconOff: "mic.slash.fill", tooltip: "Micro")
+                    StatusPanelIcon(isMuted: $isDeafened, iconOn: "headphones", iconOff: "speaker.slash.fill", tooltip: "Casque")
                     Button {
                         showSettings = true
                     } label: {
                         Image(systemName: "gearshape.fill")
-                            .font(.system(size: 14))
-                            .foregroundStyle(MoodTheme.textPrimary)
-                            .frame(width: 30, height: 30)
+                            .font(.system(size: 13))
+                            .foregroundStyle(MoodTheme.textSecondary)
+                            .frame(width: 32, height: 32)
+                            .background(Color.clear)
+                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .help("Paramètres utilisateur")
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 10)
-            .padding(.bottom, 4)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
         }
         .background(MoodTheme.serverBar)
     }
@@ -647,6 +647,46 @@ struct StatusPickerMenu: View {
         .padding(.vertical, 8)
         .background(MoodTheme.serverBar.opacity(0.95))
         .overlay(Rectangle().fill(MoodTheme.divider).frame(height: 1), alignment: .bottom)
+    }
+}
+
+struct StatusPanelIcon: View {
+    @Binding var isMuted: Bool
+    let iconOn: String
+    let iconOff: String
+    let tooltip: String
+    @State private var isHovered = false
+    @State private var slashProgress: CGFloat = 0
+
+    var body: some View {
+        Button {
+            if isMuted {
+                withAnimation(.easeIn(duration: 0.2)) { slashProgress = 0 }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { isMuted = false }
+            } else {
+                isMuted = true
+                slashProgress = 0
+                withAnimation(.easeOut(duration: 0.25)) { slashProgress = 1 }
+            }
+        } label: {
+            ZStack {
+                Image(systemName: iconOn)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(isMuted ? MoodTheme.mentionBadge : MoodTheme.textSecondary)
+                    .animation(.easeInOut(duration: 0.15), value: isMuted)
+
+                AnimatedSlash(progress: slashProgress)
+                    .stroke(MoodTheme.mentionBadge, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .frame(width: 18, height: 18)
+            }
+            .frame(width: 32, height: 32)
+            .background(isHovered ? MoodTheme.hoverBg : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in isHovered = hovering }
+        .help(tooltip)
     }
 }
 
