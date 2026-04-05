@@ -35,10 +35,26 @@ struct ContentView: View {
         }
         .background(MoodTheme.chatBackground)
         .preferredColorScheme(.dark)
-        .sheet(isPresented: $showProfilePopup) {
-            if let user = profileUser {
-                UserProfilePopup(user: user, server: selectedServer)
-                    .presentationDetents([.medium])
+        .overlay {
+            if showProfilePopup, let user = profileUser {
+                ZStack {
+                    // Dim background
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation(.easeOut(duration: 0.15)) {
+                                showProfilePopup = false
+                            }
+                        }
+
+                    UserProfilePopup(user: user, server: selectedServer, onDismiss: {
+                            withAnimation(.easeOut(duration: 0.15)) { showProfilePopup = false }
+                        })
+                        .frame(width: 320)
+                        .shadow(color: .black.opacity(0.5), radius: 20, y: 8)
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
+                .animation(.easeOut(duration: 0.15), value: showProfilePopup)
             }
         }
         .sheet(isPresented: $showSettings) {

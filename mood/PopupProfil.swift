@@ -5,7 +5,7 @@ import SwiftUI
 struct UserProfilePopup: View {
     let user: MoodUser
     var server: MoodServer? = nil
-    @Environment(\.dismiss) private var dismiss
+    var onDismiss: (() -> Void)? = nil
     @State private var messageText = ""
     @State private var showMoreMenu = false
 
@@ -159,7 +159,7 @@ struct UserProfilePopup: View {
                     if !messageText.isEmpty {
                         Button {
                             messageText = ""
-                            dismiss()
+                            onDismiss?()
                         } label: {
                             Image(systemName: "paperplane.fill")
                                 .font(.system(size: 12))
