@@ -1,154 +1,211 @@
 import SwiftUI
 
-// MARK: - User Profile Popup
+// MARK: - User Profile Popup (Discord-style card)
 
 struct UserProfilePopup: View {
     let user: MoodUser
     var server: MoodServer? = nil
     @Environment(\.dismiss) private var dismiss
+    @State private var messageText = ""
+    @State private var showMoreMenu = false
 
     var body: some View {
         VStack(spacing: 0) {
-            // Bannière gradient
-            RoundedRectangle(cornerRadius: 0)
-                .fill(
-                    LinearGradient(
-                        colors: [user.roleColor, MoodTheme.brandAccent],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            // Banner
+            ZStack(alignment: .topTrailing) {
+                RoundedRectangle(cornerRadius: 0)
+                    .fill(
+                        LinearGradient(
+                            colors: [user.roleColor, user.roleColor.opacity(0.7)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
-                .frame(height: 80)
-                .overlay(alignment: .topTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.7))
-                            .frame(width: 28, height: 28)
-                            .background(.white.opacity(0.15))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                            .padding(12)
-                    }
-                }
+                    .frame(height: 60)
 
-            VStack(alignment: .leading, spacing: 14) {
-                // Avatar
-                HStack {
+                // More button (...)
+                Button { showMoreMenu.toggle() } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .frame(width: 32, height: 32)
+                        .background(.black.opacity(0.3))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .padding(8)
+            }
+
+            VStack(alignment: .leading, spacing: 0) {
+                // Avatar overlapping banner
+                HStack(alignment: .top) {
                     ZStack(alignment: .bottomTrailing) {
                         Text(user.avatarEmoji)
-                            .font(.system(size: 30))
-                            .frame(width: 56, height: 56)
+                            .font(.system(size: 36))
+                            .frame(width: 68, height: 68)
                             .background(MoodTheme.popupBg)
                             .clipShape(Circle())
                             .overlay(
                                 Circle()
-                                    .stroke(MoodTheme.popupBg, lineWidth: 4)
+                                    .stroke(MoodTheme.popupBg, lineWidth: 5)
                             )
 
-                        StatusIndicator(status: user.status, size: 12, borderColor: MoodTheme.popupBg)
-                            .offset(x: 3, y: 3)
+                        StatusIndicator(status: user.status, size: 14, borderColor: MoodTheme.popupBg)
+                            .offset(x: 2, y: 2)
                     }
-                    .offset(y: -18)
+                    .offset(y: -30)
 
                     Spacer()
-
-                    Button {
-                        // Ouvre la conversation DM
-                        dismiss()
-                    } label: {
-                        Image(systemName: "bubble.left.fill")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.white)
-                            .frame(width: 34, height: 34)
-                            .background(MoodTheme.brandAccent)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .help("Envoyer un message")
                 }
+                .padding(.horizontal, 14)
 
-                // Infos
-                VStack(alignment: .leading, spacing: 4) {
+                // Name + badge + tag
+                VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(user.displayName)
-                            .font(.system(size: 20, weight: .bold))
+                            .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(MoodTheme.textPrimary)
-                        RoleBadge(role: server?.roleFor(user) ?? .member, size: 16)
+
+                        if let server, server.roleFor(user) != .member {
+                            RoleBadge(role: server.roleFor(user), size: 14)
+                        }
                     }
 
                     Text("@\(user.username)")
                         .font(.system(size: 13))
                         .foregroundStyle(MoodTheme.textSecondary)
-
-                    HStack(spacing: 4) {
-                        Circle().fill(user.statusColor).frame(width: 7, height: 7)
-                        Text(user.status.rawValue.capitalized)
-                            .font(.system(size: 12))
-                            .foregroundStyle(MoodTheme.textSecondary)
-                    }
-                    .padding(.top, 2)
                 }
-                .offset(y: -12)
+                .padding(.horizontal, 14)
+                .offset(y: -18)
+
+                // Divider
+                Rectangle().fill(MoodTheme.divider).frame(height: 1)
+                    .padding(.horizontal, 14)
+                    .padding(.top, -8)
 
                 // Sections
-                VStack(spacing: 8) {
-                    ProfileSection(title: "À PROPOS") {
-                        Text(user.bio)
-                            .font(.system(size: 13))
-                            .foregroundStyle(MoodTheme.textPrimary)
-                    }
-
-                    ProfileSection(title: "MEMBRE DEPUIS") {
-                        Text(user.joinedDate, style: .date)
-                            .font(.system(size: 13))
-                            .foregroundStyle(MoodTheme.textPrimary)
-                    }
-
-                    if let server, server.roleFor(user) != .member {
-                        let role = server.roleFor(user)
-                        ProfileSection(title: "RÔLE") {
-                            HStack(spacing: 6) {
-                                Image(systemName: role.icon)
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(role.color)
-                                Text(role.rawValue)
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(role.color)
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(role.color.opacity(0.10))
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                VStack(alignment: .leading, spacing: 10) {
+                    // About
+                    if !user.bio.isEmpty {
+                        ProfileCardSection(title: "À PROPOS") {
+                            Text(user.bio)
+                                .font(.system(size: 13))
+                                .foregroundStyle(MoodTheme.textPrimary)
                         }
                     }
 
+                    // Member since
+                    ProfileCardSection(title: "MEMBRE DEPUIS") {
+                        HStack(spacing: 6) {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 11))
+                                .foregroundStyle(MoodTheme.textMuted)
+                            Text(user.joinedDate, style: .date)
+                                .font(.system(size: 12))
+                                .foregroundStyle(MoodTheme.textSecondary)
+                        }
+                    }
+
+                    // Roles
+                    if let server {
+                        let role = server.roleFor(user)
+                        if role != .member {
+                            ProfileCardSection(title: "RÔLES") {
+                                HStack(spacing: 6) {
+                                    Circle()
+                                        .fill(role.color)
+                                        .frame(width: 10, height: 10)
+                                    Text(role.rawValue)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(MoodTheme.textPrimary)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(MoodTheme.glassBg)
+                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                            }
+                        }
+                    }
+
+                    // Badges
                     if !user.badges.isEmpty {
-                        ProfileSection(title: "BADGES") {
+                        ProfileCardSection(title: "BADGES") {
                             HStack(spacing: 6) {
                                 ForEach(user.badges, id: \.self) { badge in
                                     Text(badge)
                                         .font(.system(size: 11, weight: .medium))
                                         .foregroundStyle(MoodTheme.brandAccent)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 5)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
                                         .background(MoodTheme.brandAccent.opacity(0.10))
-                                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                                 }
                             }
                         }
                     }
                 }
-                .offset(y: -8)
+                .padding(.horizontal, 14)
+                .padding(.top, 4)
 
-                Spacer()
+                Spacer(minLength: 8)
+
+                // Message input at bottom (like Discord)
+                HStack(spacing: 8) {
+                    TextField("Envoyer un message à @\(user.username)", text: $messageText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13))
+                        .foregroundStyle(MoodTheme.textPrimary)
+
+                    if !messageText.isEmpty {
+                        Button {
+                            messageText = ""
+                            dismiss()
+                        } label: {
+                            Image(systemName: "paperplane.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(MoodTheme.brandAccent)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Button {} label: {
+                            Image(systemName: "face.smiling")
+                                .font(.system(size: 14))
+                                .foregroundStyle(MoodTheme.textMuted)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(MoodTheme.glassBg)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .padding(.horizontal, 14)
+                .padding(.bottom, 14)
             }
-            .padding(.horizontal, 16)
         }
         .background(MoodTheme.popupBg)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }
 
-// MARK: - Profile Section
+// MARK: - Profile Card Section
+
+struct ProfileCardSection<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.4)
+                .foregroundStyle(MoodTheme.textSecondary)
+            content
+        }
+    }
+}
+
+// MARK: - Legacy wrapper (keep ProfileSection for other uses)
 
 struct ProfileSection<Content: View>: View {
     let title: String
@@ -166,14 +223,11 @@ struct ProfileSection<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(MoodTheme.glassBg)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(MoodTheme.glassBorder, lineWidth: 0.5)
-        )
     }
 }
 
 #Preview {
     UserProfilePopup(user: MockData.users[1], server: MockData.servers[0])
+        .frame(width: 300)
         .preferredColorScheme(.dark)
 }
