@@ -18,35 +18,29 @@ struct UserProfilePopup: View {
             // Banner + Avatar overlay zone
             ZStack(alignment: .bottomLeading) {
                 // Banner
-                VStack(spacing: 0) {
-                    RoundedRectangle(cornerRadius: 0)
-                        .fill(
-                            LinearGradient(
-                                colors: [user.roleColor, user.roleColor.opacity(0.6)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
+                RoundedRectangle(cornerRadius: 0)
+                    .fill(
+                        LinearGradient(
+                            colors: [user.roleColor, user.roleColor.opacity(0.6)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                         )
-                        .frame(height: bannerHeight)
-                        .overlay(alignment: .topTrailing) {
-                            Button { } label: {
-                                Image(systemName: "ellipsis")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(.white.opacity(0.8))
-                                    .frame(width: 30, height: 30)
-                                    .background(.black.opacity(0.3))
-                                    .clipShape(Circle())
-                            }
-                            .buttonStyle(.plain)
-                            .padding(8)
+                    )
+                    .frame(height: bannerHeight)
+                    .overlay(alignment: .topTrailing) {
+                        Button { } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.8))
+                                .frame(width: 30, height: 30)
+                                .background(.black.opacity(0.3))
+                                .clipShape(Circle())
                         }
+                        .buttonStyle(.plain)
+                        .padding(8)
+                    }
 
-                    // Spacer for the bottom half of the avatar
-                    Color.clear
-                        .frame(height: avatarOverlap)
-                }
-
-                // Avatar straddling the banner
+                // Avatar straddling the banner — offset pushes bottom half below banner
                 ZStack(alignment: .bottomTrailing) {
                     Text(user.avatarEmoji)
                         .font(.system(size: 36))
@@ -62,6 +56,7 @@ struct UserProfilePopup: View {
                         .offset(x: 0, y: -2)
                 }
                 .padding(.leading, 14)
+                .offset(y: avatarOverlap)
             }
 
             // Content below avatar
@@ -83,7 +78,7 @@ struct UserProfilePopup: View {
                         .foregroundStyle(MoodTheme.textSecondary)
                 }
                 .padding(.horizontal, 14)
-                .padding(.top, 8)
+                .padding(.top, avatarOverlap + 8)
 
                 // Separator
                 Rectangle().fill(MoodTheme.divider).frame(height: 1)
@@ -163,8 +158,8 @@ struct UserProfilePopup: View {
 
                     if !messageText.isEmpty {
                         Button {
+                            // TODO: envoyer le message via MatrixStore
                             messageText = ""
-                            onDismiss?()
                         } label: {
                             Image(systemName: "paperplane.fill")
                                 .font(.system(size: 12))

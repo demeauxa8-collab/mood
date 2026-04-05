@@ -61,8 +61,6 @@ struct ChannelListColumn: View {
             // Voice connected panel
             VoiceConnectedPanel()
 
-            Rectangle().fill(MoodTheme.divider).frame(height: 1)
-
             UserStatusPanel(showSettings: $showSettings)
         }
         .background(MoodTheme.channelList)
@@ -594,6 +592,7 @@ struct UserStatusPanel: View {
             .padding(.vertical, 6)
         }
         .background(MoodTheme.serverBar)
+        .overlay(Rectangle().fill(MoodTheme.divider).frame(height: 1), alignment: .top)
     }
 }
 

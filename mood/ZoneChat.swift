@@ -1459,7 +1459,7 @@ struct SystemMessageRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Image(systemName: "arrow.right")
+                Image(systemName: icon)
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(color)
                     .frame(width: 38, alignment: .center)
@@ -1475,17 +1475,22 @@ struct SystemMessageRow: View {
 
             // "Fais coucou !" button for user joins (like Discord)
             if message.systemType == .userJoined {
-                HStack(spacing: 6) {
-                    Text("👋")
-                        .font(.system(size: 12))
-                    Text("Fais coucou !")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(MoodTheme.textPrimary)
+                Button {
+                    // TODO: envoyer "👋" dans le channel
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("👋")
+                            .font(.system(size: 12))
+                        Text("Fais coucou !")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(MoodTheme.textPrimary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(MoodTheme.glassBg)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(MoodTheme.glassBg)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .buttonStyle(.plain)
                 .padding(.leading, 46)
             }
         }
