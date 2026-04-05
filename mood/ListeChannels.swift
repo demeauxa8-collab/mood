@@ -61,6 +61,8 @@ struct ChannelListColumn: View {
             // Voice connected panel
             VoiceConnectedPanel()
 
+            Rectangle().fill(MoodTheme.divider).frame(height: 1)
+
             UserStatusPanel(showSettings: $showSettings)
         }
         .background(MoodTheme.channelList)
@@ -151,20 +153,20 @@ struct CategorySection: View {
     @State private var isExpanded = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 1) {
             Button {
                 withAnimation(.easeInOut(duration: 0.12)) {
                     isExpanded.toggle()
                 }
             } label: {
-                HStack(spacing: 3) {
+                HStack(spacing: 4) {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 8, weight: .bold))
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
 
                     Text(category.name)
                         .font(.system(size: 11, weight: .semibold))
-                        .tracking(0.4)
+                        .tracking(0.5)
 
                     Spacer()
 
@@ -172,10 +174,10 @@ struct CategorySection: View {
                         .font(.system(size: 11))
                         .opacity(0.5)
                 }
-                .foregroundStyle(MoodTheme.textPrimary)
+                .foregroundStyle(MoodTheme.textSecondary)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 6)
-                .padding(.top, 14)
+                .padding(.top, 16)
             }
             .buttonStyle(.plain)
 
@@ -202,18 +204,26 @@ struct CategorySection: View {
                                             .clipShape(Circle())
 
                                         Text(user.displayName)
-                                            .font(.system(size: 12))
-                                            .foregroundStyle(MoodTheme.textPrimary)
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(MoodTheme.textSecondary)
                                             .lineLimit(1)
-
-                                        RoleBadge(role: server.roleFor(user), size: 10)
 
                                         Spacer()
 
-                                        // Mic/headphone icons
+                                        // Live badge (like Discord "EN DIRECT")
+                                        if user.activity != nil {
+                                            Text("EN DIRECT")
+                                                .font(.system(size: 9, weight: .bold))
+                                                .foregroundStyle(.white)
+                                                .padding(.horizontal, 5)
+                                                .padding(.vertical, 2)
+                                                .background(MoodTheme.mentionBadge)
+                                                .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                                        }
+
                                         Image(systemName: "mic.fill")
                                             .font(.system(size: 9))
-                                            .foregroundStyle(MoodTheme.onlineGreen.opacity(0.6))
+                                            .foregroundStyle(MoodTheme.textMuted)
                                     }
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 3)
@@ -243,16 +253,16 @@ struct ChannelRow: View {
     private var isUnread: Bool { channel.unreadCount > 0 }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Image(systemName: channel.icon)
-                .font(.system(size: 15))
-                .foregroundStyle(MoodTheme.textPrimary)
+                .font(.system(size: 14))
+                .foregroundStyle(isSelected ? MoodTheme.textPrimary : (isUnread ? MoodTheme.textPrimary : MoodTheme.textMuted))
                 .frame(width: 20)
 
             Text(channel.name)
                 .font(.system(size: 14))
                 .fontWeight(isUnread ? .semibold : .regular)
-                .foregroundStyle(MoodTheme.textPrimary)
+                .foregroundStyle(isSelected ? MoodTheme.textPrimary : (isUnread ? MoodTheme.textPrimary : MoodTheme.textMuted))
                 .lineLimit(1)
 
             if channel.isE2E {
@@ -273,15 +283,15 @@ struct ChannelRow: View {
                     .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
         .background(
             isSelected ? MoodTheme.selectedBg :
             isHovered ? MoodTheme.hoverBg :
             Color.clear
         )
         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 6)
         .contentShape(Rectangle())
         .onHover { hovering in isHovered = hovering }
         .contextMenu {

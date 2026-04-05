@@ -1457,19 +1457,37 @@ struct SystemMessageRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 14))
-                .foregroundStyle(color)
-                .frame(width: 38, alignment: .center)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(color)
+                    .frame(width: 38, alignment: .center)
 
-            Text(message.content)
-                .font(.system(size: 13))
-                .foregroundStyle(MoodTheme.textSecondary)
+                Text(message.content)
+                    .font(.system(size: 13))
+                    .foregroundStyle(MoodTheme.textSecondary)
 
-            Text(message.timestamp.timeFormatted)
-                .font(.system(size: 11))
-                .foregroundStyle(MoodTheme.textMuted)
+                Text(message.timestamp.timeFormatted)
+                    .font(.system(size: 11))
+                    .foregroundStyle(MoodTheme.textMuted)
+            }
+
+            // "Fais coucou !" button for user joins (like Discord)
+            if message.systemType == .userJoined {
+                HStack(spacing: 6) {
+                    Text("👋")
+                        .font(.system(size: 12))
+                    Text("Fais coucou !")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(MoodTheme.textPrimary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(MoodTheme.glassBg)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .padding(.leading, 46)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 4)
