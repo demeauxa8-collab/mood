@@ -444,9 +444,12 @@ struct VoiceConnectedPanel: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(MoodTheme.serverBar)
+            .background(MoodTheme.channelList)
             .overlay(
                 Rectangle().fill(MoodTheme.divider).frame(height: 1), alignment: .top
+            )
+            .overlay(
+                Rectangle().fill(MoodTheme.divider).frame(height: 1), alignment: .bottom
             )
             .onAppear {
                 timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
