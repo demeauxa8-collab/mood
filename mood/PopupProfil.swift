@@ -7,58 +7,65 @@ struct UserProfilePopup: View {
     var server: MoodServer? = nil
     var onDismiss: (() -> Void)? = nil
     @State private var messageText = ""
-    @State private var showMoreMenu = false
+
+    private let bannerHeight: CGFloat = 60
+    private let avatarSize: CGFloat = 76
+    private let avatarBorder: CGFloat = 6
+    private let avatarOverlap: CGFloat = 38 // half of avatar hangs below banner
 
     var body: some View {
         VStack(spacing: 0) {
-            // Banner
-            ZStack(alignment: .topTrailing) {
-                RoundedRectangle(cornerRadius: 0)
-                    .fill(
-                        LinearGradient(
-                            colors: [user.roleColor, user.roleColor.opacity(0.7)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+            // Banner + Avatar overlay zone
+            ZStack(alignment: .bottomLeading) {
+                // Banner
+                VStack(spacing: 0) {
+                    RoundedRectangle(cornerRadius: 0)
+                        .fill(
+                            LinearGradient(
+                                colors: [user.roleColor, user.roleColor.opacity(0.6)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                    )
-                    .frame(height: 60)
+                        .frame(height: bannerHeight)
+                        .overlay(alignment: .topTrailing) {
+                            Button { } label: {
+                                Image(systemName: "ellipsis")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(.white.opacity(0.8))
+                                    .frame(width: 30, height: 30)
+                                    .background(.black.opacity(0.3))
+                                    .clipShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .padding(8)
+                        }
 
-                // More button (...)
-                Button { showMoreMenu.toggle() } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.8))
-                        .frame(width: 32, height: 32)
-                        .background(.black.opacity(0.3))
-                        .clipShape(Circle())
+                    // Spacer for the bottom half of the avatar
+                    Color.clear
+                        .frame(height: avatarOverlap)
                 }
-                .buttonStyle(.plain)
-                .padding(8)
+
+                // Avatar straddling the banner
+                ZStack(alignment: .bottomTrailing) {
+                    Text(user.avatarEmoji)
+                        .font(.system(size: 36))
+                        .frame(width: avatarSize, height: avatarSize)
+                        .background(MoodTheme.popupBg)
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle()
+                                .stroke(MoodTheme.popupBg, lineWidth: avatarBorder)
+                        )
+
+                    StatusIndicator(status: user.status, size: 14, borderColor: MoodTheme.popupBg)
+                        .offset(x: 0, y: -2)
+                }
+                .padding(.leading, 14)
             }
 
+            // Content below avatar
             VStack(alignment: .leading, spacing: 0) {
-                // Avatar overlapping banner
-                HStack(alignment: .top) {
-                    ZStack(alignment: .bottomTrailing) {
-                        Text(user.avatarEmoji)
-                            .font(.system(size: 36))
-                            .frame(width: 68, height: 68)
-                            .background(MoodTheme.popupBg)
-                            .clipShape(Circle())
-                            .overlay(
-                                Circle()
-                                    .stroke(MoodTheme.popupBg, lineWidth: 5)
-                            )
-
-                        StatusIndicator(status: user.status, size: 14, borderColor: MoodTheme.popupBg)
-                            .offset(x: 2, y: 2)
-                    }
-                    .offset(y: -30)
-
-                    Spacer()
-                }
-                .padding(.horizontal, 14)
-
                 // Name + badge + tag
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
@@ -76,15 +83,15 @@ struct UserProfilePopup: View {
                         .foregroundStyle(MoodTheme.textSecondary)
                 }
                 .padding(.horizontal, 14)
-                .offset(y: -18)
+                .padding(.top, 8)
 
-                // Divider
+                // Separator
                 Rectangle().fill(MoodTheme.divider).frame(height: 1)
                     .padding(.horizontal, 14)
-                    .padding(.top, -8)
+                    .padding(.top, 12)
 
-                // Sections
-                VStack(alignment: .leading, spacing: 10) {
+                // Info sections
+                VStack(alignment: .leading, spacing: 12) {
                     // About
                     if !user.bio.isEmpty {
                         ProfileCardSection(title: "À PROPOS") {
@@ -145,11 +152,9 @@ struct UserProfilePopup: View {
                     }
                 }
                 .padding(.horizontal, 14)
-                .padding(.top, 4)
+                .padding(.top, 12)
 
-                Spacer(minLength: 8)
-
-                // Message input at bottom (like Discord)
+                // Message input at bottom
                 HStack(spacing: 8) {
                     TextField("Envoyer un message à @\(user.username)", text: $messageText)
                         .textFieldStyle(.plain)
@@ -167,12 +172,9 @@ struct UserProfilePopup: View {
                         }
                         .buttonStyle(.plain)
                     } else {
-                        Button {} label: {
-                            Image(systemName: "face.smiling")
-                                .font(.system(size: 14))
-                                .foregroundStyle(MoodTheme.textMuted)
-                        }
-                        .buttonStyle(.plain)
+                        Image(systemName: "face.smiling")
+                            .font(.system(size: 14))
+                            .foregroundStyle(MoodTheme.textMuted)
                     }
                 }
                 .padding(.horizontal, 12)
@@ -180,6 +182,7 @@ struct UserProfilePopup: View {
                 .background(MoodTheme.glassBg)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .padding(.horizontal, 14)
+                .padding(.top, 14)
                 .padding(.bottom, 14)
             }
         }
@@ -205,7 +208,7 @@ struct ProfileCardSection<Content: View>: View {
     }
 }
 
-// MARK: - Legacy wrapper (keep ProfileSection for other uses)
+// MARK: - Legacy ProfileSection (used elsewhere)
 
 struct ProfileSection<Content: View>: View {
     let title: String
@@ -227,7 +230,11 @@ struct ProfileSection<Content: View>: View {
 }
 
 #Preview {
-    UserProfilePopup(user: MockData.users[1], server: MockData.servers[0])
-        .frame(width: 300)
-        .preferredColorScheme(.dark)
+    ZStack {
+        MoodTheme.chatBackground.ignoresSafeArea()
+        UserProfilePopup(user: MockData.users[1], server: MockData.servers[0])
+            .frame(width: 320)
+            .shadow(color: .black.opacity(0.5), radius: 20, y: 8)
+    }
+    .preferredColorScheme(.dark)
 }
