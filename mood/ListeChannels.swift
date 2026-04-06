@@ -551,7 +551,7 @@ struct UserStatusPanel: View {
                             .background(MoodTheme.glassBg)
                             .clipShape(Circle())
 
-                        StatusIndicator(status: .online, size: 8, borderColor: MoodTheme.serverBar)
+                        StatusIndicator(status: .online, size: 8, borderColor: MoodTheme.channelList)
                             .offset(x: 2, y: 2)
                     }
                 }
@@ -587,11 +587,15 @@ struct UserStatusPanel: View {
                     .help("Paramètres utilisateur")
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
         }
-        .background(MoodTheme.serverBar)
-        .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: -4)
+        .background(MoodTheme.channelList)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(MoodTheme.divider, lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.4), radius: 12, x: 0, y: 2)
+        .padding(.horizontal, 8)
+        .padding(.bottom, 8)
     }
 }
 
