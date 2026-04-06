@@ -1,6 +1,8 @@
 import SwiftUI
 import UIKit
 
+private let serverIconCornerRadius: CGFloat = 16
+
 // MARK: - Server Sidebar
 
 struct ServerSidebarView: View {
@@ -30,7 +32,7 @@ struct ServerSidebarView: View {
                                 showDMs ? MoodTheme.brandAccent :
                                 MoodTheme.glassBg
                             )
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: serverIconCornerRadius, style: .continuous))
 
                             // Badge mentions DMs
                             if dmUnreadCount > 0 {
@@ -149,8 +151,7 @@ struct SidebarIcon: View {
     @State private var markedAsRead = false
     @State private var hideMutedChannels = false
 
-    // Squircle (carré arrondi) comme Discord
-    private var cornerRadius: CGFloat { 16 }
+    private let cornerRadius: CGFloat = serverIconCornerRadius
 
     var body: some View {
         Button(action: action) {
@@ -299,7 +300,7 @@ struct ServerFolder: View {
                         .background(
                             isHovered ? MoodTheme.brandAccent.opacity(0.5) : MoodTheme.glassBg
                         )
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: serverIconCornerRadius, style: .continuous))
 
                         if totalMentions > 0 {
                             Text("\(totalMentions)")

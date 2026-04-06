@@ -552,7 +552,7 @@ struct UserStatusPanel: View {
                             .background(MoodTheme.glassBg)
                             .clipShape(Circle())
 
-                        StatusIndicator(status: .online, size: 8, borderColor: MoodTheme.serverBar)
+                        StatusIndicator(status: .online, size: 8, borderColor: MoodTheme.channelList)
                             .offset(x: 2, y: 2)
                     }
                 }
