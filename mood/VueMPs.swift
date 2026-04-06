@@ -158,7 +158,7 @@ struct DMRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(conversation.participant.displayName)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(isSelected ? MoodTheme.textPrimary : MoodTheme.textSecondary)
+                        .foregroundStyle(isSelected || conversation.unreadCount > 0 ? MoodTheme.textPrimary : MoodTheme.textSecondary)
 
                     Text(conversation.participant.status.rawValue.capitalized)
                         .font(.system(size: 11))

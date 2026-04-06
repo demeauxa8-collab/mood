@@ -454,7 +454,7 @@ struct CompactChannelListView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: channel.icon)
                                     .font(.system(size: 13))
-                                    .foregroundStyle(channel.unreadCount > 0 ? MoodTheme.textPrimary : MoodTheme.textMuted)
+                                    .foregroundStyle(channel.unreadCount > 0 ? MoodTheme.textPrimary : MoodTheme.textSecondary)
                                     .frame(width: 18)
 
                                 Text(channel.name)
