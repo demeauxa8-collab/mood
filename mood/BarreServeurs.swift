@@ -128,6 +128,7 @@ struct ServerSidebarView: View {
 
             Spacer()
         }
+        .padding(.bottom, 52)
         .frame(width: 72)
         .background(MoodTheme.serverBar)
     }

@@ -113,34 +113,44 @@ struct ContentView: View {
             MoodTheme.subtleGlow.ignoresSafeArea()
 
             HStack(spacing: 0) {
-                ServerSidebarView(
-                    servers: servers,
-                    selectedServer: $selectedServer,
-                    showDMs: $showDMs,
-                    selectedChannel: $selectedChannel,
-                    showCreateServer: $showCreateServer,
-                    showExplore: $showExplore,
-                    dmUnreadCount: conversations.reduce(0) { $0 + $1.unreadCount }
-                )
+                // Left panel: server bar + channel list + floating user pill
+                ZStack(alignment: .bottom) {
+                    HStack(spacing: 0) {
+                        ServerSidebarView(
+                            servers: servers,
+                            selectedServer: $selectedServer,
+                            showDMs: $showDMs,
+                            selectedChannel: $selectedChannel,
+                            showCreateServer: $showCreateServer,
+                            showExplore: $showExplore,
+                            dmUnreadCount: conversations.reduce(0) { $0 + $1.unreadCount }
+                        )
 
-                if !showExplore {
-                    Group {
-                        if showDMs {
-                            DMListView(
-                                conversations: conversations,
-                                selectedDM: $selectedDM,
-                                showSettings: $showSettings
-                            )
-                        } else if let server = selectedServer {
-                            ChannelListColumn(
-                                server: server,
-                                selectedChannel: $selectedChannel,
-                                showSettings: $showSettings
-                            )
+                        if !showExplore {
+                            Group {
+                                if showDMs {
+                                    DMListView(
+                                        conversations: conversations,
+                                        selectedDM: $selectedDM,
+                                        showSettings: $showSettings
+                                    )
+                                } else if let server = selectedServer {
+                                    ChannelListColumn(
+                                        server: server,
+                                        selectedChannel: $selectedChannel,
+                                        showSettings: $showSettings
+                                    )
+                                }
+                            }
+                            .frame(width: 240)
+                            .transition(.move(edge: .leading).combined(with: .opacity))
                         }
                     }
-                    .frame(width: 240)
-                    .transition(.move(edge: .leading).combined(with: .opacity))
+
+                    // Floating user status pill — spans server bar + channel list
+                    UserStatusPanel(showSettings: $showSettings)
+                        .frame(width: 72 + 240)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 Group {

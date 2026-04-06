@@ -60,9 +60,8 @@ struct ChannelListColumn: View {
 
             // Voice connected panel
             VoiceConnectedPanel()
-
-            UserStatusPanel(showSettings: $showSettings)
         }
+        .padding(.bottom, 52)
         .background(MoodTheme.channelList)
     }
 }
@@ -552,7 +551,7 @@ struct UserStatusPanel: View {
                             .background(MoodTheme.glassBg)
                             .clipShape(Circle())
 
-                        StatusIndicator(status: .online, size: 8, borderColor: MoodTheme.channelList)
+                        StatusIndicator(status: .online, size: 8, borderColor: MoodTheme.serverBar)
                             .offset(x: 2, y: 2)
                     }
                 }
@@ -591,8 +590,8 @@ struct UserStatusPanel: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
         }
-        .background(MoodTheme.channelList)
-        .overlay(Rectangle().fill(MoodTheme.divider).frame(height: 1), alignment: .top)
+        .background(MoodTheme.serverBar)
+        .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: -4)
     }
 }
 

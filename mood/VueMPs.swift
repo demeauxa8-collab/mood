@@ -75,9 +75,8 @@ struct DMListView: View {
             }
 
             Spacer(minLength: 0)
-
-            UserStatusPanel(showSettings: $showSettings)
         }
+        .padding(.bottom, 52)
         .background(MoodTheme.channelList)
         .alert("Bientôt disponible", isPresented: $showComingSoon) {
             Button("OK", role: .cancel) {}
