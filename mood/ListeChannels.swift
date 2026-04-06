@@ -254,13 +254,13 @@ struct ChannelRow: View {
         HStack(spacing: 6) {
             Image(systemName: channel.icon)
                 .font(.system(size: 14))
-                .foregroundStyle(isSelected ? MoodTheme.textPrimary : (isUnread ? MoodTheme.textPrimary : MoodTheme.textMuted))
+                .foregroundStyle(isSelected ? MoodTheme.textPrimary : (isUnread ? MoodTheme.textPrimary : MoodTheme.textSecondary))
                 .frame(width: 20)
 
             Text(channel.name)
                 .font(.system(size: 14))
                 .fontWeight(isUnread ? .semibold : .regular)
-                .foregroundStyle(isSelected ? MoodTheme.textPrimary : (isUnread ? MoodTheme.textPrimary : MoodTheme.textMuted))
+                .foregroundStyle(isSelected ? MoodTheme.textPrimary : (isUnread ? MoodTheme.textPrimary : MoodTheme.textSecondary))
                 .lineLimit(1)
 
             if channel.isE2E {
