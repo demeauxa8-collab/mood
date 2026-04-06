@@ -591,7 +591,7 @@ struct UserStatusPanel: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
         }
-        .background(MoodTheme.serverBar)
+        .background(MoodTheme.channelList)
         .overlay(Rectangle().fill(MoodTheme.divider).frame(height: 1), alignment: .top)
     }
 }

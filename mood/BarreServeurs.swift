@@ -30,8 +30,7 @@ struct ServerSidebarView: View {
                                 showDMs ? MoodTheme.brandAccent :
                                 MoodTheme.glassBg
                             )
-                            .clipShape(RoundedRectangle(cornerRadius: showDMs ? 16 : 25, style: .continuous))
-                            .animation(.easeInOut(duration: 0.2), value: showDMs)
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                             // Badge mentions DMs
                             if dmUnreadCount > 0 {
@@ -150,10 +149,8 @@ struct SidebarIcon: View {
     @State private var markedAsRead = false
     @State private var hideMutedChannels = false
 
-    // Discord: cercle par défaut, squircle au hover/sélection
-    private var cornerRadius: CGFloat {
-        isSelected ? 16 : (isHovered ? 16 : 25)
-    }
+    // Squircle (carré arrondi) comme Discord
+    private var cornerRadius: CGFloat { 16 }
 
     var body: some View {
         Button(action: action) {
@@ -302,8 +299,7 @@ struct ServerFolder: View {
                         .background(
                             isHovered ? MoodTheme.brandAccent.opacity(0.5) : MoodTheme.glassBg
                         )
-                        .clipShape(RoundedRectangle(cornerRadius: isHovered ? 16 : 25, style: .continuous))
-                        .animation(.easeInOut(duration: 0.2), value: isHovered)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                         if totalMentions > 0 {
                             Text("\(totalMentions)")
