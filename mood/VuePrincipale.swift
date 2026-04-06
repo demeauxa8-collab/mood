@@ -150,7 +150,6 @@ struct ContentView: View {
                     // Floating user status pill — spans server bar + channel list
                     UserStatusPanel(showSettings: $showSettings)
                         .frame(width: 72 + 240)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 Group {
