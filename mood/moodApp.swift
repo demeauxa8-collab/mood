@@ -9,6 +9,9 @@ import SwiftUI
 
 @main
 struct moodApp: App {
+    #if targetEnvironment(macCatalyst)
+    @UIApplicationDelegateAdaptor(MacAppDelegate.self) var appDelegate
+    #endif
     @State private var showSplash = true
     @State private var authState = AuthState()
     @State private var matrixStore = MatrixStore()
@@ -24,6 +27,30 @@ struct moodApp: App {
         }
     }
 }
+
+// MARK: - Mac Catalyst Window Configuration
+
+#if targetEnvironment(macCatalyst)
+class MacAppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     configurationForConnecting connectingSceneSession: UISceneSession,
+                     options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        let config = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        config.delegateClass = MacSceneDelegate.self
+        return config
+    }
+}
+
+class MacSceneDelegate: NSObject, UIWindowSceneDelegate {
+    func scene(_ scene: UIScene, willConnectTo session: UISceneSession,
+               options connectionOptions: UIScene.ConnectionOptions) {
+        guard let windowScene = scene as? UIWindowScene else { return }
+        windowScene.titlebar?.titleVisibility = .hidden
+        windowScene.titlebar?.toolbarStyle = .unifiedCompact
+        windowScene.sizeRestrictions?.minimumSize = CGSize(width: 940, height: 600)
+    }
+}
+#endif
 
 // MARK: - Root View (reads horizontalSizeClass)
 

@@ -59,10 +59,14 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showSettings) {
             AccountSettingsView(isPresented: $showSettings, authState: authState)
+                .environment(matrixStore)
+                .environment(\.layoutMode, layoutMode)
                 .preferredColorScheme(.dark)
         }
         .sheet(isPresented: $showCreateServer) {
             CreateServerModal(isPresented: $showCreateServer)
+                .environment(matrixStore)
+                .environment(\.layoutMode, layoutMode)
                 .presentationDetents(layoutMode == .compact ? [.large] : [.medium])
         }
         .overlay {
@@ -110,7 +114,9 @@ struct ContentView: View {
     @ViewBuilder
     private var desktopLayout: some View {
         ZStack {
+            #if !targetEnvironment(macCatalyst)
             MoodTheme.subtleGlow.ignoresSafeArea()
+            #endif
 
             HStack(spacing: 0) {
                 // Left panel: server bar + channel list + floating user pill
