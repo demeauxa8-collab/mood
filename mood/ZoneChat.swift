@@ -618,17 +618,17 @@ struct MessageRow: View {
 
                     // Reactions
                     if !message.reactions.isEmpty {
-                        HStack(spacing: 4) {
+                        HStack(spacing: 4 * LayoutMetrics.scale) {
                             ForEach(message.reactions) { reaction in
-                                HStack(spacing: 4) {
+                                HStack(spacing: 4 * LayoutMetrics.scale) {
                                     Text(reaction.emoji)
-                                        .font(.system(size: 13))
+                                        .font(.mood(13))
                                     Text("\(reaction.count)")
-                                        .font(.system(size: 12, weight: .medium))
+                                        .font(.mood(12, weight: .medium))
                                         .foregroundStyle(reaction.hasReacted ? MoodTheme.brandAccent : MoodTheme.textSecondary)
                                 }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
+                                .padding(.horizontal, 8 * LayoutMetrics.scale)
+                                .padding(.vertical, 4 * LayoutMetrics.scale)
                                 .background(reaction.hasReacted ? MoodTheme.brandAccent.opacity(0.15) : MoodTheme.glassBg)
                                 .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                                 .overlay(
@@ -640,9 +640,9 @@ struct MessageRow: View {
                             // Bouton ajouter réaction
                             Button { showReactionPicker = true } label: {
                                 Image(systemName: "plus")
-                                    .font(.system(size: 10))
+                                    .font(.mood(10))
                                     .foregroundStyle(MoodTheme.textPrimary)
-                                    .frame(width: 26, height: 26)
+                                    .frame(width: 26 * LayoutMetrics.scale, height: 26 * LayoutMetrics.scale)
                                     .background(MoodTheme.glassBg)
                                     .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                                     .overlay(
@@ -722,8 +722,8 @@ struct MessageRow: View {
                                     .padding(.vertical, 6)
                                 }
                                 .padding(.vertical, 6)
-                                .frame(width: 200)
-                                .font(.system(size: 13))
+                                .frame(width: 200 * LayoutMetrics.scale)
+                                .font(.mood(13))
                                 .foregroundStyle(MoodTheme.textPrimary)
                             }
                     }
@@ -789,9 +789,9 @@ struct ActionButton: View {
     var body: some View {
         Button { action?() } label: {
             Image(systemName: icon)
-                .font(.system(size: 14))
+                .font(.mood(14))
                 .foregroundStyle(MoodTheme.textPrimary)
-                .frame(width: 28, height: 28)
+                .frame(width: 28 * LayoutMetrics.scale, height: 28 * LayoutMetrics.scale)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -865,8 +865,8 @@ struct MemberListPanel: View {
                     }
                 }
             }
-            .padding(.top, 16)
-            .padding(.bottom, 12)
+            .padding(.top, 16 * LayoutMetrics.scale)
+            .padding(.bottom, 12 * LayoutMetrics.scale)
         }
         .background(MoodTheme.memberList)
     }
@@ -881,11 +881,11 @@ struct MemberSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.mood(11, weight: .semibold))
                 .tracking(0.4)
                 .foregroundStyle(MoodTheme.textSecondary)
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
+                .padding(.horizontal, 16 * LayoutMetrics.scale)
+                .padding(.top, 16 * LayoutMetrics.scale)
                 .padding(.bottom, 4)
 
             ForEach(members) { member in
@@ -903,38 +903,38 @@ struct MemberRow: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 10) {
+            HStack(spacing: 10 * LayoutMetrics.scale) {
                 ZStack(alignment: .bottomTrailing) {
                     Text(member.avatarEmoji)
-                        .font(.system(size: 14))
-                        .frame(width: 32, height: 32)
+                        .font(.mood(14))
+                        .frame(width: 32 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
                         .background(MoodTheme.glassBg)
                         .clipShape(Circle())
                         .opacity(member.status == .offline ? 0.4 : 1)
 
-                    StatusIndicator(status: member.status, size: 8, borderColor: MoodTheme.memberList)
+                    StatusIndicator(status: member.status, size: 8 * LayoutMetrics.scale, borderColor: MoodTheme.memberList)
                         .offset(x: 2, y: 2)
                 }
 
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 4) {
                         Text(member.displayName)
-                            .font(.system(size: 13))
+                            .font(.mood(13))
                             .foregroundStyle(member.status == .offline ? MoodTheme.textMuted : member.roleColor)
-                        RoleBadge(role: role, size: 11)
+                        RoleBadge(role: role, size: 11 * LayoutMetrics.scale)
                     }
 
                     if let activity = member.activity {
                         Text("\(activity.type.rawValue) \(activity.name)")
-                            .font(.system(size: 11))
+                            .font(.mood(11))
                             .foregroundStyle(MoodTheme.textMuted)
                             .lineLimit(1)
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            .padding(.horizontal, 10 * LayoutMetrics.scale)
+            .padding(.vertical, 5 * LayoutMetrics.scale)
             .background(isHovered ? MoodTheme.hoverBg : Color.clear)
             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             .padding(.horizontal, 8)
@@ -952,14 +952,14 @@ struct SearchPanel: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            HStack(spacing: 8) {
+            HStack(spacing: 8 * LayoutMetrics.scale) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 13))
+                    .font(.mood(13))
                     .foregroundStyle(MoodTheme.textMuted)
 
                 TextField("Rechercher dans ce channel...", text: $searchText)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 13))
+                    .font(.mood(13))
                     .foregroundStyle(MoodTheme.textPrimary)
 
                 Button {
@@ -968,13 +968,13 @@ struct SearchPanel: View {
                     }
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 11))
+                        .font(.mood(11))
                         .foregroundStyle(MoodTheme.textPrimary)
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 12 * LayoutMetrics.scale)
+            .padding(.vertical, 8 * LayoutMetrics.scale)
             .background(MoodTheme.glassBg)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(
@@ -1010,15 +1010,15 @@ struct SearchFilterChip: View {
         Button {
             withAnimation(.easeInOut(duration: 0.15)) { isActive.toggle() }
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: 4 * LayoutMetrics.scale) {
                 Image(systemName: icon)
-                    .font(.system(size: 10))
+                    .font(.mood(10))
                 Text(label)
-                    .font(.system(size: 11))
+                    .font(.mood(11))
             }
             .foregroundStyle(isActive ? MoodTheme.brandAccent : MoodTheme.textSecondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 8 * LayoutMetrics.scale)
+            .padding(.vertical, 4 * LayoutMetrics.scale)
             .background(isActive ? MoodTheme.brandAccent.opacity(0.15) : (isHovered ? MoodTheme.hoverBg : MoodTheme.glassBg))
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             .overlay(
@@ -1049,7 +1049,7 @@ struct MarkdownText: View {
             if remaining.hasPrefix("`"), let end = remaining.dropFirst().firstIndex(of: "`") {
                 let code = remaining[remaining.index(after: remaining.startIndex)...remaining.index(before: end)]
                 var attr = AttributedString(" \(code) ")
-                attr.font = .system(size: 13, design: .monospaced)
+                attr.font = .system(size: 13 * LayoutMetrics.scale, design: .monospaced)
                 attr.foregroundColor = MoodTheme.textSecondary
                 result += attr
                 remaining = remaining[remaining.index(after: end)...]
@@ -1058,7 +1058,7 @@ struct MarkdownText: View {
             else if remaining.hasPrefix("**"), let end = remaining.dropFirst(2).range(of: "**") {
                 let bold = remaining[remaining.index(remaining.startIndex, offsetBy: 2)..<end.lowerBound]
                 var attr = AttributedString(String(bold))
-                attr.font = .system(size: 14, weight: .bold)
+                attr.font = .system(size: 14 * LayoutMetrics.scale, weight: .bold)
                 result += attr
                 remaining = remaining[end.upperBound...]
             }
@@ -1066,7 +1066,7 @@ struct MarkdownText: View {
             else if remaining.hasPrefix("*"), let end = remaining.dropFirst().firstIndex(of: "*") {
                 let italic = remaining[remaining.index(after: remaining.startIndex)..<end]
                 var attr = AttributedString(String(italic))
-                attr.font = .system(size: 14).italic()
+                attr.font = .system(size: 14 * LayoutMetrics.scale).italic()
                 result += attr
                 remaining = remaining[remaining.index(after: end)...]
             }
@@ -1085,7 +1085,7 @@ struct MarkdownText: View {
                 if !mention.isEmpty {
                     var attr = AttributedString("@\(mention)")
                     attr.foregroundColor = MoodTheme.brandBlue
-                    attr.font = .system(size: 14, weight: .bold)
+                    attr.font = .system(size: 14 * LayoutMetrics.scale, weight: .bold)
                     result += attr
                     remaining = after.dropFirst(mention.count)
                 } else {
@@ -1132,7 +1132,7 @@ struct DateSeparator: View {
                 .frame(height: 1)
 
             Text(date.dateSeparator)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.mood(11, weight: .semibold))
                 .foregroundStyle(MoodTheme.textMuted)
                 .fixedSize()
 
@@ -1156,65 +1156,65 @@ struct PinnedMessagesPanel: View {
         VStack(spacing: 0) {
             HStack {
                 Image(systemName: "pin.fill")
-                    .font(.system(size: 12))
+                    .font(.mood(12))
                     .foregroundStyle(MoodTheme.brandAccent)
                 Text("Messages épinglés")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.mood(13, weight: .semibold))
                     .foregroundStyle(MoodTheme.textPrimary)
                 Spacer()
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) { showPanel = false }
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 11))
+                        .font(.mood(11))
                         .foregroundStyle(MoodTheme.textPrimary)
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 16 * LayoutMetrics.scale)
+            .padding(.vertical, 10 * LayoutMetrics.scale)
 
             Rectangle().fill(MoodTheme.divider).frame(height: 1)
 
             if messages.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "pin.slash")
-                        .font(.system(size: 28))
+                        .font(.mood(28))
                         .foregroundStyle(MoodTheme.textPrimary)
                     Text("Aucun message épinglé")
-                        .font(.system(size: 13))
+                        .font(.mood(13))
                         .foregroundStyle(MoodTheme.textSecondary)
                 }
-                .padding(.vertical, 24)
+                .padding(.vertical, 24 * LayoutMetrics.scale)
             } else {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 8) {
                         ForEach(messages) { msg in
-                            HStack(alignment: .top, spacing: 10) {
+                            HStack(alignment: .top, spacing: 10 * LayoutMetrics.scale) {
                                 Text(msg.sender.avatarEmoji)
-                                    .font(.system(size: 12))
-                                    .frame(width: 28, height: 28)
+                                    .font(.mood(12))
+                                    .frame(width: 28 * LayoutMetrics.scale, height: 28 * LayoutMetrics.scale)
                                     .background(MoodTheme.glassBg)
                                     .clipShape(Circle())
 
                                 VStack(alignment: .leading, spacing: 3) {
-                                    HStack(spacing: 6) {
+                                    HStack(spacing: 6 * LayoutMetrics.scale) {
                                         Text(msg.sender.displayName)
-                                            .font(.system(size: 12, weight: .semibold))
+                                            .font(.mood(12, weight: .semibold))
                                             .foregroundStyle(msg.sender.roleColor)
-                                        RoleBadge(role: server?.roleFor(msg.sender) ?? .member, size: 10)
+                                        RoleBadge(role: server?.roleFor(msg.sender) ?? .member, size: 10 * LayoutMetrics.scale)
                                         Text(msg.timestamp.timeFormatted)
-                                            .font(.system(size: 10))
+                                            .font(.mood(10))
                                             .foregroundStyle(MoodTheme.textMuted)
                                     }
                                     Text(msg.content)
-                                        .font(.system(size: 12))
+                                        .font(.mood(12))
                                         .foregroundStyle(MoodTheme.textPrimary)
                                         .lineLimit(3)
                                 }
                                 Spacer()
                             }
-                            .padding(10)
+                            .padding(10 * LayoutMetrics.scale)
                             .background(MoodTheme.glassBg)
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         }
@@ -1254,7 +1254,7 @@ struct ThreadPanel: View {
             // Header
             HStack {
                 Text("Fil de discussion")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.mood(14, weight: .bold))
                     .foregroundStyle(MoodTheme.textPrimary)
 
                 Spacer()
@@ -1263,86 +1263,86 @@ struct ThreadPanel: View {
                     withAnimation(.easeInOut(duration: 0.2)) { showPanel = false }
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 12))
+                        .font(.mood(12))
                         .foregroundStyle(MoodTheme.textPrimary)
-                        .frame(width: 28, height: 28)
+                        .frame(width: 28 * LayoutMetrics.scale, height: 28 * LayoutMetrics.scale)
                         .background(MoodTheme.glassBg)
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .help("Fermer le fil")
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 14 * LayoutMetrics.scale)
+            .padding(.vertical, 12 * LayoutMetrics.scale)
 
             Rectangle().fill(MoodTheme.divider).frame(height: 1)
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
                     // Original message
-                    HStack(alignment: .top, spacing: 10) {
+                    HStack(alignment: .top, spacing: 10 * LayoutMetrics.scale) {
                         Text(message.sender.avatarEmoji)
-                            .font(.title3)
-                            .frame(width: 36, height: 36)
+                            .font(.mood(20))
+                            .frame(width: 36 * LayoutMetrics.scale, height: 36 * LayoutMetrics.scale)
                             .background(MoodTheme.glassBg)
                             .clipShape(Circle())
 
                         VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 6) {
+                            HStack(spacing: 6 * LayoutMetrics.scale) {
                                 Text(message.sender.displayName)
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(.mood(13, weight: .semibold))
                                     .foregroundStyle(message.sender.roleColor)
-                                RoleBadge(role: server?.roleFor(message.sender) ?? .member, size: 11)
+                                RoleBadge(role: server?.roleFor(message.sender) ?? .member, size: 11 * LayoutMetrics.scale)
                                 Text(message.timestamp.messageTimestamp)
-                                    .font(.system(size: 11))
+                                    .font(.mood(11))
                                     .foregroundStyle(MoodTheme.textMuted)
                             }
                             Text(message.content)
-                                .font(.system(size: 13))
+                                .font(.mood(13))
                                 .foregroundStyle(MoodTheme.textPrimary)
                         }
                     }
-                    .padding(14)
+                    .padding(14 * LayoutMetrics.scale)
 
                     // Reply count
                     HStack(spacing: 8) {
                         Rectangle().fill(MoodTheme.divider).frame(height: 1)
                         Text("\(message.threadInfo?.replyCount ?? mockReplies.count) réponses")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.mood(11, weight: .semibold))
                             .foregroundStyle(MoodTheme.textSecondary)
                             .fixedSize()
                         Rectangle().fill(MoodTheme.divider).frame(height: 1)
                     }
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 14 * LayoutMetrics.scale)
                     .padding(.vertical, 6)
 
                     // Replies
                     ForEach(mockReplies) { reply in
-                        HStack(alignment: .top, spacing: 10) {
+                        HStack(alignment: .top, spacing: 10 * LayoutMetrics.scale) {
                             Text(reply.sender.avatarEmoji)
-                                .font(.system(size: 12))
-                                .frame(width: 30, height: 30)
+                                .font(.mood(12))
+                                .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
                                 .background(MoodTheme.glassBg)
                                 .clipShape(Circle())
 
                             VStack(alignment: .leading, spacing: 3) {
-                                HStack(spacing: 6) {
+                                HStack(spacing: 6 * LayoutMetrics.scale) {
                                     Text(reply.sender.displayName)
-                                        .font(.system(size: 12, weight: .semibold))
+                                        .font(.mood(12, weight: .semibold))
                                         .foregroundStyle(reply.sender.roleColor)
-                                    RoleBadge(role: server?.roleFor(reply.sender) ?? .member, size: 10)
+                                    RoleBadge(role: server?.roleFor(reply.sender) ?? .member, size: 10 * LayoutMetrics.scale)
                                     Text(reply.timestamp.timeFormatted)
-                                        .font(.system(size: 10))
+                                        .font(.mood(10))
                                         .foregroundStyle(MoodTheme.textMuted)
                                 }
                                 Text(reply.content)
-                                    .font(.system(size: 13))
+                                    .font(.mood(13))
                                     .foregroundStyle(MoodTheme.textPrimary)
                             }
                             Spacer()
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 5)
+                        .padding(.horizontal, 14 * LayoutMetrics.scale)
+                        .padding(.vertical, 5 * LayoutMetrics.scale)
                     }
                 }
             }
@@ -1350,15 +1350,15 @@ struct ThreadPanel: View {
             Spacer(minLength: 0)
 
             // Thread input
-            HStack(spacing: 8) {
+            HStack(spacing: 8 * LayoutMetrics.scale) {
                 TextField("Répondre au fil...", text: $threadText)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 13))
+                    .font(.mood(13))
                     .foregroundStyle(MoodTheme.textPrimary)
 
                 Button { showThreadEmojiPicker = true } label: {
                     Image(systemName: "face.smiling")
-                        .font(.system(size: 14))
+                        .font(.mood(14))
                         .foregroundStyle(MoodTheme.textPrimary)
                 }
                 .buttonStyle(.plain)
@@ -1421,7 +1421,7 @@ struct NewMessagesSeparator: View {
                 .frame(height: 1)
 
             Text("NOUVEAU")
-                .font(.system(size: 10, weight: .bold))
+                .font(.mood(10, weight: .bold))
                 .foregroundStyle(MoodTheme.mentionBadge)
 
             Rectangle()
@@ -1458,18 +1458,18 @@ struct SystemMessageRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
+            HStack(spacing: 8 * LayoutMetrics.scale) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.mood(12, weight: .bold))
                     .foregroundStyle(color)
-                    .frame(width: 38, alignment: .center)
+                    .frame(width: 38 * LayoutMetrics.scale, alignment: .center)
 
                 Text(message.content)
-                    .font(.system(size: 13))
+                    .font(.mood(13))
                     .foregroundStyle(MoodTheme.textSecondary)
 
                 Text(message.timestamp.timeFormatted)
-                    .font(.system(size: 11))
+                    .font(.mood(11))
                     .foregroundStyle(MoodTheme.textMuted)
             }
 
@@ -1478,20 +1478,20 @@ struct SystemMessageRow: View {
                 Button {
                     // TODO: envoyer "👋" dans le channel
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 6 * LayoutMetrics.scale) {
                         Text("👋")
-                            .font(.system(size: 12))
+                            .font(.mood(12))
                         Text("Fais coucou !")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.mood(12, weight: .medium))
                             .foregroundStyle(MoodTheme.textPrimary)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 12 * LayoutMetrics.scale)
+                    .padding(.vertical, 6 * LayoutMetrics.scale)
                     .background(MoodTheme.glassBg)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .padding(.leading, 46)
+                .padding(.leading, 46 * LayoutMetrics.scale)
             }
         }
         .padding(.horizontal, 16)

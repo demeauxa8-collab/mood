@@ -252,42 +252,42 @@ struct DMChatArea: View {
         VStack(spacing: 0) {
             // Header DM — masqué sur compact (NavigationStack fournit le titre)
             if layoutMode == .regular {
-                HStack(spacing: 10) {
+                HStack(spacing: 10 * LayoutMetrics.scale) {
                     Button { onBack?() } label: {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.mood(16, weight: .medium))
                             .foregroundStyle(MoodTheme.textPrimary)
-                            .frame(width: 30, height: 30)
+                            .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .help("Retour aux amis")
 
                     Text(conversation.participant.avatarEmoji)
-                        .font(.system(size: 14))
-                        .frame(width: 28, height: 28)
+                        .font(.mood(14))
+                        .frame(width: 28 * LayoutMetrics.scale, height: 28 * LayoutMetrics.scale)
                         .background(MoodTheme.glassBg)
                         .clipShape(Circle())
 
                     Text(conversation.participant.displayName)
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.mood(15, weight: .bold))
                         .foregroundStyle(MoodTheme.textPrimary)
 
                     HStack(spacing: 3) {
                         Image(systemName: "lock.fill")
-                            .font(.system(size: 8))
+                            .font(.mood(8))
                         Text("E2E")
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.mood(10, weight: .semibold))
                     }
                     .foregroundStyle(MoodTheme.onlineGreen)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
+                    .padding(.horizontal, 8 * LayoutMetrics.scale)
+                    .padding(.vertical, 3 * LayoutMetrics.scale)
                     .background(MoodTheme.onlineGreen.opacity(0.10))
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
                     Spacer()
 
-                    HStack(spacing: 6) {
+                    HStack(spacing: 6 * LayoutMetrics.scale) {
                         HeaderButton(icon: "phone") {
                             activeCall = .voice
                         }
@@ -308,9 +308,9 @@ struct DMChatArea: View {
                             showInlineProfile.toggle()
                         } label: {
                             Image(systemName: "person.crop.circle")
-                                .font(.system(size: 16))
+                                .font(.mood(16))
                                 .foregroundStyle(MoodTheme.textPrimary)
-                                .frame(width: 30, height: 30)
+                                .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -328,8 +328,8 @@ struct DMChatArea: View {
                         .help("Rechercher")
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 16 * LayoutMetrics.scale)
+                .padding(.vertical, 10 * LayoutMetrics.scale)
 
                 Rectangle().fill(MoodTheme.divider).frame(height: 1)
             }
@@ -352,31 +352,31 @@ struct DMChatArea: View {
             ScrollView {
                 ScrollViewReader { proxy in
                     LazyVStack(spacing: 0) {
-                        VStack(spacing: 10) {
+                        VStack(spacing: 10 * LayoutMetrics.scale) {
                             Text(conversation.participant.avatarEmoji)
-                                .font(.system(size: 50))
-                                .frame(width: 80, height: 80)
+                                .font(.mood(50))
+                                .frame(width: 80 * LayoutMetrics.scale, height: 80 * LayoutMetrics.scale)
                                 .background(MoodTheme.glassBg)
                                 .clipShape(Circle())
 
                             Text(conversation.participant.displayName)
-                                .font(.system(size: 20, weight: .bold))
+                                .font(.mood(20, weight: .bold))
                                 .foregroundStyle(MoodTheme.textPrimary)
 
                             Text("@\(conversation.participant.username)")
-                                .font(.system(size: 13))
+                                .font(.mood(13))
                                 .foregroundStyle(MoodTheme.textSecondary)
 
                             HStack(spacing: 4) {
                                 Image(systemName: "lock.fill")
-                                    .font(.system(size: 9))
+                                    .font(.mood(9))
                                 Text("Conversation chiffrée de bout en bout")
-                                    .font(.system(size: 12))
+                                    .font(.mood(12))
                             }
                             .foregroundStyle(MoodTheme.onlineGreen)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 28)
+                        .padding(.vertical, 28 * LayoutMetrics.scale)
 
                         Rectangle()
                             .fill(MoodTheme.divider)
