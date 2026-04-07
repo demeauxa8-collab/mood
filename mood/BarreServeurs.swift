@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-private let serverIconCornerRadius: CGFloat = 16
+private let serverIconCornerRadius: CGFloat = LayoutMetrics.serverIconCornerRadius
 
 // MARK: - Server Sidebar
 
@@ -25,9 +25,9 @@ struct ServerSidebarView: View {
                     } label: {
                         ZStack(alignment: .bottomTrailing) {
                             ZStack {
-                                MoodLogoDots(dotSize: 9, spacing: 5)
+                                MoodLogoDots(dotSize: 9 * LayoutMetrics.scale, spacing: 5 * LayoutMetrics.scale)
                             }
-                            .frame(width: 48, height: 48)
+                            .frame(width: LayoutMetrics.serverIconSize, height: LayoutMetrics.serverIconSize)
                             .background(
                                 showDMs ? MoodTheme.brandAccent :
                                 MoodTheme.glassBg
@@ -37,10 +37,10 @@ struct ServerSidebarView: View {
                             // Badge mentions DMs
                             if dmUnreadCount > 0 {
                                 Text("\(dmUnreadCount)")
-                                    .font(.system(size: 10, weight: .bold))
+                                    .font(.mood(10, weight: .bold))
                                     .foregroundStyle(.white)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
+                                    .padding(.horizontal, 5 * LayoutMetrics.scale)
+                                    .padding(.vertical, 2 * LayoutMetrics.scale)
                                     .background(MoodTheme.mentionBadge)
                                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                     .overlay(
@@ -58,15 +58,15 @@ struct ServerSidebarView: View {
                         if showDMs {
                             RoundedRectangle(cornerRadius: 3, style: .continuous)
                                 .fill(MoodTheme.textPrimary)
-                                .frame(width: 3, height: 36)
-                                .offset(x: -12)
+                                .frame(width: 3 * LayoutMetrics.scale, height: 36 * LayoutMetrics.scale)
+                                .offset(x: LayoutMetrics.serverPillOffset)
                         }
                     }
 
                     // Séparateur
                     RoundedRectangle(cornerRadius: 2)
                         .fill(MoodTheme.divider)
-                        .frame(width: 32, height: 2)
+                        .frame(width: LayoutMetrics.serverSeparatorWidth, height: 2)
                         .padding(.vertical, 4)
 
                     // Serveurs (premiers 3 individuels)
@@ -95,7 +95,7 @@ struct ServerSidebarView: View {
                     // Séparateur
                     RoundedRectangle(cornerRadius: 2)
                         .fill(MoodTheme.divider)
-                        .frame(width: 32, height: 2)
+                        .frame(width: LayoutMetrics.serverSeparatorWidth, height: 2)
                         .padding(.vertical, 4)
 
                     // Ajouter
@@ -122,14 +122,14 @@ struct ServerSidebarView: View {
                     }
                     .help("Explorer les serveurs")
                 }
-                .padding(.vertical, 12)
-                .padding(.horizontal, 10)
+                .padding(.vertical, 12 * LayoutMetrics.scale)
+                .padding(.horizontal, 10 * LayoutMetrics.scale)
             }
 
             Spacer()
         }
-        .padding(.bottom, 52)
-        .frame(width: 72)
+        .padding(.bottom, LayoutMetrics.channelBottomPadding)
+        .frame(width: LayoutMetrics.serverBarWidth)
         .background(MoodTheme.serverBar)
     }
 }
@@ -160,14 +160,14 @@ struct SidebarIcon: View {
                 Group {
                     if let emoji = emoji {
                         Text(emoji)
-                            .font(.title2)
+                            .font(.mood(20))
                     } else if let icon = systemIcon {
                         Image(systemName: icon)
-                            .font(.system(size: 20, weight: .medium))
+                            .font(.mood(20, weight: .medium))
                             .foregroundStyle(isHovered ? .white : iconColor)
                     }
                 }
-                .frame(width: 48, height: 48)
+                .frame(width: LayoutMetrics.serverIconSize, height: LayoutMetrics.serverIconSize)
                 .background(
                     isSelected ? MoodTheme.brandAccent :
                     isHovered ? MoodTheme.brandAccent.opacity(0.5) :
@@ -180,10 +180,10 @@ struct SidebarIcon: View {
                 // Badge mentions
                 if mentionCount > 0 {
                     Text("\(mentionCount)")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.mood(10, weight: .bold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
+                        .padding(.horizontal, 5 * LayoutMetrics.scale)
+                        .padding(.vertical, 2 * LayoutMetrics.scale)
                         .background(MoodTheme.mentionBadge)
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         .overlay(
@@ -201,8 +201,8 @@ struct SidebarIcon: View {
             if hasUnread || isSelected {
                 RoundedRectangle(cornerRadius: 3, style: .continuous)
                     .fill(MoodTheme.textPrimary)
-                    .frame(width: 3, height: isSelected ? 36 : (isHovered ? 18 : 6))
-                    .offset(x: -12)
+                    .frame(width: 3 * LayoutMetrics.scale, height: (isSelected ? 36 : (isHovered ? 18 : 6)) * LayoutMetrics.scale)
+                    .offset(x: LayoutMetrics.serverPillOffset)
                     .animation(.easeInOut(duration: 0.2), value: isSelected)
                     .animation(.easeInOut(duration: 0.2), value: isHovered)
             }
@@ -291,13 +291,13 @@ struct ServerFolder: View {
                 } label: {
                     ZStack(alignment: .bottomTrailing) {
                         // Mini 2x2 grid of server emojis
-                        LazyVGrid(columns: [GridItem(.fixed(20)), GridItem(.fixed(20))], spacing: 3) {
+                        LazyVGrid(columns: [GridItem(.fixed(20 * LayoutMetrics.scale)), GridItem(.fixed(20 * LayoutMetrics.scale))], spacing: 3 * LayoutMetrics.scale) {
                             ForEach(servers.prefix(4)) { server in
                                 Text(server.iconEmoji)
-                                    .font(.system(size: 12))
+                                    .font(.mood(12))
                             }
                         }
-                        .frame(width: 48, height: 48)
+                        .frame(width: LayoutMetrics.serverIconSize, height: LayoutMetrics.serverIconSize)
                         .background(
                             isHovered ? MoodTheme.brandAccent.opacity(0.5) : MoodTheme.glassBg
                         )

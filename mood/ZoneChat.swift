@@ -102,7 +102,7 @@ struct ChatArea: View {
                             server: server,
                             showPanel: $showThreadPanel
                         )
-                        .frame(width: 340)
+                        .frame(width: LayoutMetrics.threadPanelWidth)
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                     } else if showMemberList {
                         Rectangle().fill(MoodTheme.divider).frame(width: 1)
@@ -113,7 +113,7 @@ struct ChatArea: View {
                             showProfilePopup: $showProfilePopup,
                             profileUser: $profileUser
                         )
-                        .frame(width: 240)
+                        .frame(width: LayoutMetrics.memberListWidth)
                     }
                 }
             }
@@ -176,41 +176,41 @@ struct ChannelHeader: View {
     @State private var showNotifAlert = false
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 10 * LayoutMetrics.scale) {
             Image(systemName: channel.icon)
-                .font(.system(size: 16))
+                .font(.mood(16))
                 .foregroundStyle(MoodTheme.textPrimary)
 
             Text(channel.name)
-                .font(.system(size: 15, weight: .bold))
+                .font(.mood(15, weight: .bold))
                 .foregroundStyle(MoodTheme.textPrimary)
 
             if channel.isE2E {
                 HStack(spacing: 3) {
                     Image(systemName: "lock.fill")
-                        .font(.system(size: 8))
+                        .font(.mood(8))
                     Text("E2E")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.mood(10, weight: .semibold))
                 }
                 .foregroundStyle(MoodTheme.onlineGreen)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
+                .padding(.horizontal, 8 * LayoutMetrics.scale)
+                .padding(.vertical, 3 * LayoutMetrics.scale)
                 .background(MoodTheme.onlineGreen.opacity(0.10))
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             }
 
             if !channel.topic.isEmpty {
-                Rectangle().fill(MoodTheme.divider).frame(width: 1, height: 16)
+                Rectangle().fill(MoodTheme.divider).frame(width: 1, height: 16 * LayoutMetrics.scale)
 
                 Text(channel.topic)
-                    .font(.system(size: 13))
+                    .font(.mood(13))
                     .foregroundStyle(MoodTheme.textMuted)
                     .lineLimit(1)
             }
 
             Spacer()
 
-            HStack(spacing: 6) {
+            HStack(spacing: 6 * LayoutMetrics.scale) {
                 HeaderButton(icon: "bell") { showNotifAlert = true }
                     .help("Paramètres de notification")
                     .alert("Notifications", isPresented: $showNotifAlert) {
@@ -225,9 +225,9 @@ struct ChannelHeader: View {
                     }
                 } label: {
                     Image(systemName: "pin")
-                        .font(.system(size: 16))
+                        .font(.mood(16))
                         .foregroundStyle(MoodTheme.textPrimary)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -239,9 +239,9 @@ struct ChannelHeader: View {
                     }
                 } label: {
                     Image(systemName: "person.2")
-                        .font(.system(size: 16))
+                        .font(.mood(16))
                         .foregroundStyle(MoodTheme.textPrimary)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -254,17 +254,17 @@ struct ChannelHeader: View {
                     }
                 } label: {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 16))
+                        .font(.mood(16))
                         .foregroundStyle(MoodTheme.textPrimary)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help("Rechercher")
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 16 * LayoutMetrics.scale)
+        .padding(.vertical, 10 * LayoutMetrics.scale)
         .background(MoodTheme.chatBackground)
     }
 }
@@ -276,9 +276,9 @@ struct HeaderButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 16))
+                .font(.mood(16))
                 .foregroundStyle(MoodTheme.textPrimary)
-                .frame(width: 30, height: 30)
+                .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -304,18 +304,18 @@ struct MessageList: View {
                 ScrollViewReader { proxy in
                     LazyVStack(spacing: 0) {
                         // Welcome
-                        VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 10 * LayoutMetrics.scale) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                                     .fill(MoodTheme.brandAccent.opacity(0.12))
-                                    .frame(width: 56, height: 56)
+                                    .frame(width: 56 * LayoutMetrics.scale, height: 56 * LayoutMetrics.scale)
                                 Image(systemName: channel.icon)
-                                    .font(.system(size: 26))
+                                    .font(.mood(26))
                                     .foregroundStyle(MoodTheme.brandAccent)
                             }
 
                             Text("Bienvenue dans #\(channel.name)")
-                                .font(.system(size: 22, weight: .bold))
+                                .font(.mood(22, weight: .bold))
                                 .foregroundStyle(MoodTheme.textPrimary)
 
                             HStack(spacing: 6) {
@@ -324,18 +324,18 @@ struct MessageList: View {
                                 if channel.isE2E {
                                     HStack(spacing: 3) {
                                         Image(systemName: "lock.fill")
-                                            .font(.system(size: 9))
+                                            .font(.mood(9))
                                         Text("Chiffrement E2E")
                                     }
                                     .foregroundStyle(MoodTheme.onlineGreen)
                                 }
                             }
-                            .font(.system(size: 13))
+                            .font(.mood(13))
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 24)
-                        .padding(.bottom, 16)
+                        .padding(.horizontal, 16 * LayoutMetrics.scale)
+                        .padding(.top, 24 * LayoutMetrics.scale)
+                        .padding(.bottom, 16 * LayoutMetrics.scale)
 
                         Rectangle()
                             .fill(MoodTheme.divider)
@@ -426,42 +426,42 @@ struct MessageRow: View {
         VStack(alignment: .leading, spacing: 0) {
             // Reply reference
             if let reply = message.replyTo {
-                HStack(spacing: 6) {
+                HStack(spacing: 6 * LayoutMetrics.scale) {
                     RoundedRectangle(cornerRadius: 1)
                         .fill(MoodTheme.textMuted.opacity(0.4))
-                        .frame(width: 2, height: 12)
-                        .padding(.leading, 52)
+                        .frame(width: 2, height: 12 * LayoutMetrics.scale)
+                        .padding(.leading, 52 * LayoutMetrics.scale)
 
                     Text(reply.sender.avatarEmoji)
-                        .font(.system(size: 9))
-                        .frame(width: 16, height: 16)
+                        .font(.mood(9))
+                        .frame(width: 16 * LayoutMetrics.scale, height: 16 * LayoutMetrics.scale)
                         .background(MoodTheme.glassBg)
                         .clipShape(Circle())
 
                     Text(reply.sender.displayName)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.mood(12, weight: .semibold))
                         .foregroundStyle(reply.sender.roleColor)
 
                     Text(reply.content)
-                        .font(.system(size: 12))
+                        .font(.mood(12))
                         .foregroundStyle(MoodTheme.textMuted)
                         .lineLimit(1)
                 }
                 .padding(.bottom, 4)
             }
 
-            HStack(alignment: .top, spacing: 14) {
+            HStack(alignment: .top, spacing: 14 * LayoutMetrics.scale) {
                 if message.isGrouped {
                     Text(message.timestamp.timeFormatted)
-                        .font(.system(size: 10))
+                        .font(.mood(10))
                         .foregroundStyle(MoodTheme.textMuted)
-                        .frame(width: 38, alignment: .center)
+                        .frame(width: 38 * LayoutMetrics.scale, alignment: .center)
                         .opacity(isHovered ? 1 : 0)
                 } else {
                     Button(action: onAvatarTap) {
                         Text(message.sender.avatarEmoji)
-                            .font(.title3)
-                            .frame(width: 40, height: 40)
+                            .font(.mood(20))
+                            .frame(width: 40 * LayoutMetrics.scale, height: 40 * LayoutMetrics.scale)
                             .background(MoodTheme.glassBg)
                             .clipShape(Circle())
                     }
@@ -470,24 +470,24 @@ struct MessageRow: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     if !message.isGrouped {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 8 * LayoutMetrics.scale) {
                             Button(action: onAvatarTap) {
                                 HStack(spacing: 4) {
                                     Text(message.sender.displayName)
-                                        .font(.system(size: 14, weight: .semibold))
+                                        .font(.mood(14, weight: .semibold))
                                         .foregroundStyle(message.sender.roleColor)
-                                    RoleBadge(role: server?.roleFor(message.sender) ?? .member, size: 12)
+                                    RoleBadge(role: server?.roleFor(message.sender) ?? .member, size: 12 * LayoutMetrics.scale)
                                 }
                             }
                             .buttonStyle(.plain)
 
                             Text(message.timestamp.messageTimestamp)
-                                .font(.system(size: 11))
+                                .font(.mood(11))
                                 .foregroundStyle(MoodTheme.textMuted)
 
                             if message.isPinned {
                                 Image(systemName: "pin.fill")
-                                    .font(.system(size: 9))
+                                    .font(.mood(9))
                                     .foregroundStyle(MoodTheme.textMuted.opacity(0.5))
                             }
                         }
@@ -495,13 +495,13 @@ struct MessageRow: View {
 
                     HStack(spacing: 0) {
                         MarkdownText(text: message.content)
-                            .font(.system(size: 14))
+                            .font(.mood(14))
                             .foregroundStyle(MoodTheme.textPrimary)
                             .textSelection(.enabled)
 
                         if message.isEdited {
                             Text(" (modifié)")
-                                .font(.system(size: 11))
+                                .font(.mood(11))
                                 .foregroundStyle(MoodTheme.textMuted)
                         }
                     }
@@ -511,8 +511,8 @@ struct MessageRow: View {
                         if att.type == .image {
                             HStack(spacing: 8) {
                                 Text(att.previewEmoji)
-                                    .font(.system(size: 28))
-                                    .frame(width: 200, height: 120)
+                                    .font(.mood(28))
+                                    .frame(width: 200 * LayoutMetrics.scale, height: 120 * LayoutMetrics.scale)
                                     .background(MoodTheme.glassBg)
                                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                     .overlay(
@@ -523,17 +523,17 @@ struct MessageRow: View {
                         } else {
                             HStack(spacing: 8) {
                                 Image(systemName: "doc.fill")
-                                    .font(.system(size: 16))
+                                    .font(.mood(16))
                                     .foregroundStyle(MoodTheme.brandAccent)
                                 Text(att.name)
-                                    .font(.system(size: 13))
+                                    .font(.mood(13))
                                     .foregroundStyle(MoodTheme.brandBlue)
                                     .underline()
                                 Image(systemName: "arrow.down.circle")
-                                    .font(.system(size: 13))
+                                    .font(.mood(13))
                                     .foregroundStyle(MoodTheme.textMuted)
                             }
-                            .padding(10)
+                            .padding(10 * LayoutMetrics.scale)
                             .background(MoodTheme.glassBg)
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             .overlay(
@@ -552,30 +552,30 @@ struct MessageRow: View {
 
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(embed.siteName)
-                                    .font(.system(size: 11))
+                                    .font(.mood(11))
                                     .foregroundStyle(MoodTheme.textSecondary)
 
                                 Text(embed.title)
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(.mood(13, weight: .semibold))
                                     .foregroundStyle(MoodTheme.brandBlue)
 
                                 Text(embed.description)
-                                    .font(.system(size: 12))
+                                    .font(.mood(12))
                                     .foregroundStyle(MoodTheme.textSecondary)
                                     .lineLimit(2)
 
                                 if let emoji = embed.imageEmoji {
                                     Text(emoji)
-                                        .font(.system(size: 22))
+                                        .font(.mood(22))
                                         .frame(maxWidth: .infinity, alignment: .leading)
-                                        .frame(height: 60)
+                                        .frame(height: 60 * LayoutMetrics.scale)
                                         .background(MoodTheme.glassBg)
                                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                                 }
                             }
-                            .padding(10)
+                            .padding(10 * LayoutMetrics.scale)
                         }
-                        .frame(maxWidth: 400, alignment: .leading)
+                        .frame(maxWidth: 400 * LayoutMetrics.scale, alignment: .leading)
                         .background(MoodTheme.glassBg)
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         .overlay(
@@ -588,27 +588,27 @@ struct MessageRow: View {
                     // Thread indicator
                     if let thread = message.threadInfo {
                         Button { onThread?() } label: {
-                            HStack(spacing: 6) {
+                            HStack(spacing: 6 * LayoutMetrics.scale) {
                                 Text(thread.lastReplier.avatarEmoji)
-                                    .font(.system(size: 10))
-                                    .frame(width: 20, height: 20)
+                                    .font(.mood(10))
+                                    .frame(width: 20 * LayoutMetrics.scale, height: 20 * LayoutMetrics.scale)
                                     .background(MoodTheme.glassBg)
                                     .clipShape(Circle())
 
                                 Text("\(thread.replyCount) réponses")
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(.mood(12, weight: .semibold))
                                     .foregroundStyle(MoodTheme.brandBlue)
 
                                 Text(thread.lastReplyDate.relativeFormatted)
-                                    .font(.system(size: 11))
+                                    .font(.mood(11))
                                     .foregroundStyle(MoodTheme.textMuted)
 
                                 Image(systemName: "chevron.right")
-                                    .font(.system(size: 9, weight: .semibold))
+                                    .font(.mood(9, weight: .semibold))
                                     .foregroundStyle(MoodTheme.textMuted)
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
+                            .padding(.horizontal, 8 * LayoutMetrics.scale)
+                            .padding(.vertical, 5 * LayoutMetrics.scale)
                             .background(MoodTheme.glassBg.opacity(0.6))
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         }

@@ -15,20 +15,20 @@ struct DMListView: View {
             Button { showQuickSwitcher = true } label: {
                 HStack {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 11))
+                        .font(.mood(11))
                     Text("Recherche ou lance une conversation")
-                        .font(.system(size: 12))
+                        .font(.mood(12))
                     Spacer()
                 }
                 .foregroundStyle(MoodTheme.textPrimary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 10 * LayoutMetrics.scale)
+                .padding(.vertical, 8 * LayoutMetrics.scale)
                 .background(MoodTheme.glassBg)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 12 * LayoutMetrics.scale)
+            .padding(.vertical, 12 * LayoutMetrics.scale)
 
             Rectangle().fill(MoodTheme.divider).frame(height: 1)
 
@@ -45,7 +45,7 @@ struct DMListView: View {
                     // Header messages privés
                     HStack {
                         Text("MESSAGES PRIVÉS")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.mood(11, weight: .semibold))
                             .tracking(0.4)
                             .foregroundStyle(MoodTheme.textSecondary)
 
@@ -53,14 +53,14 @@ struct DMListView: View {
 
                         Button { showComingSoon = true } label: {
                             Image(systemName: "plus")
-                                .font(.system(size: 11))
+                                .font(.mood(11))
                                 .foregroundStyle(MoodTheme.textPrimary)
                         }
                         .buttonStyle(.plain)
                         .help("Nouveau message")
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
+                    .padding(.horizontal, 16 * LayoutMetrics.scale)
+                    .padding(.top, 16 * LayoutMetrics.scale)
                     .padding(.bottom, 4)
 
                     ForEach(conversations) { convo in
@@ -76,7 +76,7 @@ struct DMListView: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.bottom, 52)
+        .padding(.bottom, LayoutMetrics.channelBottomPadding)
         .background(MoodTheme.channelList)
         .alert("Bientôt disponible", isPresented: $showComingSoon) {
             Button("OK", role: .cancel) {}
@@ -101,19 +101,19 @@ struct SidebarNavItem: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
+            HStack(spacing: 12 * LayoutMetrics.scale) {
                 Image(systemName: icon)
-                    .font(.system(size: 15))
-                    .frame(width: 20)
+                    .font(.mood(15))
+                    .frame(width: 20 * LayoutMetrics.scale)
 
                 Text(label)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.mood(14, weight: .medium))
 
                 Spacer()
             }
             .foregroundStyle(isSelected ? MoodTheme.textPrimary : MoodTheme.textSecondary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 12 * LayoutMetrics.scale)
+            .padding(.vertical, 8 * LayoutMetrics.scale)
             .background(
                 isSelected ? MoodTheme.selectedBg :
                 isHovered ? MoodTheme.hoverBg :
@@ -141,26 +141,26 @@ struct DMRow: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
+            HStack(spacing: 12 * LayoutMetrics.scale) {
                 // Avatar circle + status
                 ZStack(alignment: .bottomTrailing) {
                     Text(conversation.participant.avatarEmoji)
-                        .font(.system(size: 20))
-                        .frame(width: 32, height: 32)
+                        .font(.mood(20))
+                        .frame(width: 32 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
                         .background(MoodTheme.glassBg)
                         .clipShape(Circle())
 
-                    StatusIndicator(status: conversation.participant.status, size: 10, borderColor: MoodTheme.channelList)
+                    StatusIndicator(status: conversation.participant.status, size: 10 * LayoutMetrics.scale, borderColor: MoodTheme.channelList)
                         .offset(x: 2, y: 2)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(conversation.participant.displayName)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.mood(14, weight: .medium))
                         .foregroundStyle(isSelected || conversation.unreadCount > 0 ? MoodTheme.textPrimary : MoodTheme.textSecondary)
 
                     Text(conversation.participant.status.rawValue.capitalized)
-                        .font(.system(size: 11))
+                        .font(.mood(11))
                         .foregroundStyle(MoodTheme.textMuted)
                 }
 
@@ -168,10 +168,10 @@ struct DMRow: View {
 
                 if conversation.unreadCount > 0 {
                     Text("\(conversation.unreadCount)")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.mood(10, weight: .bold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
+                        .padding(.horizontal, 6 * LayoutMetrics.scale)
+                        .padding(.vertical, 2 * LayoutMetrics.scale)
                         .background(MoodTheme.mentionBadge)
                         .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                 }
@@ -184,15 +184,15 @@ struct DMRow: View {
                         }
                     } label: {
                         Image(systemName: showClosedFeedback ? "checkmark" : "xmark")
-                            .font(.system(size: 9))
+                            .font(.mood(9))
                             .foregroundStyle(MoodTheme.textPrimary)
                     }
                     .buttonStyle(.plain)
                     .help("Fermer la conversation")
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 10 * LayoutMetrics.scale)
+            .padding(.vertical, 8 * LayoutMetrics.scale)
             .background(
                 isSelected ? MoodTheme.selectedBg :
                 isHovered ? MoodTheme.hoverBg :

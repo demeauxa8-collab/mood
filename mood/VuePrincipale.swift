@@ -148,14 +148,14 @@ struct ContentView: View {
                                     )
                                 }
                             }
-                            .frame(width: 240)
+                            .frame(width: LayoutMetrics.channelListWidth)
                             .transition(.move(edge: .leading).combined(with: .opacity))
                         }
                     }
 
                     // Floating user status pill — spans server bar + channel list
                     UserStatusPanel(showSettings: $showSettings)
-                        .frame(width: 72 + 240)
+                        .frame(width: LayoutMetrics.userPanelWidth)
                 }
 
                 Group {

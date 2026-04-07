@@ -47,7 +47,7 @@ class MacSceneDelegate: NSObject, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
         windowScene.titlebar?.titleVisibility = .hidden
         windowScene.titlebar?.toolbarStyle = .unifiedCompact
-        windowScene.sizeRestrictions?.minimumSize = CGSize(width: 940, height: 600)
+        windowScene.sizeRestrictions?.minimumSize = CGSize(width: 1200, height: 720)
     }
 }
 #endif

@@ -19,15 +19,15 @@ struct ChannelListColumn: View {
             } label: {
                 HStack {
                     Text(server.name)
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.mood(15, weight: .bold))
                         .foregroundStyle(MoodTheme.textPrimary)
                     Spacer()
                     Image(systemName: showServerMenu ? "xmark" : "chevron.down")
-                        .font(.system(size: showServerMenu ? 11 : 10, weight: .semibold))
+                        .font(.mood(showServerMenu ? 11 : 10, weight: .semibold))
                         .foregroundStyle(MoodTheme.textPrimary)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
+                .padding(.horizontal, 16 * LayoutMetrics.scale)
+                .padding(.vertical, 14 * LayoutMetrics.scale)
             }
             .buttonStyle(.plain)
 
@@ -52,8 +52,8 @@ struct ChannelListColumn: View {
                         )
                     }
                 }
-                .padding(.top, 10)
-                .padding(.bottom, 16)
+                .padding(.top, 10 * LayoutMetrics.scale)
+                .padding(.bottom, 16 * LayoutMetrics.scale)
             }
 
             Spacer(minLength: 0)
@@ -61,7 +61,7 @@ struct ChannelListColumn: View {
             // Voice connected panel
             VoiceConnectedPanel()
         }
-        .padding(.bottom, 52)
+        .padding(.bottom, LayoutMetrics.channelBottomPadding)
         .background(MoodTheme.channelList)
     }
 }
@@ -121,17 +121,17 @@ struct ServerMenuItem: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(spacing: 10 * LayoutMetrics.scale) {
                 Text(label)
-                    .font(.system(size: 13))
+                    .font(.mood(13))
                     .foregroundStyle(isHovered ? .white : color)
                 Spacer()
                 Image(systemName: icon)
-                    .font(.system(size: 12))
+                    .font(.mood(12))
                     .foregroundStyle(isHovered ? .white : color)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 10 * LayoutMetrics.scale)
+            .padding(.vertical, 7 * LayoutMetrics.scale)
             .background(isHovered ? MoodTheme.brandAccent : Color.clear)
             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             .padding(.horizontal, 8)
@@ -156,25 +156,25 @@ struct CategorySection: View {
                     isExpanded.toggle()
                 }
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: 4 * LayoutMetrics.scale) {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.mood(8, weight: .bold))
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
 
                     Text(category.name)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.mood(11, weight: .semibold))
                         .tracking(0.5)
 
                     Spacer()
 
                     Image(systemName: "plus")
-                        .font(.system(size: 11))
+                        .font(.mood(11))
                         .opacity(0.5)
                 }
                 .foregroundStyle(MoodTheme.textSecondary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
-                .padding(.top, 16)
+                .padding(.horizontal, 14 * LayoutMetrics.scale)
+                .padding(.vertical, 6 * LayoutMetrics.scale)
+                .padding(.top, 16 * LayoutMetrics.scale)
             }
             .buttonStyle(.plain)
 
@@ -193,15 +193,15 @@ struct CategorySection: View {
                         if channel.type == .voice, let users = MockData.voiceUsers[channel.id], !users.isEmpty {
                             VStack(spacing: 2) {
                                 ForEach(users) { user in
-                                    HStack(spacing: 8) {
+                                    HStack(spacing: 8 * LayoutMetrics.scale) {
                                         Text(user.avatarEmoji)
-                                            .font(.system(size: 12))
-                                            .frame(width: 24, height: 24)
+                                            .font(.mood(12))
+                                            .frame(width: 24 * LayoutMetrics.scale, height: 24 * LayoutMetrics.scale)
                                             .background(MoodTheme.glassBg)
                                             .clipShape(Circle())
 
                                         Text(user.displayName)
-                                            .font(.system(size: 13))
+                                            .font(.mood(13))
                                             .foregroundStyle(MoodTheme.textSecondary)
                                             .lineLimit(1)
 
@@ -210,24 +210,24 @@ struct CategorySection: View {
                                         // Live badge (like Discord "EN DIRECT")
                                         if user.activity != nil {
                                             Text("EN DIRECT")
-                                                .font(.system(size: 9, weight: .bold))
+                                                .font(.mood(9, weight: .bold))
                                                 .foregroundStyle(.white)
-                                                .padding(.horizontal, 5)
-                                                .padding(.vertical, 2)
+                                                .padding(.horizontal, 5 * LayoutMetrics.scale)
+                                                .padding(.vertical, 2 * LayoutMetrics.scale)
                                                 .background(MoodTheme.mentionBadge)
                                                 .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
                                         }
 
                                         Image(systemName: "mic.fill")
-                                            .font(.system(size: 9))
+                                            .font(.mood(9))
                                             .foregroundStyle(MoodTheme.textMuted)
                                     }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 3)
+                                    .padding(.horizontal, 10 * LayoutMetrics.scale)
+                                    .padding(.vertical, 3 * LayoutMetrics.scale)
                                 }
                             }
-                            .padding(.leading, 32)
-                            .padding(.horizontal, 8)
+                            .padding(.leading, 32 * LayoutMetrics.scale)
+                            .padding(.horizontal, 8 * LayoutMetrics.scale)
                         }
                     }
                 }
@@ -250,21 +250,21 @@ struct ChannelRow: View {
     private var isUnread: Bool { channel.unreadCount > 0 }
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 6 * LayoutMetrics.scale) {
             Image(systemName: channel.icon)
-                .font(.system(size: 14))
+                .font(.mood(14))
                 .foregroundStyle(isSelected || isUnread ? MoodTheme.textPrimary : MoodTheme.textSecondary)
-                .frame(width: 20)
+                .frame(width: 20 * LayoutMetrics.scale)
 
             Text(channel.name)
-                .font(.system(size: 14))
+                .font(.mood(14))
                 .fontWeight(isUnread ? .semibold : .regular)
                 .foregroundStyle(isSelected || isUnread ? MoodTheme.textPrimary : MoodTheme.textSecondary)
                 .lineLimit(1)
 
             if channel.isE2E {
                 Image(systemName: "lock.fill")
-                    .font(.system(size: 7))
+                    .font(.mood(7))
                     .foregroundStyle(MoodTheme.textMuted.opacity(0.4))
             }
 
@@ -272,16 +272,16 @@ struct ChannelRow: View {
 
             if channel.unreadCount > 0 && !isSelected {
                 Text("\(channel.unreadCount)")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.mood(10, weight: .bold))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
+                    .padding(.horizontal, 5 * LayoutMetrics.scale)
+                    .padding(.vertical, 2 * LayoutMetrics.scale)
                     .background(MoodTheme.mentionBadge)
                     .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 8 * LayoutMetrics.scale)
+        .padding(.vertical, 6 * LayoutMetrics.scale)
         .background(
             isSelected ? MoodTheme.selectedBg :
             isHovered ? MoodTheme.hoverBg :
@@ -336,22 +336,22 @@ struct VoiceConnectedPanel: View {
 
     var body: some View {
         if isConnected {
-            VStack(spacing: 4) {
+            VStack(spacing: 4 * LayoutMetrics.scale) {
                 // Ligne 1 : Voix connectée + signal + timer
-                HStack(spacing: 6) {
+                HStack(spacing: 6 * LayoutMetrics.scale) {
                     Circle()
                         .fill(MoodTheme.onlineGreen)
-                        .frame(width: 8, height: 8)
+                        .frame(width: 8 * LayoutMetrics.scale, height: 8 * LayoutMetrics.scale)
 
                     Text("Voix connectée")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.mood(12, weight: .semibold))
                         .foregroundStyle(MoodTheme.onlineGreen)
 
                     Spacer()
 
                     // Timer
                     Text(formattedDuration)
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .font(.mood(11, weight: .medium, design: .monospaced))
                         .foregroundStyle(MoodTheme.textSecondary)
 
                     // Barres signal
@@ -365,13 +365,13 @@ struct VoiceConnectedPanel: View {
                 }
 
                 // Ligne 2 : Channel / Serveur + mode actif
-                HStack(spacing: 6) {
+                HStack(spacing: 6 * LayoutMetrics.scale) {
                     Image(systemName: "speaker.wave.2")
-                        .font(.system(size: 10))
+                        .font(.mood(10))
                         .foregroundStyle(MoodTheme.textSecondary)
 
                     Text("lounge / Design Club")
-                        .font(.system(size: 11))
+                        .font(.mood(11))
                         .foregroundStyle(MoodTheme.textSecondary)
                         .lineLimit(1)
 
@@ -379,20 +379,20 @@ struct VoiceConnectedPanel: View {
 
                     if isScreenSharing {
                         Text("Partage")
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(.mood(9, weight: .semibold))
                             .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
+                            .padding(.horizontal, 6 * LayoutMetrics.scale)
+                            .padding(.vertical, 2 * LayoutMetrics.scale)
                             .background(MoodTheme.brandAccent)
                             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                     }
 
                     if isCameraOn {
                         Text("Caméra")
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(.mood(9, weight: .semibold))
                             .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
+                            .padding(.horizontal, 6 * LayoutMetrics.scale)
+                            .padding(.vertical, 2 * LayoutMetrics.scale)
                             .background(MoodTheme.onlineGreen)
                             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                     }
@@ -449,8 +449,8 @@ struct VoiceConnectedPanel: View {
                     }
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 10 * LayoutMetrics.scale)
+            .padding(.vertical, 8 * LayoutMetrics.scale)
             .background(MoodTheme.channelList)
             .overlay(
                 Rectangle().fill(MoodTheme.divider).frame(height: 1), alignment: .top
@@ -503,9 +503,9 @@ struct VoicePanelButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 13))
+                .font(.mood(13))
                 .foregroundStyle(fgColor)
-                .frame(width: 32, height: 32)
+                .frame(width: 32 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
                 .background(bgColor)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .contentTransition(.symbolEffect(.replace))
@@ -537,7 +537,7 @@ struct UserStatusPanel: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
-            HStack(spacing: 8) {
+            HStack(spacing: 8 * LayoutMetrics.scale) {
                 // Avatar circle (clickable for status)
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) {
@@ -546,12 +546,12 @@ struct UserStatusPanel: View {
                 } label: {
                     ZStack(alignment: .bottomTrailing) {
                         Text(user.avatarEmoji)
-                            .font(.system(size: 18))
-                            .frame(width: 32, height: 32)
+                            .font(.mood(18))
+                            .frame(width: 32 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
                             .background(MoodTheme.glassBg)
                             .clipShape(Circle())
 
-                        StatusIndicator(status: .online, size: 8, borderColor: MoodTheme.channelList)
+                        StatusIndicator(status: .online, size: 8 * LayoutMetrics.scale, borderColor: MoodTheme.channelList)
                             .offset(x: 2, y: 2)
                     }
                 }
@@ -560,25 +560,25 @@ struct UserStatusPanel: View {
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(user.displayName)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.mood(13, weight: .semibold))
                         .foregroundStyle(MoodTheme.textPrimary)
                         .lineLimit(1)
                     Text("En ligne")
-                        .font(.system(size: 11))
+                        .font(.mood(11))
                         .foregroundStyle(MoodTheme.textSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack(spacing: 4) {
+                HStack(spacing: 4 * LayoutMetrics.scale) {
                     StatusPanelIcon(isMuted: $isMicMuted, iconOn: "mic.fill", iconOff: "mic.slash.fill", tooltip: "Micro")
                     StatusPanelIcon(isMuted: $isDeafened, iconOn: "headphones", iconOff: "speaker.slash.fill", tooltip: "Casque")
                     Button {
                         showSettings = true
                     } label: {
                         Image(systemName: "gearshape.fill")
-                            .font(.system(size: 13))
+                            .font(.mood(13))
                             .foregroundStyle(MoodTheme.textSecondary)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 32 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
                             .background(Color.clear)
                             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                             .contentShape(Rectangle())
@@ -587,8 +587,8 @@ struct UserStatusPanel: View {
                     .help("Paramètres utilisateur")
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 10 * LayoutMetrics.scale)
+            .padding(.vertical, 8 * LayoutMetrics.scale)
         }
         .background(MoodTheme.channelList)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -686,15 +686,15 @@ struct StatusPanelIcon: View {
         } label: {
             ZStack {
                 Image(systemName: iconOn)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.mood(13, weight: .medium))
                     .foregroundStyle(isMuted ? MoodTheme.mentionBadge : MoodTheme.textSecondary)
                     .animation(.easeInOut(duration: 0.15), value: isMuted)
 
                 AnimatedSlash(progress: slashProgress)
                     .stroke(MoodTheme.mentionBadge, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                    .frame(width: 18, height: 18)
+                    .frame(width: 18 * LayoutMetrics.scale, height: 18 * LayoutMetrics.scale)
             }
-            .frame(width: 32, height: 32)
+            .frame(width: 32 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
             .background(isHovered ? MoodTheme.hoverBg : Color.clear)
             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             .contentShape(Rectangle())

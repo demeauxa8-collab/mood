@@ -25,34 +25,34 @@ struct MessageInputBar: View {
         VStack(spacing: 0) {
             // Typing indicator
             if !typingUsers.isEmpty {
-                HStack(spacing: 6) {
+                HStack(spacing: 6 * LayoutMetrics.scale) {
                     TypingDots()
                     Text(typingText)
-                        .font(.system(size: 12))
+                        .font(.mood(12))
                         .foregroundStyle(MoodTheme.textSecondary)
                     Spacer()
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 20 * LayoutMetrics.scale)
                 .padding(.bottom, 4)
             }
 
             // Reply bar
             if let reply = replyingTo {
-                HStack(spacing: 8) {
+                HStack(spacing: 8 * LayoutMetrics.scale) {
                     Image(systemName: "arrowshape.turn.up.left.fill")
-                        .font(.system(size: 10))
+                        .font(.mood(10))
                         .foregroundStyle(MoodTheme.brandAccent)
 
                     Text("Répondre à")
-                        .font(.system(size: 12))
+                        .font(.mood(12))
                         .foregroundStyle(MoodTheme.textSecondary)
 
                     Text(reply.sender.displayName)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.mood(12, weight: .semibold))
                         .foregroundStyle(reply.sender.roleColor)
 
                     Text("— \(reply.content)")
-                        .font(.system(size: 12))
+                        .font(.mood(12))
                         .foregroundStyle(MoodTheme.textMuted)
                         .lineLimit(1)
 
@@ -62,13 +62,13 @@ struct MessageInputBar: View {
                         withAnimation(.easeInOut(duration: 0.12)) { replyingTo = nil }
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 10))
+                            .font(.mood(10))
                             .foregroundStyle(MoodTheme.textPrimary)
                     }
                     .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 16 * LayoutMetrics.scale)
+                .padding(.vertical, 8 * LayoutMetrics.scale)
                 .background(MoodTheme.glassBg)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -77,14 +77,14 @@ struct MessageInputBar: View {
                 // Bouton +
                 Button { showAttachMenu.toggle() } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.mood(16, weight: .medium))
                         .foregroundStyle(MoodTheme.textPrimary)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .padding(.leading, 8)
-                .padding(.trailing, 10)
+                .padding(.leading, 8 * LayoutMetrics.scale)
+                .padding(.trailing, 10 * LayoutMetrics.scale)
                 .help("Joindre un fichier")
                 .popover(isPresented: $showAttachMenu, arrowEdge: .top) {
                     VStack(spacing: 2) {
@@ -112,22 +112,22 @@ struct MessageInputBar: View {
                 }
 
                 // Champ texte
-                HStack(spacing: 6) {
+                HStack(spacing: 6 * LayoutMetrics.scale) {
                     if isE2E {
                         Image(systemName: "lock.fill")
-                            .font(.system(size: 9))
+                            .font(.mood(9))
                             .foregroundStyle(MoodTheme.brandAccent.opacity(0.4))
                     }
 
                     TextField("Envoyer un message dans #\(channelName)", text: $text)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 14))
+                        .font(.mood(14))
                         .foregroundStyle(MoodTheme.textPrimary)
                         .onSubmit { onSend?() }
                 }
 
                 // Boutons droite
-                HStack(spacing: 4) {
+                HStack(spacing: 4 * LayoutMetrics.scale) {
                     InputBarButton(icon: "gift")
                         .help("Envoyer un cadeau")
 
@@ -136,9 +136,9 @@ struct MessageInputBar: View {
                         showEmojiPicker = false
                     } label: {
                         Text("GIF")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.mood(10, weight: .bold))
                             .foregroundStyle(MoodTheme.textPrimary)
-                            .frame(width: 30, height: 30)
+                            .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -152,9 +152,9 @@ struct MessageInputBar: View {
                         showGIFPicker = false
                     } label: {
                         Image(systemName: "face.smiling")
-                            .font(.system(size: 16))
+                            .font(.mood(16))
                             .foregroundStyle(MoodTheme.textPrimary)
-                            .frame(width: 30, height: 30)
+                            .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -166,13 +166,13 @@ struct MessageInputBar: View {
                     }
                 }
                 .fixedSize()
-                .padding(.trailing, 8)
+                .padding(.trailing, 8 * LayoutMetrics.scale)
             }
-            .padding(.vertical, 6)
+            .padding(.vertical, 6 * LayoutMetrics.scale)
             .background(MoodTheme.glassBg)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .padding(.horizontal, 16)
-            .padding(.bottom, 20)
+            .padding(.horizontal, 16 * LayoutMetrics.scale)
+            .padding(.bottom, 20 * LayoutMetrics.scale)
             .padding(.top, 4)
         }
         .background(MoodTheme.chatBackground)
@@ -221,9 +221,9 @@ struct InputBarButton: View {
     var body: some View {
         Button { showAlert = true } label: {
             Image(systemName: icon)
-                .font(.system(size: 16))
+                .font(.mood(16))
                 .foregroundStyle(MoodTheme.textPrimary)
-                .frame(width: 30, height: 30)
+                .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
