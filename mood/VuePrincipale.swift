@@ -121,6 +121,12 @@ struct ContentView: View {
             HStack(spacing: 0) {
                 // Left panel: server bar + channel list + floating user pill
                 ZStack(alignment: .bottom) {
+                    // Rounded frame container
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.clear)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1.5)
+                        .padding(8)
+
                     HStack(spacing: 0) {
                         ServerSidebarView(
                             servers: servers,

@@ -590,9 +590,12 @@ struct UserStatusPanel: View {
             .padding(.horizontal, 10 * LayoutMetrics.scale)
             .padding(.vertical, 8 * LayoutMetrics.scale)
         }
-        .background(MoodTheme.channelList)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.white.opacity(0.08))
+        )
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(MoodTheme.divider, lineWidth: 0.5))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(MoodTheme.brandAccent.opacity(0.4), lineWidth: 1.5))
         .shadow(color: .black.opacity(0.4), radius: 12, x: 0, y: 2)
         .padding(.horizontal, 8)
         .padding(.bottom, 8)
