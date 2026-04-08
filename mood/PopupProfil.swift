@@ -11,7 +11,14 @@ struct UserProfilePopup: View {
     private let bannerHeight: CGFloat = 60
     private let avatarSize: CGFloat = 76
     private let avatarBorder: CGFloat = 6
-    private let avatarOverlap: CGFloat = 38 // half of avatar hangs below banner
+    private let avatarOverlap: CGFloat = 38
+
+    // Compute mutual servers from MockData
+    private var mutualServers: [MoodServer] {
+        MockData.servers.filter { s in
+            s.members.contains(where: { $0.id == user.id })
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -40,7 +47,7 @@ struct UserProfilePopup: View {
                         .padding(8)
                     }
 
-                // Avatar straddling the banner — offset pushes bottom half below banner
+                // Avatar straddling the banner
                 ZStack(alignment: .bottomTrailing) {
                     Text(user.avatarEmoji)
                         .font(.system(size: 36))
@@ -61,21 +68,34 @@ struct UserProfilePopup: View {
 
             // Content below avatar
             VStack(alignment: .leading, spacing: 0) {
-                // Name + badge + tag
+                // Name + badges
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(user.displayName)
                             .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(MoodTheme.textPrimary)
 
+                        if user.isBot {
+                            BotBadge()
+                        }
+
                         if let server, server.roleFor(user) != .member {
                             RoleBadge(role: server.roleFor(user), size: 14)
                         }
                     }
 
-                    Text("@\(user.username)")
-                        .font(.system(size: 13))
-                        .foregroundStyle(MoodTheme.textSecondary)
+                    // Username#discriminator + dev badge
+                    HStack(spacing: 4) {
+                        Text(user.displayName + (user.discriminator.map { "#\($0)" } ?? ""))
+                            .font(.system(size: 13))
+                            .foregroundStyle(MoodTheme.textSecondary)
+
+                        if user.isBot {
+                            Text("{/}")
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(MoodTheme.textMuted)
+                        }
+                    }
                 }
                 .padding(.horizontal, 14)
                 .padding(.top, avatarOverlap + 8)
@@ -108,23 +128,82 @@ struct UserProfilePopup: View {
                         }
                     }
 
+                    // Mutual servers
+                    if !mutualServers.isEmpty {
+                        ProfileCardSection(title: "\(mutualServers.count) SERVEUR\(mutualServers.count > 1 ? "S" : "") EN COMMUN") {
+                            HStack(spacing: 6) {
+                                ForEach(mutualServers.prefix(5)) { s in
+                                    Text(s.iconEmoji)
+                                        .font(.system(size: 14))
+                                        .frame(width: 28, height: 28)
+                                        .background(MoodTheme.glassBg)
+                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                        .help(s.name)
+                                }
+                                if mutualServers.count > 5 {
+                                    Text("+\(mutualServers.count - 5)")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(MoodTheme.textSecondary)
+                                        .frame(width: 28, height: 28)
+                                        .background(MoodTheme.glassBg)
+                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                }
+                            }
+                        }
+                    }
+
+                    // Add application button (for bots)
+                    if user.isBot {
+                        Button { } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 12, weight: .medium))
+                                Text("Ajouter l'application")
+                                    .font(.system(size: 13, weight: .medium))
+                            }
+                            .foregroundStyle(MoodTheme.textPrimary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(MoodTheme.glassBg)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .stroke(MoodTheme.glassBorder, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     // Roles
                     if let server {
                         let role = server.roleFor(user)
                         if role != .member {
                             ProfileCardSection(title: "RÔLES") {
                                 HStack(spacing: 6) {
-                                    Circle()
-                                        .fill(role.color)
-                                        .frame(width: 10, height: 10)
-                                    Text(role.rawValue)
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundStyle(MoodTheme.textPrimary)
+                                    HStack(spacing: 6) {
+                                        Circle()
+                                            .fill(role.color)
+                                            .frame(width: 10, height: 10)
+                                        Text(role.rawValue)
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundStyle(MoodTheme.textPrimary)
+                                    }
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 5)
+                                    .background(MoodTheme.glassBg)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+
+                                    // "+" button to add role
+                                    Button { } label: {
+                                        Image(systemName: "plus")
+                                            .font(.system(size: 10, weight: .medium))
+                                            .foregroundStyle(MoodTheme.textSecondary)
+                                            .frame(width: 26, height: 26)
+                                            .background(MoodTheme.glassBg)
+                                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(MoodTheme.glassBg)
-                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                             }
                         }
                     }
@@ -158,7 +237,6 @@ struct UserProfilePopup: View {
 
                     if !messageText.isEmpty {
                         Button {
-                            // TODO: envoyer le message via MatrixStore
                             messageText = ""
                         } label: {
                             Image(systemName: "paperplane.fill")
@@ -183,6 +261,20 @@ struct UserProfilePopup: View {
         }
         .background(MoodTheme.popupBg)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+// MARK: - Bot Badge
+
+struct BotBadge: View {
+    var body: some View {
+        Text("APP")
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(MoodTheme.onlineGreen)
+            .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
     }
 }
 

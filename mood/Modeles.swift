@@ -13,6 +13,18 @@ struct MoodUser: Identifiable, Hashable {
     let joinedDate: Date
     let badges: [String]
     let activity: UserActivity?
+    let isBot: Bool
+    let discriminator: String?
+
+    init(id: UUID, username: String, displayName: String, avatarEmoji: String,
+         roleColor: Color, status: UserStatus, bio: String, joinedDate: Date,
+         badges: [String], activity: UserActivity?, isBot: Bool = false,
+         discriminator: String? = nil) {
+        self.id = id; self.username = username; self.displayName = displayName
+        self.avatarEmoji = avatarEmoji; self.roleColor = roleColor; self.status = status
+        self.bio = bio; self.joinedDate = joinedDate; self.badges = badges
+        self.activity = activity; self.isBot = isBot; self.discriminator = discriminator
+    }
 
     struct UserActivity {
         let type: ActivityType
