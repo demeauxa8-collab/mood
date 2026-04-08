@@ -124,6 +124,9 @@ struct ContentView: View {
                         }
                     }
                     .frame(width: 240)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .padding(.vertical, 10)
+                    .padding(.leading, 6)
                     .transition(.move(edge: .leading).combined(with: .opacity))
                 }
 
