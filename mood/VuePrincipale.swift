@@ -155,6 +155,9 @@ struct ContentView: View {
                                 }
                             }
                             .frame(width: LayoutMetrics.channelListWidth)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .padding(.vertical, 10)
+                            .padding(.leading, 6)
                             .transition(.move(edge: .leading).combined(with: .opacity))
                         }
                     }
