@@ -820,11 +820,11 @@ struct MemberListPanel: View {
     }
 
     private var onlineMembers: [MoodUser] {
-        members.filter { server.roleFor($0) == .member && $0.status != .offline }
+        members.filter { server.roleFor($0) == .member && $0.status != .offline && $0.status != .invisible }
     }
 
     private var offlineMembers: [MoodUser] {
-        members.filter { $0.status == .offline }
+        members.filter { $0.status == .offline || $0.status == .invisible }
     }
 
     var body: some View {
@@ -910,7 +910,7 @@ struct MemberRow: View {
                         .frame(width: 32 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
                         .background(MoodTheme.glassBg)
                         .clipShape(Circle())
-                        .opacity(member.status == .offline ? 0.4 : 1)
+                        .opacity(member.status == .offline || member.status == .invisible ? 0.4 : 1)
 
                     StatusIndicator(status: member.status, size: 8 * LayoutMetrics.scale, borderColor: MoodTheme.memberList)
                         .offset(x: 2, y: 2)
@@ -920,7 +920,7 @@ struct MemberRow: View {
                     HStack(spacing: 4) {
                         Text(member.displayName)
                             .font(.mood(13))
-                            .foregroundStyle(member.status == .offline ? MoodTheme.textMuted : member.roleColor)
+                            .foregroundStyle(member.status == .offline || member.status == .invisible ? MoodTheme.textMuted : member.roleColor)
                         RoleBadge(role: role, size: 11 * LayoutMetrics.scale)
                     }
 
@@ -1396,6 +1396,15 @@ struct StatusIndicator: View {
         self.borderColor = borderColor
     }
 
+    private var statusColor: Color {
+        switch status {
+        case .online: return MoodTheme.onlineGreen
+        case .idle: return Color(hex: "f0b232")
+        case .dnd: return MoodTheme.mentionBadge
+        case .invisible, .offline: return Color(hex: "80848e")
+        }
+    }
+
     var body: some View {
         ZStack {
             // Border
@@ -1403,10 +1412,46 @@ struct StatusIndicator: View {
                 .fill(borderColor)
                 .frame(width: size + 4, height: size + 4)
 
-            // Simple: green = online, red = offline
-            Circle()
-                .fill(status == .offline ? MoodTheme.mentionBadge : MoodTheme.onlineGreen)
-                .frame(width: size, height: size)
+            switch status {
+            case .online:
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: size, height: size)
+
+            case .idle:
+                // Croissant jaune (comme Discord)
+                ZStack {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: size, height: size)
+                    Circle()
+                        .fill(borderColor)
+                        .frame(width: size * 0.6, height: size * 0.6)
+                        .offset(x: -size * 0.15, y: -size * 0.15)
+                }
+
+            case .dnd:
+                // Cercle rouge avec trait blanc (comme Discord)
+                ZStack {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: size, height: size)
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(borderColor)
+                        .frame(width: size * 0.55, height: size * 0.2)
+                }
+
+            case .invisible, .offline:
+                // Cercle gris creux (comme Discord)
+                ZStack {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: size, height: size)
+                    Circle()
+                        .fill(borderColor)
+                        .frame(width: size * 0.5, height: size * 0.5)
+                }
+            }
         }
     }
 }

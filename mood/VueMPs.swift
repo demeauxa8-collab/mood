@@ -38,6 +38,8 @@ struct DMListView: View {
                         selectedDM = nil
                     }
 
+                    SidebarNavItem(icon: "sparkles", label: "Nitro", isSelected: false) { showComingSoon = true }
+
                     SidebarNavItem(icon: "bag.fill", label: "Boutique", isSelected: false) { showComingSoon = true }
 
                     SidebarNavItem(icon: "flag.fill", label: "Quêtes", isSelected: false) { showComingSoon = true }
@@ -159,7 +161,7 @@ struct DMRow: View {
                         .font(.mood(14, weight: .medium))
                         .foregroundStyle(isSelected || conversation.unreadCount > 0 ? MoodTheme.textPrimary : MoodTheme.textSecondary)
 
-                    Text(conversation.participant.status.rawValue.capitalized)
+                    Text(conversation.participant.status.rawValue)
                         .font(.mood(11))
                         .foregroundStyle(MoodTheme.textMuted)
                 }

@@ -39,13 +39,19 @@ struct MoodUser: Identifiable, Hashable {
     }
 
     enum UserStatus: String {
-        case online, offline
+        case online = "En ligne"
+        case idle = "Inactif"
+        case dnd = "Ne pas déranger"
+        case invisible = "Invisible"
+        case offline = "Hors ligne"
     }
 
     var statusColor: Color {
         switch status {
         case .online: return MoodTheme.onlineGreen
-        case .offline: return MoodTheme.mentionBadge
+        case .idle: return Color(hex: "f0b232")
+        case .dnd: return MoodTheme.mentionBadge
+        case .invisible, .offline: return Color(hex: "80848e")
         }
     }
 
@@ -273,9 +279,9 @@ enum MockData {
     static let users: [MoodUser] = [
         testUser,
         MoodUser(id: UUID(), username: "clara", displayName: "Clara", avatarEmoji: "🌸", roleColor: .purple, status: .online, bio: "Designer & cat person", joinedDate: Date(), badges: ["Early Adopter"], activity: MoodUser.UserActivity(type: .playing, name: "Figma")),
-        MoodUser(id: UUID(), username: "maxime", displayName: "Maxime", avatarEmoji: "⚡", roleColor: .orange, status: .online, bio: "Full-stack dev", joinedDate: Date(), badges: [], activity: MoodUser.UserActivity(type: .listening, name: "Spotify")),
+        MoodUser(id: UUID(), username: "maxime", displayName: "Maxime", avatarEmoji: "⚡", roleColor: .orange, status: .idle, bio: "Full-stack dev", joinedDate: Date(), badges: [], activity: MoodUser.UserActivity(type: .listening, name: "Spotify")),
         MoodUser(id: UUID(), username: "lea", displayName: "Léa", avatarEmoji: "🎨", roleColor: .pink, status: .online, bio: "Illustrator", joinedDate: Date(), badges: ["Creator"], activity: nil),
-        MoodUser(id: UUID(), username: "thomas", displayName: "Thomas", avatarEmoji: "🎵", roleColor: .green, status: .offline, bio: "Music producer", joinedDate: Date(), badges: [], activity: nil),
+        MoodUser(id: UUID(), username: "thomas", displayName: "Thomas", avatarEmoji: "🎵", roleColor: .green, status: .dnd, bio: "Music producer", joinedDate: Date(), badges: [], activity: nil),
         MoodUser(id: UUID(), username: "sophie", displayName: "Sophie", avatarEmoji: "📚", roleColor: .red, status: .offline, bio: "Book lover & writer", joinedDate: Date(), badges: ["Moderator"], activity: MoodUser.UserActivity(type: .watching, name: "YouTube")),
     ]
 

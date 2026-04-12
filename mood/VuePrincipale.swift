@@ -662,7 +662,7 @@ struct CompactDMListView: View {
     private var onlineFriendsCarousel: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 16) {
-                ForEach(MockData.users.filter { $0.status == .online }) { user in
+                ForEach(MockData.users.filter { $0.status != .offline && $0.status != .invisible }) { user in
                     VStack(spacing: 4) {
                         ZStack(alignment: .bottomTrailing) {
                             Text(user.avatarEmoji)
@@ -987,7 +987,7 @@ struct FriendsPlaceholderView: View {
     }
 
     var offlineFriends: [MoodUser] {
-        filteredFriends.filter { $0.status == .offline }
+        filteredFriends.filter { $0.status == .offline || $0.status == .invisible }
     }
 
     var body: some View {
@@ -1213,7 +1213,7 @@ struct FriendRow: View {
                     .frame(width: 36, height: 36)
                     .background(MoodTheme.glassBg)
                     .clipShape(Circle())
-                    .opacity(user.status == .offline ? 0.5 : 1)
+                    .opacity(user.status == .offline || user.status == .invisible ? 0.5 : 1)
 
                 StatusIndicator(status: user.status, size: 10, borderColor: MoodTheme.chatBackground)
                     .offset(x: 3, y: 3)
@@ -1223,9 +1223,9 @@ struct FriendRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(user.displayName)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(user.status == .offline ? MoodTheme.textMuted : MoodTheme.textPrimary)
+                    .foregroundStyle(user.status == .offline || user.status == .invisible ? MoodTheme.textMuted : MoodTheme.textPrimary)
 
-                Text(user.status == .online ? "En ligne" : "Hors ligne")
+                Text(user.status.rawValue)
                     .font(.system(size: 12))
                     .foregroundStyle(MoodTheme.textSecondary)
             }

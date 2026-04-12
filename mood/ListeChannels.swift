@@ -551,7 +551,7 @@ struct UserStatusPanel: View {
                             .background(MoodTheme.glassBg)
                             .clipShape(Circle())
 
-                        StatusIndicator(status: .online, size: 8 * LayoutMetrics.scale, borderColor: MoodTheme.channelList)
+                        StatusIndicator(status: user.status, size: 8 * LayoutMetrics.scale, borderColor: MoodTheme.channelList)
                             .offset(x: 2, y: 2)
                     }
                 }
@@ -563,7 +563,7 @@ struct UserStatusPanel: View {
                         .font(.mood(13, weight: .semibold))
                         .foregroundStyle(MoodTheme.textPrimary)
                         .lineLimit(1)
-                    Text("En ligne")
+                    Text(user.status.rawValue)
                         .font(.mood(11))
                         .foregroundStyle(MoodTheme.textSecondary)
                 }
@@ -610,7 +610,9 @@ struct StatusPickerMenu: View {
 
     private let statuses: [(status: MoodUser.UserStatus, label: String, description: String)] = [
         (.online, "En ligne", ""),
-        (.offline, "Hors ligne", "Tu apparaîtras hors ligne"),
+        (.idle, "Inactif", ""),
+        (.dnd, "Ne pas déranger", "Tu ne recevras pas de notifications"),
+        (.invisible, "Invisible", "Tu apparaîtras hors ligne"),
     ]
 
     var body: some View {
