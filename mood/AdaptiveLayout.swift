@@ -35,8 +35,8 @@ enum LayoutMetrics {
     // Combined widths
     static var userPanelWidth: CGFloat { serverBarWidth + channelListWidth }
 
-    // Bottom padding to leave room for floating user panel
-    static let channelBottomPadding: CGFloat = 52 * scale
+    // Bottom padding (no longer floating, kept minimal)
+    static let channelBottomPadding: CGFloat = 0
 }
 
 // MARK: - Scaled Font helper

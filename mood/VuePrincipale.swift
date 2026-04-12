@@ -114,30 +114,21 @@ struct ContentView: View {
     @ViewBuilder
     private var desktopLayout: some View {
         ZStack {
-            #if !targetEnvironment(macCatalyst)
-            MoodTheme.subtleGlow.ignoresSafeArea()
-            #endif
-
             HStack(spacing: 0) {
-                // Left panel: server bar + channel list + floating user pill
-                ZStack(alignment: .bottom) {
-                    // Rounded frame container (Discord-style bubble)
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(MoodTheme.glassBorder, lineWidth: 1)
-                        .padding(6)
+                // Left panel: server bar + channel list + user panel
+                HStack(spacing: 0) {
+                    ServerSidebarView(
+                        servers: servers,
+                        selectedServer: $selectedServer,
+                        showDMs: $showDMs,
+                        selectedChannel: $selectedChannel,
+                        showCreateServer: $showCreateServer,
+                        showExplore: $showExplore,
+                        dmUnreadCount: conversations.reduce(0) { $0 + $1.unreadCount }
+                    )
 
-                    HStack(spacing: 0) {
-                        ServerSidebarView(
-                            servers: servers,
-                            selectedServer: $selectedServer,
-                            showDMs: $showDMs,
-                            selectedChannel: $selectedChannel,
-                            showCreateServer: $showCreateServer,
-                            showExplore: $showExplore,
-                            dmUnreadCount: conversations.reduce(0) { $0 + $1.unreadCount }
-                        )
-
-                        if !showExplore {
+                    if !showExplore {
+                        VStack(spacing: 0) {
                             Group {
                                 if showDMs {
                                     DMListView(
@@ -154,16 +145,13 @@ struct ContentView: View {
                                 }
                             }
                             .frame(width: LayoutMetrics.channelListWidth)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .padding(.vertical, 10)
-                            .padding(.leading, 6)
-                            .transition(.move(edge: .leading).combined(with: .opacity))
-                        }
-                    }
 
-                    // Floating user status pill — spans server bar + channel list
-                    UserStatusPanel(showSettings: $showSettings)
-                        .frame(width: LayoutMetrics.userPanelWidth)
+                            // User panel flush at bottom of channel list
+                            UserStatusPanel(showSettings: $showSettings)
+                                .frame(width: LayoutMetrics.channelListWidth)
+                        }
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                    }
                 }
 
                 Group {
