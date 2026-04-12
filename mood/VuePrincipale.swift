@@ -121,11 +121,10 @@ struct ContentView: View {
             HStack(spacing: 0) {
                 // Left panel: server bar + channel list + floating user pill
                 ZStack(alignment: .bottom) {
-                    // Rounded frame container
+                    // Rounded frame container (Discord-style bubble)
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.clear)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1.5)
-                        .padding(8)
+                        .strokeBorder(MoodTheme.glassBorder, lineWidth: 1)
+                        .padding(6)
 
                     HStack(spacing: 0) {
                         ServerSidebarView(
