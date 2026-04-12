@@ -57,7 +57,7 @@ enum MoodTheme {
 
     static var serverBar: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "000000")
+        case .dark:   return Color(hex: "1e1f22")
         case .amoled: return Color(hex: "000000")
         case .light:  return Color(hex: "e3e5e8")
         }
@@ -65,7 +65,7 @@ enum MoodTheme {
 
     static var channelList: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "0a0a0a")
+        case .dark:   return Color(hex: "2b2d31")
         case .amoled: return Color(hex: "000000")
         case .light:  return Color(hex: "f2f3f5")
         }
@@ -73,7 +73,7 @@ enum MoodTheme {
 
     static var chatBackground: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "111113")
+        case .dark:   return Color(hex: "313338")
         case .amoled: return Color(hex: "050505")
         case .light:  return Color(hex: "ffffff")
         }
@@ -81,7 +81,7 @@ enum MoodTheme {
 
     static var memberList: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "0a0a0a")
+        case .dark:   return Color(hex: "2b2d31")
         case .amoled: return Color(hex: "000000")
         case .light:  return Color(hex: "f2f3f5")
         }
@@ -89,7 +89,7 @@ enum MoodTheme {
 
     static var inputBg: Color {
         switch shared.theme {
-        case .dark:   return Color.white.opacity(0.06)
+        case .dark:   return Color(hex: "383a40")
         case .amoled: return Color.white.opacity(0.06)
         case .light:  return Color(hex: "ebedef")
         }
@@ -97,7 +97,7 @@ enum MoodTheme {
 
     static var hoverBg: Color {
         switch shared.theme {
-        case .dark:   return Color.white.opacity(0.05)
+        case .dark:   return Color.white.opacity(0.04)
         case .amoled: return Color.white.opacity(0.05)
         case .light:  return Color.black.opacity(0.04)
         }
@@ -105,7 +105,7 @@ enum MoodTheme {
 
     static var selectedBg: Color {
         switch shared.theme {
-        case .dark:   return Color.white.opacity(0.10)
+        case .dark:   return Color.white.opacity(0.08)
         case .amoled: return Color.white.opacity(0.10)
         case .light:  return Color.black.opacity(0.08)
         }
@@ -113,7 +113,7 @@ enum MoodTheme {
 
     static var popupBg: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "0a0a0a")
+        case .dark:   return Color(hex: "2b2d31")
         case .amoled: return Color(hex: "000000")
         case .light:  return Color(hex: "ffffff")
         }
@@ -123,7 +123,7 @@ enum MoodTheme {
 
     static var glassBg: Color {
         switch shared.theme {
-        case .dark:   return Color.white.opacity(0.06)
+        case .dark:   return Color(hex: "2b2d31")
         case .amoled: return Color.white.opacity(0.06)
         case .light:  return Color.black.opacity(0.04)
         }
@@ -131,7 +131,7 @@ enum MoodTheme {
 
     static var glassBorder: Color {
         switch shared.theme {
-        case .dark:   return Color.white.opacity(0.10)
+        case .dark:   return Color(hex: "3f4147")
         case .amoled: return Color.white.opacity(0.10)
         case .light:  return Color.black.opacity(0.08)
         }
@@ -139,7 +139,7 @@ enum MoodTheme {
 
     static var glassHighlight: Color {
         switch shared.theme {
-        case .dark:   return Color.white.opacity(0.15)
+        case .dark:   return Color(hex: "4e5058")
         case .amoled: return Color.white.opacity(0.15)
         case .light:  return Color.black.opacity(0.06)
         }
@@ -157,16 +157,16 @@ enum MoodTheme {
 
     static var textSecondary: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "86868b")
-        case .amoled: return Color(hex: "86868b")
+        case .dark:   return Color(hex: "949ba4")
+        case .amoled: return Color(hex: "949ba4")
         case .light:  return Color(hex: "4e5058")
         }
     }
 
     static var textMuted: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "424245")
-        case .amoled: return Color(hex: "424245")
+        case .dark:   return Color(hex: "5c6069")
+        case .amoled: return Color(hex: "5c6069")
         case .light:  return Color(hex: "a0a3a8")
         }
     }
@@ -179,13 +179,13 @@ enum MoodTheme {
 
     static var mentionBadge: Color { Color(hex: "da373c") }
 
-    static var onlineGreen: Color { Color(hex: "34c759") }
+    static var onlineGreen: Color { Color(hex: "23a55a") }
 
     // — Server icons —
 
     static var serverIconBg: Color {
         switch shared.theme {
-        case .dark:   return Color.white.opacity(0.06)
+        case .dark:   return Color(hex: "313338")
         case .amoled: return Color.white.opacity(0.06)
         case .light:  return Color.black.opacity(0.04)
         }
@@ -197,7 +197,7 @@ enum MoodTheme {
 
     static var divider: Color {
         switch shared.theme {
-        case .dark:   return Color.white.opacity(0.08)
+        case .dark:   return Color(hex: "3f4147")
         case .amoled: return Color.white.opacity(0.08)
         case .light:  return Color.black.opacity(0.06)
         }
@@ -207,7 +207,7 @@ enum MoodTheme {
 
     static var messageHover: Color {
         switch shared.theme {
-        case .dark:   return Color.white.opacity(0.03)
+        case .dark:   return Color(hex: "2e3035")
         case .amoled: return Color.white.opacity(0.03)
         case .light:  return Color.black.opacity(0.02)
         }
