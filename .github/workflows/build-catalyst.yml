@@ -1,0 +1,79 @@
+name: Build Mac Catalyst DMG
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-catalyst.yml'
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inspect available Xcodes
+        run: ls /Applications | grep -i Xcode || true
+
+      - name: Select Xcode 26
+        run: |
+          XC=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XC" ]; then
+            echo "::error::Xcode 26 not found on runner"; exit 1
+          fi
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
+
+      - name: List project schemes
+        run: xcodebuild -project mood.xcodeproj -list
+
+      - name: Archive (Mac Catalyst, ad-hoc signed)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project mood.xcodeproj \
+            -scheme mood \
+            -configuration Release \
+            -destination 'generic/platform=macOS,variant=Mac Catalyst' \
+            -archivePath build/mood.xcarchive \
+            -skipPackagePluginValidation \
+            archive \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM=""
+
+      - name: Extract and ad-hoc sign the .app
+        run: |
+          mkdir -p build/export
+          APP=$(find build/mood.xcarchive/Products/Applications -maxdepth 1 -name '*.app' | head -1)
+          if [ -z "$APP" ]; then
+            echo "::error::No .app found in archive"; exit 1
+          fi
+          cp -R "$APP" build/export/
+          codesign --force --deep --sign - "build/export/$(basename "$APP")"
+          codesign -dv "build/export/$(basename "$APP")" 2>&1 || true
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Build DMG
+        run: |
+          cd build/export
+          create-dmg \
+            --volname "Mood" \
+            --window-size 520 320 \
+            --icon-size 96 \
+            --app-drop-link 360 160 \
+            --no-internet-enable \
+            ../mood.dmg . \
+          || hdiutil create -volname Mood -srcfolder . -ov -format UDZO ../mood.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mood-dmg
+          path: build/mood.dmg
+          if-no-files-found: error
+          retention-days: 14
