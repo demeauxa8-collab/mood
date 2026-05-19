@@ -2,121 +2,351 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8" />
-<title>Mood — Brouillon UI (calage Figma)</title>
+<title>Mood — Brouillon UI</title>
 <style>
   :root {
     --server-bar: #1e1f22;
     --channel-list: #2b2d31;
     --chat-bg: #313338;
     --input-bg: #383a40;
+    --hover: rgba(255,255,255,0.04);
+    --selected: rgba(255,255,255,0.08);
     --divider: #3f4147;
-    --red: #ff2a2a;
+    --text: #f5f5f7;
+    --text-sec: #949ba4;
+    --text-muted: #5c6069;
+    --accent: #6e56cf;
+    --online: #23a55a;
+    --idle: #f0b232;
+    --dnd: #da373c;
+    --mention: #da373c;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: #000; color: #f5f5f7;
-    font-family: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif; }
-  .app {
-    display: flex;
-    width: 100vw;
-    height: 100vh;
-    background: #000;
-  }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--text);
+    font-family: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif;
+    font-size: 14px; line-height: 1.4; }
+  .app { display: flex; width: 100vw; height: 100vh; }
 
-  /* Col 1 — barre serveurs */
-  .server-bar {
-    width: 72px;
-    background: var(--server-bar);
-    padding-top: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-  }
-  .server-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    background: var(--red);
-  }
+  /* ───── Col 1 — barre serveurs ───── */
+  .server-bar { width: 72px; background: var(--server-bar);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px 0; gap: 8px; flex-shrink: 0; }
+  .server-icon { width: 48px; height: 48px; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: #fff; cursor: pointer;
+    transition: border-radius .15s; position: relative; }
+  .server-icon:hover { border-radius: 12px; }
+  .server-icon.active { border-radius: 12px; }
+  .server-icon.active::before { content: ""; position: absolute; left: -16px;
+    width: 4px; height: 40px; background: #fff; border-radius: 0 4px 4px 0; }
+  .server-icon.home { background: var(--accent); }
+  .server-icon.s1 { background: #5865f2; }
+  .server-icon.s2 { background: #eb459e; }
+  .server-icon.s3 { background: #57f287; color: #000; }
+  .server-icon.s4 { background: #fee75c; color: #000; }
+  .server-icon.s5 { background: #ed4245; }
+  .server-divider { width: 32px; height: 2px; background: var(--divider);
+    border-radius: 1px; margin: 4px 0; }
+  .server-add { background: var(--chat-bg); color: var(--online);
+    font-size: 24px; font-weight: 300; }
 
-  /* Col 2 — liste channels */
-  .channel-col {
-    width: 240px;
-    display: flex;
-    flex-direction: column;
-    background: var(--channel-list);
-  }
-  .channel-header {
-    height: 48px;
-    border-bottom: 1px solid var(--divider);
-  }
-  .channel-list { flex: 1; }
-  .profile-bar {
-    height: 56px;
-    background: var(--input-bg);
-  }
+  /* ───── Col 2 — channels ───── */
+  .channel-col { width: 240px; background: var(--channel-list);
+    display: flex; flex-direction: column; flex-shrink: 0; }
+  .server-header { height: 48px; padding: 0 16px; display: flex;
+    align-items: center; justify-content: space-between;
+    border-bottom: 1px solid #1e1f22; font-weight: 600; cursor: pointer; }
+  .server-header:hover { background: var(--hover); }
+  .server-header .chev { color: var(--text-sec); font-size: 18px; }
+  .channels { flex: 1; overflow-y: auto; padding: 8px 8px 0; }
+  .category { display: flex; align-items: center; gap: 4px;
+    padding: 16px 8px 4px; color: var(--text-sec); font-size: 12px;
+    font-weight: 600; text-transform: uppercase; letter-spacing: .02em;
+    cursor: pointer; }
+  .category:hover { color: var(--text); }
+  .category .chev { font-size: 10px; }
+  .channel { display: flex; align-items: center; gap: 6px;
+    padding: 6px 8px; margin: 1px 0; border-radius: 4px;
+    color: var(--text-sec); cursor: pointer; }
+  .channel:hover { background: var(--hover); color: var(--text); }
+  .channel.selected { background: var(--selected); color: var(--text); }
+  .channel .icon { width: 20px; color: var(--text-muted); text-align: center; }
+  .channel.selected .icon { color: var(--text); }
+  .channel .name { flex: 1; }
+  .channel .badge { background: var(--mention); color: #fff;
+    font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 8px;
+    min-width: 16px; text-align: center; }
+  .profile-bar { height: 56px; background: var(--input-bg);
+    display: flex; align-items: center; padding: 0 8px; gap: 8px; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%;
+    background: var(--accent); display: flex; align-items: center;
+    justify-content: center; color: #fff; font-weight: 700; font-size: 13px;
+    flex-shrink: 0; position: relative; }
+  .avatar .dot { position: absolute; right: -2px; bottom: -2px;
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 3px solid var(--input-bg); }
+  .avatar .dot.online { background: var(--online); }
+  .profile-meta { flex: 1; min-width: 0; line-height: 1.1; }
+  .profile-name { font-size: 13px; font-weight: 600; }
+  .profile-status { font-size: 11px; color: var(--text-sec);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .profile-actions { display: flex; gap: 4px; color: var(--text-sec); }
+  .profile-actions .ic { width: 28px; height: 28px; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .profile-actions .ic:hover { background: var(--hover); color: var(--text); }
 
-  /* Col 3 — chat */
-  .main-col {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    background: var(--chat-bg);
-  }
-  .chat-header {
-    height: 48px;
-    position: relative;
-    border-bottom: 1px solid var(--divider);
-  }
-  .chat-header .measure {
-    position: absolute;
-    top: 10px;
-    left: 160px;
-    width: 1px;
-    height: 28px;
-    background: var(--red);
-  }
-  .messages { flex: 1; }
-  .input-bar {
-    height: 56px;
-    margin: 0 16px 12px;
-    background: var(--input-bg);
-    border-radius: 8px;
-  }
-  .footnote {
-    position: fixed;
-    bottom: 8px;
-    right: 12px;
-    font-size: 11px;
-    color: #5c6069;
-  }
+  /* ───── Col 3 — chat ───── */
+  .main-col { flex: 1; display: flex; flex-direction: column;
+    background: var(--chat-bg); min-width: 0; }
+  .chat-header { height: 48px; padding: 0 16px; display: flex;
+    align-items: center; gap: 12px; border-bottom: 1px solid #1e1f22; }
+  .chat-header .hash { color: var(--text-sec); font-size: 22px; font-weight: 400; }
+  .chat-header .title { font-weight: 600; }
+  .chat-header .topic-divider { width: 1px; height: 24px; background: var(--divider); }
+  .chat-header .topic { color: var(--text-sec); font-size: 13px; }
+  .chat-header .spacer { flex: 1; }
+  .chat-header .actions { display: flex; gap: 16px; color: var(--text-sec); }
+  .chat-header .actions .ic { cursor: pointer; }
+  .chat-header .actions .ic:hover { color: var(--text); }
+  .chat-header .search { display: flex; align-items: center;
+    background: var(--server-bar); border-radius: 4px; padding: 2px 8px;
+    color: var(--text-sec); font-size: 12px; min-width: 144px; }
+
+  .messages { flex: 1; overflow-y: auto; padding: 16px 0 0; }
+  .day-divider { display: flex; align-items: center; gap: 8px;
+    padding: 16px 16px 8px; color: var(--text-sec); font-size: 12px; }
+  .day-divider::before, .day-divider::after { content: "";
+    flex: 1; height: 1px; background: var(--divider); }
+  .msg { display: flex; gap: 16px; padding: 8px 16px;
+    margin-top: 16px; position: relative; }
+  .msg:hover { background: #2e3035; }
+  .msg.compact { margin-top: 0; padding: 2px 16px 2px 72px; }
+  .msg.compact:hover .ts { color: var(--text-sec); }
+  .msg .avatar-l { width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: #fff; flex-shrink: 0; }
+  .msg.compact .avatar-l { display: none; }
+  .msg .body { flex: 1; min-width: 0; }
+  .msg .head { display: flex; align-items: baseline; gap: 8px; }
+  .msg .name { font-weight: 600; }
+  .msg .ts { font-size: 11px; color: var(--text-sec); }
+  .msg.compact .ts { position: absolute; left: 16px; top: 4px;
+    color: transparent; width: 48px; text-align: right; }
+  .msg .text { color: #dbdee1; font-size: 15px; line-height: 1.4; }
+  .reactions { display: flex; gap: 4px; margin-top: 6px; }
+  .reaction { background: var(--server-bar); border: 1px solid var(--divider);
+    border-radius: 8px; padding: 2px 8px; font-size: 12px;
+    display: flex; align-items: center; gap: 4px; color: var(--text-sec); }
+  .reaction.mine { background: rgba(110,86,207,0.15); border-color: var(--accent); color: var(--text); }
+
+  .input-wrap { padding: 0 16px 24px; }
+  .input-bar { background: var(--input-bg); border-radius: 8px;
+    min-height: 44px; display: flex; align-items: center;
+    padding: 0 16px; gap: 16px; color: var(--text-sec); }
+  .input-bar .plus { font-size: 22px; cursor: pointer; }
+  .input-bar .ph { flex: 1; }
+  .input-bar .ic-row { display: flex; gap: 16px; }
+
+  /* ───── Col 4 — membres ───── */
+  .members-col { width: 240px; background: var(--channel-list);
+    flex-shrink: 0; padding: 16px 0; overflow-y: auto; }
+  .members-cat { padding: 16px 16px 4px; color: var(--text-sec);
+    font-size: 12px; font-weight: 600; text-transform: uppercase; }
+  .member { display: flex; align-items: center; gap: 12px;
+    padding: 6px 8px; margin: 0 8px; border-radius: 4px; cursor: pointer; }
+  .member:hover { background: var(--hover); }
+  .member .av { width: 32px; height: 32px; border-radius: 50%;
+    background: #5865f2; color: #fff; font-weight: 700; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; flex-shrink: 0; }
+  .member .av .dot { position: absolute; right: -2px; bottom: -2px;
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 3px solid var(--channel-list); }
+  .member .av .dot.on { background: var(--online); }
+  .member .av .dot.idle { background: var(--idle); }
+  .member .av .dot.dnd { background: var(--dnd); }
+  .member .av.offline { background: #4f545c; }
+  .member.offline .av .dot { display: none; }
+  .member .nm { color: var(--text); font-weight: 500; }
+  .member.offline .nm { color: var(--text-muted); }
+  .member .role { color: var(--accent); }
+
+  /* avatars couleurs variées */
+  .c1 { background: #5865f2; } .c2 { background: #eb459e; }
+  .c3 { background: #23a55a; } .c4 { background: #f0b232; color:#000; }
+  .c5 { background: #da373c; } .c6 { background: #6e56cf; }
+  .c7 { background: #2997ff; }
 </style>
 </head>
 <body>
-  <div class="app">
-    <div class="server-bar">
-      <div class="server-icon"></div>
-      <div class="server-icon"></div>
-      <div class="server-icon"></div>
-      <div class="server-icon"></div>
-      <div class="server-icon"></div>
-      <div class="server-icon"></div>
-    </div>
+<div class="app">
 
-    <div class="channel-col">
-      <div class="channel-header"></div>
-      <div class="channel-list"></div>
-      <div class="profile-bar"></div>
-    </div>
+  <!-- ───── 1. Barre serveurs ───── -->
+  <aside class="server-bar">
+    <div class="server-icon home active">M</div>
+    <div class="server-divider"></div>
+    <div class="server-icon s1">DV</div>
+    <div class="server-icon s2">★</div>
+    <div class="server-icon s3">GG</div>
+    <div class="server-icon s4">JS</div>
+    <div class="server-icon s5">RP</div>
+    <div class="server-icon server-add">+</div>
+  </aside>
 
-    <div class="main-col">
-      <div class="chat-header">
-        <div class="measure"></div>
+  <!-- ───── 2. Liste channels ───── -->
+  <aside class="channel-col">
+    <div class="server-header">
+      <span>Mood — Équipe</span>
+      <span class="chev">⌄</span>
+    </div>
+    <div class="channels">
+      <div class="category"><span class="chev">⌄</span> Information</div>
+      <div class="channel"><span class="icon">#</span><span class="name">annonces</span></div>
+      <div class="channel"><span class="icon">#</span><span class="name">règles</span></div>
+
+      <div class="category"><span class="chev">⌄</span> Discussion</div>
+      <div class="channel selected"><span class="icon">#</span><span class="name">général</span></div>
+      <div class="channel"><span class="icon">#</span><span class="name">dev</span><span class="badge">3</span></div>
+      <div class="channel"><span class="icon">#</span><span class="name">design</span></div>
+      <div class="channel"><span class="icon">#</span><span class="name">memes</span><span class="badge">12</span></div>
+
+      <div class="category"><span class="chev">⌄</span> Vocal</div>
+      <div class="channel"><span class="icon">🔊</span><span class="name">Salon vocal</span></div>
+      <div class="channel"><span class="icon">🔊</span><span class="name">Stand-up</span></div>
+    </div>
+    <div class="profile-bar">
+      <div class="avatar">A<span class="dot online"></span></div>
+      <div class="profile-meta">
+        <div class="profile-name">adm</div>
+        <div class="profile-status">@adm:matrix.org</div>
       </div>
-      <div class="messages"></div>
-      <div class="input-bar"></div>
+      <div class="profile-actions">
+        <div class="ic" title="Micro">🎙</div>
+        <div class="ic" title="Casque">🎧</div>
+        <div class="ic" title="Réglages">⚙</div>
+      </div>
     </div>
-  </div>
-  <div class="footnote">Mood — brouillon UI (calage Figma). Carrés rouges = placeholders icônes serveur.</div>
+  </aside>
+
+  <!-- ───── 3. Chat ───── -->
+  <section class="main-col">
+    <div class="chat-header">
+      <span class="hash">#</span>
+      <span class="title">général</span>
+      <span class="topic-divider"></span>
+      <span class="topic">Discussions générales de l'équipe Mood</span>
+      <span class="spacer"></span>
+      <div class="actions">
+        <span class="ic" title="Fil">🧵</span>
+        <span class="ic" title="Notifs">🔔</span>
+        <span class="ic" title="Épinglés">📌</span>
+        <span class="ic" title="Membres">👥</span>
+      </div>
+      <div class="search">Rechercher</div>
+    </div>
+
+    <div class="messages">
+      <div class="day-divider">19 mai 2026</div>
+
+      <div class="msg">
+        <div class="avatar-l c1">L</div>
+        <div class="body">
+          <div class="head">
+            <span class="name" style="color:#5865f2">léo</span>
+            <span class="ts">aujourd'hui à 09:12</span>
+          </div>
+          <div class="text">Salut tout le monde, j'ai poussé le brouillon de l'UI sur la branche <code style="background:#1e1f22;padding:1px 4px;border-radius:3px">claude/connect-figma-0fOzY</code> 🎨</div>
+        </div>
+      </div>
+      <div class="msg compact">
+        <div class="body">
+          <div class="head"><span class="ts">09:12</span></div>
+          <div class="text">Le calage suit la frame Figma "Mood — UI Discord Calage"</div>
+        </div>
+      </div>
+
+      <div class="msg">
+        <div class="avatar-l c2">M</div>
+        <div class="body">
+          <div class="head">
+            <span class="name" style="color:#eb459e">manon</span>
+            <span class="ts">aujourd'hui à 09:18</span>
+          </div>
+          <div class="text">Top, j'ouvre la PR. Faut juste remplacer les carrés rouges par les icônes serveurs.</div>
+          <div class="reactions">
+            <div class="reaction mine">👍 2</div>
+            <div class="reaction">🔥 1</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="msg">
+        <div class="avatar-l c3">T</div>
+        <div class="body">
+          <div class="head">
+            <span class="name" style="color:#23a55a">tom</span>
+            <span class="ts">aujourd'hui à 09:24</span>
+          </div>
+          <div class="text">@adm tu peux ajouter la liste des membres à droite stp ? Sinon LGTM 👌</div>
+        </div>
+      </div>
+
+      <div class="msg">
+        <div class="avatar-l c6">A</div>
+        <div class="body">
+          <div class="head">
+            <span class="name" style="color:#6e56cf">adm</span>
+            <span class="ts">aujourd'hui à 09:31</span>
+          </div>
+          <div class="text">Fait. La col 4 est là, 240px, avec online/offline et statuts.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-wrap">
+      <div class="input-bar">
+        <span class="plus">＋</span>
+        <span class="ph">Envoyer un message dans #général</span>
+        <span class="ic-row">
+          <span>🎁</span><span>GIF</span><span>😀</span>
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───── 4. Membres ───── -->
+  <aside class="members-col">
+    <div class="members-cat">En ligne — 4</div>
+
+    <div class="member">
+      <div class="av c6">A<span class="dot on"></span></div>
+      <div><div class="nm">adm</div></div>
+    </div>
+    <div class="member">
+      <div class="av c1">L<span class="dot on"></span></div>
+      <div><div class="nm">léo</div></div>
+    </div>
+    <div class="member">
+      <div class="av c2">M<span class="dot dnd"></span></div>
+      <div><div class="nm">manon</div></div>
+    </div>
+    <div class="member">
+      <div class="av c4">J<span class="dot idle"></span></div>
+      <div><div class="nm">jules</div></div>
+    </div>
+
+    <div class="members-cat">Hors ligne — 3</div>
+
+    <div class="member offline">
+      <div class="av offline">T</div><div><div class="nm">tom</div></div>
+    </div>
+    <div class="member offline">
+      <div class="av offline">N</div><div><div class="nm">nora</div></div>
+    </div>
+    <div class="member offline">
+      <div class="av offline">S</div><div><div class="nm">sami</div></div>
+    </div>
+  </aside>
+</div>
 </body>
 </html>

@@ -1,48 +1,228 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 760" width="1280" height="760">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" width="1440" height="900" font-family="-apple-system, 'SF Pro Text', system-ui, sans-serif">
   <defs>
     <style>
+      .bg { fill: #000; }
       .serverBar { fill: #1e1f22; }
       .channelList { fill: #2b2d31; }
       .chatBg { fill: #313338; }
       .inputBg { fill: #383a40; }
       .divider { fill: #3f4147; }
-      .red { fill: #ff2a2a; }
-      .bg { fill: #000000; }
-      .label { fill: #5c6069; font: 11px -apple-system, "SF Pro Text", system-ui, sans-serif; }
+      .hoverBg { fill: #2e3035; }
+      .selectedBg { fill: rgba(255,255,255,0.08); }
+      .text { fill: #f5f5f7; }
+      .textSec { fill: #949ba4; }
+      .textMuted { fill: #5c6069; }
+      .accent { fill: #6e56cf; }
+      .online { fill: #23a55a; }
+      .idle { fill: #f0b232; }
+      .dnd { fill: #da373c; }
+      .mention { fill: #da373c; }
     </style>
   </defs>
 
-  <!-- fond global -->
-  <rect class="bg" width="1280" height="760"/>
+  <!-- Fond -->
+  <rect class="bg" width="1440" height="900"/>
 
-  <!-- Col 1 — barre serveurs (72px) -->
-  <rect class="serverBar" x="0" y="0" width="72" height="760"/>
-  <!-- 6 icônes serveur placeholders (48x48, gap 8, top 12) -->
-  <g>
-    <rect class="red" x="12" y="12"  width="48" height="48" rx="12"/>
-    <rect class="red" x="12" y="68"  width="48" height="48" rx="12"/>
-    <rect class="red" x="12" y="124" width="48" height="48" rx="12"/>
-    <rect class="red" x="12" y="180" width="48" height="48" rx="12"/>
-    <rect class="red" x="12" y="236" width="48" height="48" rx="12"/>
-    <rect class="red" x="12" y="292" width="48" height="48" rx="12"/>
-  </g>
+  <!-- ─────────────────────────── -->
+  <!-- COL 1 — Barre serveurs 72px -->
+  <!-- ─────────────────────────── -->
+  <rect class="serverBar" x="0" y="0" width="72" height="900"/>
 
-  <!-- Col 2 — liste channels (240px) -->
-  <rect class="channelList" x="72" y="0" width="240" height="760"/>
-  <!-- header de colonne (48px) -->
-  <rect class="divider" x="72" y="47" width="240" height="1"/>
-  <!-- barre profil en bas (56px) -->
-  <rect class="inputBg" x="72" y="704" width="240" height="56"/>
+  <!-- Home (sélectionné) -->
+  <rect class="accent" x="12" y="12" width="48" height="48" rx="14"/>
+  <text x="36" y="44" fill="#fff" font-size="18" font-weight="700" text-anchor="middle">M</text>
+  <rect x="0" y="20" width="4" height="40" rx="2" fill="#fff"/>
 
-  <!-- Col 3 — chat -->
-  <rect class="chatBg" x="312" y="0" width="968" height="760"/>
-  <!-- header du channel (48px) -->
-  <rect class="divider" x="312" y="47" width="968" height="1"/>
-  <!-- trait rouge de calage -->
-  <rect class="red" x="472" y="10" width="1" height="28"/>
-  <!-- barre de saisie (56px, marges 16) -->
-  <rect class="inputBg" x="328" y="692" width="936" height="56" rx="8"/>
+  <!-- Divider -->
+  <rect class="divider" x="20" y="72" width="32" height="2" rx="1"/>
 
-  <!-- légende discrète -->
-  <text class="label" x="1268" y="752" text-anchor="end">Mood — brouillon UI (calage Figma). Carrés rouges = placeholders icônes serveur.</text>
+  <!-- Autres serveurs -->
+  <rect x="12" y="84"  width="48" height="48" rx="16" fill="#5865f2"/>
+  <text x="36" y="115" fill="#fff" font-size="14" font-weight="700" text-anchor="middle">DV</text>
+
+  <rect x="12" y="140" width="48" height="48" rx="16" fill="#eb459e"/>
+  <text x="36" y="172" fill="#fff" font-size="18" font-weight="700" text-anchor="middle">★</text>
+
+  <rect x="12" y="196" width="48" height="48" rx="16" fill="#57f287"/>
+  <text x="36" y="227" fill="#000" font-size="14" font-weight="700" text-anchor="middle">GG</text>
+
+  <rect x="12" y="252" width="48" height="48" rx="16" fill="#fee75c"/>
+  <text x="36" y="283" fill="#000" font-size="14" font-weight="700" text-anchor="middle">JS</text>
+
+  <rect x="12" y="308" width="48" height="48" rx="16" fill="#ed4245"/>
+  <text x="36" y="339" fill="#fff" font-size="14" font-weight="700" text-anchor="middle">RP</text>
+
+  <!-- + ajouter serveur -->
+  <rect class="chatBg" x="12" y="364" width="48" height="48" rx="16"/>
+  <text x="36" y="397" fill="#23a55a" font-size="26" font-weight="300" text-anchor="middle">+</text>
+
+  <!-- ─────────────────────────────── -->
+  <!-- COL 2 — Liste channels 240px    -->
+  <!-- ─────────────────────────────── -->
+  <rect class="channelList" x="72" y="0" width="240" height="900"/>
+
+  <!-- Header serveur -->
+  <text x="88" y="30" class="text" font-size="15" font-weight="600">Mood — Équipe</text>
+  <text x="296" y="30" class="textSec" font-size="18" text-anchor="end">⌄</text>
+  <rect fill="#1e1f22" x="72" y="47" width="240" height="1"/>
+
+  <!-- Catégorie INFORMATION -->
+  <text x="88" y="78" class="textSec" font-size="11" font-weight="700">⌄ INFORMATION</text>
+  <text x="100" y="102" class="textSec" font-size="14"># annonces</text>
+  <text x="100" y="126" class="textSec" font-size="14"># règles</text>
+
+  <!-- Catégorie DISCUSSION -->
+  <text x="88" y="158" class="textSec" font-size="11" font-weight="700">⌄ DISCUSSION</text>
+
+  <!-- # général sélectionné -->
+  <rect class="selectedBg" x="80" y="170" width="224" height="28" rx="4"/>
+  <text x="100" y="188" class="text" font-size="14"># général</text>
+
+  <!-- # dev + badge -->
+  <text x="100" y="212" class="textSec" font-size="14"># dev</text>
+  <rect class="mention" x="270" y="200" width="26" height="16" rx="8"/>
+  <text x="283" y="212" fill="#fff" font-size="11" font-weight="700" text-anchor="middle">3</text>
+
+  <text x="100" y="236" class="textSec" font-size="14"># design</text>
+
+  <!-- # memes + badge -->
+  <text x="100" y="260" class="textSec" font-size="14"># memes</text>
+  <rect class="mention" x="262" y="248" width="34" height="16" rx="8"/>
+  <text x="279" y="260" fill="#fff" font-size="11" font-weight="700" text-anchor="middle">12</text>
+
+  <!-- Catégorie VOCAL -->
+  <text x="88" y="292" class="textSec" font-size="11" font-weight="700">⌄ VOCAL</text>
+  <text x="100" y="316" class="textSec" font-size="14">🔊 Salon vocal</text>
+  <text x="100" y="340" class="textSec" font-size="14">🔊 Stand-up</text>
+
+  <!-- Barre profil -->
+  <rect class="inputBg" x="72" y="844" width="240" height="56"/>
+  <circle class="accent" cx="96" cy="872" r="16"/>
+  <text x="96" y="877" fill="#fff" font-size="13" font-weight="700" text-anchor="middle">A</text>
+  <circle class="online" cx="106" cy="882" r="5"/>
+  <circle fill="#383a40" cx="106" cy="882" r="6.5" fill-opacity="0"/>
+  <text x="120" y="868" class="text" font-size="13" font-weight="600">adm</text>
+  <text x="120" y="884" class="textSec" font-size="11">@adm:matrix.org</text>
+  <text x="232" y="877" class="textSec" font-size="13">🎙</text>
+  <text x="258" y="877" class="textSec" font-size="13">🎧</text>
+  <text x="284" y="877" class="textSec" font-size="13">⚙</text>
+
+  <!-- ───────────────────────────── -->
+  <!-- COL 3 — Chat (flex)            -->
+  <!-- ───────────────────────────── -->
+  <rect class="chatBg" x="312" y="0" width="888" height="900"/>
+
+  <!-- Chat header -->
+  <text x="328" y="32" class="textSec" font-size="22">#</text>
+  <text x="348" y="30" class="text" font-size="15" font-weight="600">général</text>
+  <rect class="divider" x="412" y="14" width="1" height="22"/>
+  <text x="424" y="30" class="textSec" font-size="13">Discussions générales de l'équipe Mood</text>
+
+  <!-- Actions header (droite) -->
+  <text x="1020" y="30" class="textSec" font-size="14">🧵</text>
+  <text x="1048" y="30" class="textSec" font-size="14">🔔</text>
+  <text x="1076" y="30" class="textSec" font-size="14">📌</text>
+  <text x="1104" y="30" class="textSec" font-size="14">👥</text>
+  <rect fill="#1e1f22" x="1128" y="14" width="64" height="22" rx="4"/>
+  <text x="1136" y="30" class="textMuted" font-size="12">Rechercher</text>
+  <rect fill="#1e1f22" x="312" y="47" width="888" height="1"/>
+
+  <!-- Séparateur de jour -->
+  <line x1="328" y1="72" x2="540" y2="72" stroke="#3f4147" stroke-width="1"/>
+  <text x="600" y="76" class="textSec" font-size="12" text-anchor="middle">19 mai 2026</text>
+  <line x1="660" y1="72" x2="1184" y2="72" stroke="#3f4147" stroke-width="1"/>
+
+  <!-- Message 1 : léo -->
+  <circle cx="348" cy="116" r="20" fill="#5865f2"/>
+  <text x="348" y="122" fill="#fff" font-size="16" font-weight="700" text-anchor="middle">L</text>
+  <text x="380" y="112" font-size="15" font-weight="600" fill="#5865f2">léo</text>
+  <text x="418" y="112" class="textSec" font-size="11">aujourd'hui à 09:12</text>
+  <text x="380" y="132" class="text" font-size="14">Salut tout le monde, j'ai poussé le brouillon de l'UI sur la branche</text>
+  <rect fill="#1e1f22" x="380" y="142" width="240" height="20" rx="3"/>
+  <text x="386" y="156" class="text" font-size="12" font-family="ui-monospace, Menlo, monospace">claude/connect-figma-0fOzY</text>
+  <text x="630" y="156" class="text" font-size="14">🎨</text>
+
+  <!-- Suite (compact) -->
+  <text x="380" y="184" class="text" font-size="14">Le calage suit la frame Figma "Mood — UI Discord Calage"</text>
+  <text x="356" y="184" class="textMuted" font-size="10">09:12</text>
+
+  <!-- Message 2 : manon -->
+  <circle cx="348" cy="224" r="20" fill="#eb459e"/>
+  <text x="348" y="230" fill="#fff" font-size="16" font-weight="700" text-anchor="middle">M</text>
+  <text x="380" y="220" font-size="15" font-weight="600" fill="#eb459e">manon</text>
+  <text x="430" y="220" class="textSec" font-size="11">aujourd'hui à 09:18</text>
+  <text x="380" y="240" class="text" font-size="14">Top, j'ouvre la PR. Faut juste remplacer les carrés rouges par les icônes serveurs.</text>
+  <!-- Réactions -->
+  <rect fill="rgba(110,86,207,0.15)" stroke="#6e56cf" x="380" y="252" width="48" height="22" rx="11"/>
+  <text x="404" y="267" class="text" font-size="12" text-anchor="middle">👍 2</text>
+  <rect fill="#1e1f22" stroke="#3f4147" x="436" y="252" width="48" height="22" rx="11"/>
+  <text x="460" y="267" class="textSec" font-size="12" text-anchor="middle">🔥 1</text>
+
+  <!-- Message 3 : tom -->
+  <circle cx="348" cy="316" r="20" fill="#23a55a"/>
+  <text x="348" y="322" fill="#fff" font-size="16" font-weight="700" text-anchor="middle">T</text>
+  <text x="380" y="312" font-size="15" font-weight="600" fill="#23a55a">tom</text>
+  <text x="412" y="312" class="textSec" font-size="11">aujourd'hui à 09:24</text>
+  <text x="380" y="332" class="text" font-size="14">@adm tu peux ajouter la liste des membres à droite stp ? Sinon LGTM 👌</text>
+
+  <!-- Message 4 : adm -->
+  <circle cx="348" cy="384" r="20" fill="#6e56cf"/>
+  <text x="348" y="390" fill="#fff" font-size="16" font-weight="700" text-anchor="middle">A</text>
+  <text x="380" y="380" font-size="15" font-weight="600" fill="#6e56cf">adm</text>
+  <text x="416" y="380" class="textSec" font-size="11">aujourd'hui à 09:31</text>
+  <text x="380" y="400" class="text" font-size="14">Fait. La col 4 est là, 240px, avec online/offline et statuts.</text>
+
+  <!-- Barre saisie -->
+  <rect class="inputBg" x="328" y="832" width="856" height="44" rx="8"/>
+  <text x="348" y="860" class="textSec" font-size="22">＋</text>
+  <text x="380" y="860" class="textMuted" font-size="14">Envoyer un message dans #général</text>
+  <text x="1108" y="860" class="textSec" font-size="14">🎁</text>
+  <text x="1132" y="860" class="textSec" font-size="12">GIF</text>
+  <text x="1162" y="860" class="textSec" font-size="14">😀</text>
+
+  <!-- ───────────────────────────── -->
+  <!-- COL 4 — Membres 240px           -->
+  <!-- ───────────────────────────── -->
+  <rect class="channelList" x="1200" y="0" width="240" height="900"/>
+
+  <text x="1216" y="36" class="textSec" font-size="11" font-weight="700">EN LIGNE — 4</text>
+
+  <!-- adm -->
+  <circle cx="1232" cy="64" r="16" fill="#6e56cf"/>
+  <text x="1232" y="69" fill="#fff" font-size="13" font-weight="700" text-anchor="middle">A</text>
+  <circle class="online" cx="1242" cy="74" r="5"/>
+  <text x="1256" y="69" class="text" font-size="14" font-weight="500">adm</text>
+
+  <!-- léo -->
+  <circle cx="1232" cy="100" r="16" fill="#5865f2"/>
+  <text x="1232" y="105" fill="#fff" font-size="13" font-weight="700" text-anchor="middle">L</text>
+  <circle class="online" cx="1242" cy="110" r="5"/>
+  <text x="1256" y="105" class="text" font-size="14" font-weight="500">léo</text>
+
+  <!-- manon (dnd) -->
+  <circle cx="1232" cy="136" r="16" fill="#eb459e"/>
+  <text x="1232" y="141" fill="#fff" font-size="13" font-weight="700" text-anchor="middle">M</text>
+  <circle class="dnd" cx="1242" cy="146" r="5"/>
+  <text x="1256" y="141" class="text" font-size="14" font-weight="500">manon</text>
+
+  <!-- jules (idle) -->
+  <circle cx="1232" cy="172" r="16" fill="#fee75c"/>
+  <text x="1232" y="177" fill="#000" font-size="13" font-weight="700" text-anchor="middle">J</text>
+  <circle class="idle" cx="1242" cy="182" r="5"/>
+  <text x="1256" y="177" class="text" font-size="14" font-weight="500">jules</text>
+
+  <!-- HORS LIGNE -->
+  <text x="1216" y="220" class="textSec" font-size="11" font-weight="700">HORS LIGNE — 3</text>
+
+  <circle cx="1232" cy="248" r="16" fill="#4f545c"/>
+  <text x="1232" y="253" fill="#dbdee1" font-size="13" font-weight="700" text-anchor="middle">T</text>
+  <text x="1256" y="253" class="textMuted" font-size="14" font-weight="500">tom</text>
+
+  <circle cx="1232" cy="284" r="16" fill="#4f545c"/>
+  <text x="1232" y="289" fill="#dbdee1" font-size="13" font-weight="700" text-anchor="middle">N</text>
+  <text x="1256" y="289" class="textMuted" font-size="14" font-weight="500">nora</text>
+
+  <circle cx="1232" cy="320" r="16" fill="#4f545c"/>
+  <text x="1232" y="325" fill="#dbdee1" font-size="13" font-weight="700" text-anchor="middle">S</text>
+  <text x="1256" y="325" class="textMuted" font-size="14" font-weight="500">sami</text>
 </svg>
