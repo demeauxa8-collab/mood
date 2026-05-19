@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<title>Mood — Brouillon UI (calage Figma)</title>
+<style>
+  :root {
+    --server-bar: #1e1f22;
+    --channel-list: #2b2d31;
+    --chat-bg: #313338;
+    --input-bg: #383a40;
+    --divider: #3f4147;
+    --red: #ff2a2a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #000; color: #f5f5f7;
+    font-family: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif; }
+  .app {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+  }
+
+  /* Col 1 — barre serveurs */
+  .server-bar {
+    width: 72px;
+    background: var(--server-bar);
+    padding-top: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .server-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: var(--red);
+  }
+
+  /* Col 2 — liste channels */
+  .channel-col {
+    width: 240px;
+    display: flex;
+    flex-direction: column;
+    background: var(--channel-list);
+  }
+  .channel-header {
+    height: 48px;
+    border-bottom: 1px solid var(--divider);
+  }
+  .channel-list { flex: 1; }
+  .profile-bar {
+    height: 56px;
+    background: var(--input-bg);
+  }
+
+  /* Col 3 — chat */
+  .main-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--chat-bg);
+  }
+  .chat-header {
+    height: 48px;
+    position: relative;
+    border-bottom: 1px solid var(--divider);
+  }
+  .chat-header .measure {
+    position: absolute;
+    top: 10px;
+    left: 160px;
+    width: 1px;
+    height: 28px;
+    background: var(--red);
+  }
+  .messages { flex: 1; }
+  .input-bar {
+    height: 56px;
+    margin: 0 16px 12px;
+    background: var(--input-bg);
+    border-radius: 8px;
+  }
+  .footnote {
+    position: fixed;
+    bottom: 8px;
+    right: 12px;
+    font-size: 11px;
+    color: #5c6069;
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="server-bar">
+      <div class="server-icon"></div>
+      <div class="server-icon"></div>
+      <div class="server-icon"></div>
+      <div class="server-icon"></div>
+      <div class="server-icon"></div>
+      <div class="server-icon"></div>
+    </div>
+
+    <div class="channel-col">
+      <div class="channel-header"></div>
+      <div class="channel-list"></div>
+      <div class="profile-bar"></div>
+    </div>
+
+    <div class="main-col">
+      <div class="chat-header">
+        <div class="measure"></div>
+      </div>
+      <div class="messages"></div>
+      <div class="input-bar"></div>
+    </div>
+  </div>
+  <div class="footnote">Mood — brouillon UI (calage Figma). Carrés rouges = placeholders icônes serveur.</div>
+</body>
+</html>
