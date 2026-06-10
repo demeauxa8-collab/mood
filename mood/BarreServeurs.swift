@@ -33,6 +33,8 @@ struct ServerSidebarView: View {
                                 MoodTheme.glassBg
                             )
                             .clipShape(RoundedRectangle(cornerRadius: serverIconCornerRadius, style: .continuous))
+                            .shadow(color: showDMs ? MoodTheme.brandAccent.opacity(0.45) : .clear, radius: 9, y: 2)
+                            .animation(.easeInOut(duration: 0.2), value: showDMs)
 
                             // Badge mentions DMs
                             if dmUnreadCount > 0 {
@@ -122,7 +124,8 @@ struct ServerSidebarView: View {
                     }
                     .help("Explorer les serveurs")
                 }
-                .padding(.vertical, 12 * LayoutMetrics.scale)
+                .padding(.top, 12 * LayoutMetrics.scale)
+                .padding(.bottom, LayoutMetrics.dockReserve)
                 .padding(.horizontal, 10 * LayoutMetrics.scale)
             }
 
@@ -174,6 +177,8 @@ struct SidebarIcon: View {
                     MoodTheme.glassBg
                 )
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                .shadow(color: isSelected ? MoodTheme.brandAccent.opacity(0.45) : .clear, radius: 9, y: 2)
+                .scaleEffect(isHovered ? 1.05 : 1)
                 .animation(.easeInOut(duration: 0.2), value: isSelected)
                 .animation(.easeInOut(duration: 0.2), value: isHovered)
 

@@ -90,6 +90,12 @@ struct ContentView: View {
             }
         }
         .onAppear {
+            // Mode -uiPreview : ouvre directement un serveur pour montrer la vue channel
+            if ProcessInfo.processInfo.arguments.contains("-uiPreview"), let first = servers.first {
+                showDMs = false
+                selectedServer = first
+                selectedChannel = first.categories.first?.channels.first
+            }
             if selectedServer == nil, !showDMs, let first = servers.first {
                 selectedServer = first
                 selectedChannel = first.categories.first?.channels.first
@@ -109,11 +115,15 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Desktop Layout (inchangé)
+    // MARK: - Desktop Layout
 
     @ViewBuilder
     private var desktopLayout: some View {
-        ZStack {
+        VStack(spacing: 0) {
+            // Bande de titre : canvas noir visible derrière les feux macOS
+            Color.clear
+                .frame(height: LayoutMetrics.titleBarInset)
+
             HStack(spacing: 0) {
                 ServerSidebarView(
                     servers: servers,
@@ -125,85 +135,20 @@ struct ContentView: View {
                     dmUnreadCount: conversations.reduce(0) { $0 + $1.unreadCount }
                 )
 
-                if !showExplore {
-                    VStack(spacing: 0) {
-                        Group {
-                            if showDMs {
-                                DMListView(
-                                    conversations: conversations,
-                                    selectedDM: $selectedDM,
-                                    showSettings: $showSettings
-                                )
-                            } else if let server = selectedServer {
-                                ChannelListColumn(
-                                    server: server,
-                                    selectedChannel: $selectedChannel,
-                                    showSettings: $showSettings
-                                )
-                            }
-                        }
-                        .frame(width: LayoutMetrics.channelListWidth)
-
-                        UserStatusPanel(showSettings: $showSettings)
-                            .frame(width: LayoutMetrics.channelListWidth)
-                    }
-                    .transition(.move(edge: .leading).combined(with: .opacity))
-                }
-
-                Group {
-                    if showExplore {
-                        ExploreServersView()
-                    } else if showDMs {
-                        if let dm = selectedDM {
-                            DMChatArea(
-                                conversation: dm,
-                                showProfilePopup: $showProfilePopup,
-                                profileUser: $profileUser,
-                                onBack: {
-                                    withAnimation(.easeInOut(duration: 0.2)) {
-                                        selectedDM = nil
-                                    }
-                                }
-                            )
-                            .transition(.move(edge: .trailing).combined(with: .opacity))
-                        } else {
-                            FriendsPlaceholderView(
-                                onOpenDM: { user in
-                                    if let convo = conversations.first(where: { $0.participant.id == user.id }) {
-                                        withAnimation(.easeInOut(duration: 0.2)) {
-                                            selectedDM = convo
-                                        }
-                                    }
-                                },
-                                onShowProfile: { user in
-                                    profileUser = user
-                                    showProfilePopup = true
-                                },
-                                onCall: { user in
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        callingUser = user
-                                    }
-                                }
-                            )
-                            .transition(.opacity)
-                        }
-                    } else if let channel = selectedChannel {
-                        ChatArea(
-                            channel: channel,
-                            server: selectedServer!,
-                            showProfilePopup: $showProfilePopup,
-                            profileUser: $profileUser
-                        )
-                    } else {
-                        EmptyStateView()
-                    }
-                }
-                .transition(.opacity)
+                mainCard
             }
             .animation(.easeInOut(duration: 0.2), value: showDMs)
             .animation(.easeInOut(duration: 0.15), value: selectedServer?.id)
             .animation(.easeInOut(duration: 0.15), value: selectedChannel?.id)
             .animation(.easeInOut(duration: 0.15), value: selectedDM?.id)
+        }
+        .background(MoodTheme.serverBar)
+        .overlay(alignment: .bottomLeading) {
+            // Pilule utilisateur pleine largeur : s'étend sous le rail + le panneau
+            if !showExplore {
+                UserStatusPanel(showSettings: $showSettings)
+                    .frame(width: LayoutMetrics.userPanelWidth)
+            }
         }
         .ignoresSafeArea()
         .overlay {
@@ -228,6 +173,108 @@ struct ContentView: View {
                 }
                 .transition(.opacity)
             }
+        }
+    }
+
+    // MARK: - Carte principale (panneau gauche + zone de chat, coin arrondi haut-gauche)
+
+    @ViewBuilder
+    private var mainCard: some View {
+        HStack(spacing: 0) {
+            if !showExplore {
+                VStack(spacing: 0) {
+                    Group {
+                        if showDMs {
+                            DMListView(
+                                conversations: conversations,
+                                selectedDM: $selectedDM,
+                                showSettings: $showSettings
+                            )
+                        } else if let server = selectedServer {
+                            ChannelListColumn(
+                                server: server,
+                                selectedChannel: $selectedChannel,
+                                showSettings: $showSettings
+                            )
+                        }
+                    }
+
+                    // Espace réservé : la pilule utilisateur flotte par-dessus (overlay du layout)
+                    Color.clear
+                        .frame(height: LayoutMetrics.dockReserve)
+                }
+                .frame(width: LayoutMetrics.channelListWidth)
+                .background(MoodTheme.channelList)
+                .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+
+            Group {
+                if showExplore {
+                    ExploreServersView()
+                } else if showDMs {
+                    if let dm = selectedDM {
+                        DMChatArea(
+                            conversation: dm,
+                            showProfilePopup: $showProfilePopup,
+                            profileUser: $profileUser,
+                            onBack: {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    selectedDM = nil
+                                }
+                            }
+                        )
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                    } else {
+                        FriendsPlaceholderView(
+                            onOpenDM: { user in
+                                if let convo = conversations.first(where: { $0.participant.id == user.id }) {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        selectedDM = convo
+                                    }
+                                }
+                            },
+                            onShowProfile: { user in
+                                profileUser = user
+                                showProfilePopup = true
+                            },
+                            onCall: { user in
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    callingUser = user
+                                }
+                            }
+                        )
+                        .transition(.opacity)
+                    }
+                } else if let channel = selectedChannel {
+                    ChatArea(
+                        channel: channel,
+                        server: selectedServer!,
+                        showProfilePopup: $showProfilePopup,
+                        profileUser: $profileUser
+                    )
+                } else {
+                    EmptyStateView()
+                }
+            }
+            .transition(.opacity)
+        }
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: LayoutMetrics.cardCornerRadius, style: .continuous))
+        .overlay {
+            // Liseré lumineux : net sur le bord haut et le coin arrondi, fondu rapide sur les côtés
+            UnevenRoundedRectangle(topLeadingRadius: LayoutMetrics.cardCornerRadius, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        stops: [
+                            .init(color: MoodTheme.cardStroke, location: 0),
+                            .init(color: MoodTheme.cardStroke.opacity(0.25), location: 0.05),
+                            .init(color: .clear, location: 0.35)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1
+                )
+                .allowsHitTesting(false)
         }
     }
 
@@ -1004,7 +1051,9 @@ struct FriendsPlaceholderView: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 14)
+            .frame(height: LayoutMetrics.headerHeight)
+
+            Rectangle().fill(MoodTheme.divider).frame(height: 1)
 
             // Barre de recherche
             HStack(spacing: 8) {

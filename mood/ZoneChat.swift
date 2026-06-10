@@ -264,7 +264,7 @@ struct ChannelHeader: View {
             }
         }
         .padding(.horizontal, 16 * LayoutMetrics.scale)
-        .padding(.vertical, 10 * LayoutMetrics.scale)
+        .frame(height: LayoutMetrics.headerHeight)
         .background(MoodTheme.chatBackground)
     }
 }

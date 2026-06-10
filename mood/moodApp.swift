@@ -20,7 +20,12 @@ struct moodApp: App {
         WindowGroup {
             RootView(showSplash: $showSplash, authState: authState, matrixStore: matrixStore)
                 .task {
-                    if matrixStore.restoreSession() {
+                    // Lancement avec `-uiPreview` : entre directement sur les données
+                    // de démo (MockData) sans session Matrix, pour le dev UI.
+                    if ProcessInfo.processInfo.arguments.contains("-uiPreview") {
+                        showSplash = false
+                        authState.isLoggedIn = true
+                    } else if matrixStore.restoreSession() {
                         authState.isLoggedIn = true
                     }
                 }

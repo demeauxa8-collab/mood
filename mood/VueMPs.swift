@@ -28,7 +28,7 @@ struct DMListView: View {
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 12 * LayoutMetrics.scale)
-            .padding(.vertical, 12 * LayoutMetrics.scale)
+            .frame(height: LayoutMetrics.headerHeight)
 
             Rectangle().fill(MoodTheme.divider).frame(height: 1)
 
@@ -331,7 +331,7 @@ struct DMChatArea: View {
                     }
                 }
                 .padding(.horizontal, 16 * LayoutMetrics.scale)
-                .padding(.vertical, 10 * LayoutMetrics.scale)
+                .frame(height: LayoutMetrics.headerHeight)
 
                 Rectangle().fill(MoodTheme.divider).frame(height: 1)
             }

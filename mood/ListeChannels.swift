@@ -27,7 +27,7 @@ struct ChannelListColumn: View {
                         .foregroundStyle(MoodTheme.textPrimary)
                 }
                 .padding(.horizontal, 16 * LayoutMetrics.scale)
-                .padding(.vertical, 14 * LayoutMetrics.scale)
+                .frame(height: LayoutMetrics.headerHeight)
             }
             .buttonStyle(.plain)
 
@@ -551,7 +551,7 @@ struct UserStatusPanel: View {
                             .background(MoodTheme.glassBg)
                             .clipShape(Circle())
 
-                        StatusIndicator(status: user.status, size: 8 * LayoutMetrics.scale, borderColor: MoodTheme.channelList)
+                        StatusIndicator(status: user.status, size: 8 * LayoutMetrics.scale, borderColor: MoodTheme.dockPill)
                             .offset(x: 2, y: 2)
                     }
                 }
@@ -587,13 +587,13 @@ struct UserStatusPanel: View {
                     .help("Paramètres utilisateur")
                 }
             }
-            .padding(.horizontal, 10 * LayoutMetrics.scale)
-            .padding(.vertical, 8 * LayoutMetrics.scale)
+            .padding(.horizontal, 12 * LayoutMetrics.scale)
+            .frame(minHeight: LayoutMetrics.dockPillHeight)
         }
-        .background(MoodTheme.channelList)
-        .overlay(alignment: .top) {
-            Rectangle().fill(MoodTheme.divider).frame(height: 1)
-        }
+        .dockPillStyle(background: MoodTheme.dockPill)
+        .padding(.horizontal, LayoutMetrics.dockMargin)
+        .padding(.top, 6 * LayoutMetrics.scale)
+        .padding(.bottom, LayoutMetrics.dockMargin)
     }
 }
 
