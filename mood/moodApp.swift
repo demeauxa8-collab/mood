@@ -20,11 +20,10 @@ struct moodApp: App {
         WindowGroup {
             RootView(showSplash: $showSplash, authState: authState, matrixStore: matrixStore)
                 .task {
-                    if matrixStore.restoreSession() {
-                        authState.isLoggedIn = true
-                    }
+                    authState.isLoggedIn = true
                 }
         }
+        .defaultSize(width: 1280, height: 780)
     }
 }
 
@@ -47,7 +46,14 @@ class MacSceneDelegate: NSObject, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
         windowScene.titlebar?.titleVisibility = .hidden
         windowScene.titlebar?.toolbarStyle = .unifiedCompact
-        windowScene.sizeRestrictions?.minimumSize = CGSize(width: 1200, height: 720)
+        windowScene.sizeRestrictions?.minimumSize = CGSize(width: 1100, height: 700)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            let preferred = UIWindowScene.GeometryPreferences.Mac(
+                systemFrame: CGRect(x: 40, y: 40, width: 1200, height: 760)
+            )
+            windowScene.requestGeometryUpdate(preferred) { _ in }
+        }
     }
 }
 #endif

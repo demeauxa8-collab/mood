@@ -531,14 +531,12 @@ struct UserStatusPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Status picker popup
             if showStatusPicker {
                 StatusPickerMenu(showPicker: $showStatusPicker)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
-            HStack(spacing: 8 * LayoutMetrics.scale) {
-                // Avatar circle (clickable for status)
+            HStack(spacing: 6 * LayoutMetrics.scale) {
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) {
                         showStatusPicker.toggle()
@@ -551,14 +549,14 @@ struct UserStatusPanel: View {
                             .background(MoodTheme.glassBg)
                             .clipShape(Circle())
 
-                        StatusIndicator(status: user.status, size: 8 * LayoutMetrics.scale, borderColor: MoodTheme.channelList)
+                        StatusIndicator(status: user.status, size: 9 * LayoutMetrics.scale, borderColor: MoodTheme.serverBar)
                             .offset(x: 2, y: 2)
                     }
                 }
                 .buttonStyle(.plain)
                 .help("Changer le statut")
 
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 0) {
                     Text(user.displayName)
                         .font(.mood(13, weight: .semibold))
                         .foregroundStyle(MoodTheme.textPrimary)
@@ -566,34 +564,76 @@ struct UserStatusPanel: View {
                     Text(user.status.rawValue)
                         .font(.mood(11))
                         .foregroundStyle(MoodTheme.textSecondary)
+                        .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack(spacing: 4 * LayoutMetrics.scale) {
-                    StatusPanelIcon(isMuted: $isMicMuted, iconOn: "mic.fill", iconOff: "mic.slash.fill", tooltip: "Micro")
-                    StatusPanelIcon(isMuted: $isDeafened, iconOn: "headphones", iconOff: "speaker.slash.fill", tooltip: "Casque")
+                HStack(spacing: 2 * LayoutMetrics.scale) {
+                    UserActionPill(
+                        icon: isMicMuted ? "mic.slash.fill" : "mic.fill",
+                        isActive: isMicMuted,
+                        tooltip: "Micro"
+                    ) {
+                        isMicMuted.toggle()
+                    }
+                    UserActionPill(
+                        icon: isDeafened ? "speaker.slash.fill" : "headphones",
+                        isActive: isDeafened,
+                        tooltip: "Casque"
+                    ) {
+                        isDeafened.toggle()
+                    }
                     Button {
                         showSettings = true
                     } label: {
                         Image(systemName: "gearshape.fill")
                             .font(.mood(13))
                             .foregroundStyle(MoodTheme.textSecondary)
-                            .frame(width: 32 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
-                            .background(Color.clear)
-                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                            .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .help("Paramètres utilisateur")
                 }
             }
-            .padding(.horizontal, 10 * LayoutMetrics.scale)
-            .padding(.vertical, 8 * LayoutMetrics.scale)
+            .padding(.horizontal, 8 * LayoutMetrics.scale)
+            .padding(.vertical, 7 * LayoutMetrics.scale)
         }
-        .background(MoodTheme.channelList)
-        .overlay(alignment: .top) {
-            Rectangle().fill(MoodTheme.divider).frame(height: 1)
+        .background(MoodTheme.serverBar)
+    }
+}
+
+// MARK: - User Action Pill (mic/headphones with dropdown chevron)
+
+struct UserActionPill: View {
+    let icon: String
+    let isActive: Bool
+    let tooltip: String
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 1) {
+                Image(systemName: icon)
+                    .font(.mood(12, weight: .medium))
+                    .foregroundStyle(isActive ? MoodTheme.mentionBadge : MoodTheme.textSecondary)
+                Image(systemName: "chevron.down")
+                    .font(.mood(7, weight: .bold))
+                    .foregroundStyle(isActive ? MoodTheme.mentionBadge : MoodTheme.textMuted)
+            }
+            .padding(.horizontal, 5 * LayoutMetrics.scale)
+            .frame(height: 30 * LayoutMetrics.scale)
+            .background(
+                isActive ? MoodTheme.mentionBadge.opacity(0.15) :
+                (isHovered ? MoodTheme.hoverBg : Color.clear)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .onHover { hovering in isHovered = hovering }
+        .help(tooltip)
     }
 }
 

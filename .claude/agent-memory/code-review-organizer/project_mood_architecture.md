@@ -38,3 +38,13 @@ Exceptions allowed: `.white` on overlays with explicit opacity (banner button), 
 - Popup: `.horizontal 14`, sections `.top 12`
 - System messages: icon frame width 38, "Fais coucou" button `.leading 46`
 - Voice panel: `.horizontal 10`, `.vertical 8`
+
+## Mac Catalyst Scaling
+- `LayoutMetrics` enum in `AdaptiveLayout.swift` provides scaled constants (1.28x on Mac Catalyst, 1.0 on iOS)
+- Use `LayoutMetrics.channelListWidth` (not `240`), `LayoutMetrics.userPanelWidth`, etc.
+- Use `Font.mood()` instead of `.system()` for auto-scaled fonts
+
+## Desktop Layout Visual Chrome (VuePrincipale.swift)
+- Left panel is a `ZStack(alignment: .bottom)` containing: a border `RoundedRectangle` (cornerRadius 16, white 0.08 opacity), the `HStack` of server bar + channel/DM list, and the floating `UserStatusPanel`
+- The `RoundedRectangle` border is drawn first (behind) with `.fill(Color.clear).stroke(...)`, inset with `.padding(8)`
+- `DMListView` and `ChannelListColumn` share the same slot in the `Group` inside `HStack` — they are NOT individually bubbled, only the whole left panel has the border

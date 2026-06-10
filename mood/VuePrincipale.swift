@@ -114,7 +114,11 @@ struct ContentView: View {
     @ViewBuilder
     private var desktopLayout: some View {
         ZStack {
+            // Base layer — server bar dark fills everything
+            MoodTheme.serverBar.ignoresSafeArea()
+
             HStack(spacing: 0) {
+                // Layer 0 — Server bar (darkest, base)
                 ServerSidebarView(
                     servers: servers,
                     selectedServer: $selectedServer,
@@ -126,6 +130,7 @@ struct ContentView: View {
                 )
 
                 if !showExplore {
+                    // Layer 1 — Channel list (rounded top, sits ON TOP of server bar)
                     VStack(spacing: 0) {
                         Group {
                             if showDMs {
@@ -147,9 +152,16 @@ struct ContentView: View {
                         UserStatusPanel(showSettings: $showSettings)
                             .frame(width: LayoutMetrics.channelListWidth)
                     }
+                    .clipShape(UnevenRoundedRectangle(
+                        topLeadingRadius: 8 * LayoutMetrics.scale,
+                        bottomLeadingRadius: 0,
+                        bottomTrailingRadius: 0,
+                        topTrailingRadius: 8 * LayoutMetrics.scale
+                    ))
                     .transition(.move(edge: .leading).combined(with: .opacity))
                 }
 
+                // Layer 2 — Chat area (rounded top-left, sits ON TOP of channel list)
                 Group {
                     if showExplore {
                         ExploreServersView()
@@ -198,6 +210,12 @@ struct ContentView: View {
                         EmptyStateView()
                     }
                 }
+                .clipShape(UnevenRoundedRectangle(
+                    topLeadingRadius: 8 * LayoutMetrics.scale,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: 0
+                ))
                 .transition(.opacity)
             }
             .animation(.easeInOut(duration: 0.2), value: showDMs)

@@ -11,7 +11,7 @@ struct ChatArea: View {
     @Binding var showProfilePopup: Bool
     @Binding var profileUser: MoodUser?
     @State private var messageText = ""
-    @State private var showMemberList = false
+    @State private var showMemberList = true
     @State private var showSearch = false
     @State private var showPinnedMessages = false
     @State private var showThreadPanel = false
