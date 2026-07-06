@@ -5,6 +5,8 @@ struct MessageInputBar: View {
     let channelName: String
     let isE2E: Bool
     var typingUsers: [String] = []
+    // Bloque la saisie (ex. room E2EE non supportée — ne pas envoyer du clair)
+    var isDisabled: Bool = false
     @Binding var replyingTo: ChatMessage?
     var onSend: (() -> Void)?
     @State private var showEmojiPicker = false
@@ -12,11 +14,12 @@ struct MessageInputBar: View {
     @State private var showAttachMenu = false
     @State private var showAttachAlert = false
 
-    init(text: Binding<String>, channelName: String, isE2E: Bool, typingUsers: [String] = [], replyingTo: Binding<ChatMessage?> = .constant(nil), onSend: (() -> Void)? = nil) {
+    init(text: Binding<String>, channelName: String, isE2E: Bool, typingUsers: [String] = [], isDisabled: Bool = false, replyingTo: Binding<ChatMessage?> = .constant(nil), onSend: (() -> Void)? = nil) {
         self._text = text
         self.channelName = channelName
         self.isE2E = isE2E
         self.typingUsers = typingUsers
+        self.isDisabled = isDisabled
         self._replyingTo = replyingTo
         self.onSend = onSend
     }
@@ -77,7 +80,7 @@ struct MessageInputBar: View {
                 // Bouton +
                 Button { showAttachMenu.toggle() } label: {
                     Image(systemName: "plus")
-                        .font(.mood(16, weight: .medium))
+                        .font(.mood(18, weight: .medium))
                         .foregroundStyle(MoodTheme.textPrimary)
                         .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
                         .contentShape(Rectangle())
@@ -119,11 +122,18 @@ struct MessageInputBar: View {
                             .foregroundStyle(MoodTheme.brandAccent.opacity(0.4))
                     }
 
-                    TextField("Envoyer un message dans #\(channelName)", text: $text)
-                        .textFieldStyle(.plain)
-                        .font(.mood(14))
-                        .foregroundStyle(MoodTheme.textPrimary)
-                        .onSubmit { onSend?() }
+                    TextField(
+                        isDisabled ? "Saisie désactivée (conversation chiffrée)" : "Envoyer un message dans #\(channelName)",
+                        text: $text
+                    )
+                    .textFieldStyle(.plain)
+                    .font(.mood(16))
+                    .foregroundStyle(MoodTheme.textPrimary)
+                    .disabled(isDisabled)
+                    .onSubmit {
+                        guard !isDisabled else { return }
+                        onSend?()
+                    }
                 }
 
                 // Boutons droite
@@ -136,7 +146,7 @@ struct MessageInputBar: View {
                         showEmojiPicker = false
                     } label: {
                         Text("GIF")
-                            .font(.mood(10, weight: .bold))
+                            .font(.mood(12, weight: .bold))
                             .foregroundStyle(MoodTheme.textPrimary)
                             .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
                             .contentShape(Rectangle())
@@ -168,11 +178,12 @@ struct MessageInputBar: View {
                 .fixedSize()
                 .padding(.trailing, 8 * LayoutMetrics.scale)
             }
-            .padding(.vertical, 6 * LayoutMetrics.scale)
+            .padding(.vertical, 7 * LayoutMetrics.scale)
             .background(MoodTheme.glassBg)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .opacity(isDisabled ? 0.5 : 1)
             .padding(.horizontal, 16 * LayoutMetrics.scale)
-            .padding(.bottom, 20 * LayoutMetrics.scale)
+            .padding(.bottom, 16 * LayoutMetrics.scale)
             .padding(.top, 4)
         }
         .background(MoodTheme.chatBackground)

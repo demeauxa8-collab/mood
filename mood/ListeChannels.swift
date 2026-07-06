@@ -19,7 +19,7 @@ struct ChannelListColumn: View {
             } label: {
                 HStack {
                     Text(server.name)
-                        .font(.mood(15, weight: .bold))
+                        .font(.mood(16, weight: .bold))
                         .foregroundStyle(MoodTheme.textPrimary)
                     Spacer()
                     Image(systemName: showServerMenu ? "xmark" : "chevron.down")
@@ -44,6 +44,16 @@ struct ChannelListColumn: View {
             // Channels
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 2) {
+                    // Liens rapides (Événements / Boosts de serveur) — comme la maquette
+                    QuickLinkRow(icon: "calendar", label: "Événements")
+                    QuickLinkRow(icon: "diamond.fill", label: "Boosts de serveur")
+
+                    Rectangle()
+                        .fill(MoodTheme.divider)
+                        .frame(height: 1)
+                        .padding(.horizontal, 16 * LayoutMetrics.scale)
+                        .padding(.top, 8 * LayoutMetrics.scale)
+
                     ForEach(server.categories) { category in
                         CategorySection(
                             category: category,
@@ -63,6 +73,45 @@ struct ChannelListColumn: View {
         }
         .padding(.bottom, LayoutMetrics.channelBottomPadding)
         .background(MoodTheme.channelList)
+    }
+}
+
+// MARK: - Quick Link Row (Événements / Boosts — comme la maquette)
+
+struct QuickLinkRow: View {
+    let icon: String
+    let label: String
+    @State private var isHovered = false
+    @State private var showComingSoon = false
+
+    var body: some View {
+        Button { showComingSoon = true } label: {
+            HStack(spacing: 10 * LayoutMetrics.scale) {
+                Image(systemName: icon)
+                    .font(.mood(15))
+                    .foregroundStyle(MoodTheme.textSecondary)
+                    .frame(width: 20 * LayoutMetrics.scale)
+
+                Text(label)
+                    .font(.mood(15, weight: .semibold))
+                    .foregroundStyle(MoodTheme.textSecondary)
+
+                Spacer()
+            }
+            .padding(.horizontal, 8 * LayoutMetrics.scale)
+            .padding(.vertical, 8 * LayoutMetrics.scale)
+            .background(isHovered ? MoodTheme.hoverBg : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .padding(.horizontal, 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in isHovered = hovering }
+        .alert("Bientôt disponible", isPresented: $showComingSoon) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Cette fonctionnalité arrive dans une prochaine version de Mood.")
+        }
     }
 }
 
@@ -162,7 +211,7 @@ struct CategorySection: View {
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
 
                     Text(category.name)
-                        .font(.mood(11, weight: .semibold))
+                        .font(.mood(12, weight: .bold))
                         .tracking(0.5)
 
                     Spacer()
@@ -201,7 +250,7 @@ struct CategorySection: View {
                                             .clipShape(Circle())
 
                                         Text(user.displayName)
-                                            .font(.mood(13))
+                                            .font(.mood(14, weight: .medium))
                                             .foregroundStyle(MoodTheme.textSecondary)
                                             .lineLimit(1)
 
@@ -210,12 +259,12 @@ struct CategorySection: View {
                                         // Live badge (like Discord "EN DIRECT")
                                         if user.activity != nil {
                                             Text("EN DIRECT")
-                                                .font(.mood(9, weight: .bold))
+                                                .font(.mood(10, weight: .bold))
                                                 .foregroundStyle(.white)
-                                                .padding(.horizontal, 5 * LayoutMetrics.scale)
-                                                .padding(.vertical, 2 * LayoutMetrics.scale)
+                                                .padding(.horizontal, 8 * LayoutMetrics.scale)
+                                                .padding(.vertical, 3 * LayoutMetrics.scale)
                                                 .background(MoodTheme.mentionBadge)
-                                                .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                                         }
 
                                         Image(systemName: "mic.fill")
@@ -252,13 +301,13 @@ struct ChannelRow: View {
     var body: some View {
         HStack(spacing: 6 * LayoutMetrics.scale) {
             Image(systemName: channel.icon)
-                .font(.mood(14))
+                .font(.mood(15))
                 .foregroundStyle(isSelected || isUnread ? MoodTheme.textPrimary : MoodTheme.textSecondary)
                 .frame(width: 20 * LayoutMetrics.scale)
 
             Text(channel.name)
-                .font(.mood(14))
-                .fontWeight(isUnread ? .semibold : .regular)
+                .font(.mood(16))
+                .fontWeight(isSelected || isUnread ? .semibold : .medium)
                 .foregroundStyle(isSelected || isUnread ? MoodTheme.textPrimary : MoodTheme.textSecondary)
                 .lineLimit(1)
 
@@ -272,22 +321,22 @@ struct ChannelRow: View {
 
             if channel.unreadCount > 0 && !isSelected {
                 Text("\(channel.unreadCount)")
-                    .font(.mood(10, weight: .bold))
+                    .font(.mood(11, weight: .bold))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 5 * LayoutMetrics.scale)
+                    .padding(.horizontal, 6 * LayoutMetrics.scale)
                     .padding(.vertical, 2 * LayoutMetrics.scale)
                     .background(MoodTheme.mentionBadge)
-                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    .clipShape(Capsule())
             }
         }
         .padding(.horizontal, 8 * LayoutMetrics.scale)
-        .padding(.vertical, 6 * LayoutMetrics.scale)
+        .padding(.vertical, 7 * LayoutMetrics.scale)
         .background(
             isSelected ? MoodTheme.selectedBg :
             isHovered ? MoodTheme.hoverBg :
             Color.clear
         )
-        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .padding(.horizontal, 6)
         .contentShape(Rectangle())
         .onHover { hovering in isHovered = hovering }
@@ -549,7 +598,7 @@ struct UserStatusPanel: View {
                             .background(MoodTheme.glassBg)
                             .clipShape(Circle())
 
-                        StatusIndicator(status: user.status, size: 9 * LayoutMetrics.scale, borderColor: MoodTheme.serverBar)
+                        StatusIndicator(status: user.status, size: 9 * LayoutMetrics.scale, borderColor: MoodTheme.userPanelBg)
                             .offset(x: 2, y: 2)
                     }
                 }
@@ -599,7 +648,7 @@ struct UserStatusPanel: View {
             .padding(.horizontal, 8 * LayoutMetrics.scale)
             .padding(.vertical, 7 * LayoutMetrics.scale)
         }
-        .background(MoodTheme.serverBar)
+        .background(MoodTheme.userPanelBg)
     }
 }
 

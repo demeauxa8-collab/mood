@@ -67,7 +67,7 @@ struct MoodLogoDots: View {
     var spacing: CGFloat = 4
 
     var body: some View {
-        VStack(spacing: spacing) {
+        HStack(spacing: spacing) {
             Circle()
                 .fill(MoodTheme.brandAccent)
                 .frame(width: dotSize, height: dotSize)

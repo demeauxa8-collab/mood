@@ -30,9 +30,10 @@ struct ServerSidebarView: View {
                             .frame(width: LayoutMetrics.serverIconSize, height: LayoutMetrics.serverIconSize)
                             .background(
                                 showDMs ? MoodTheme.brandAccent :
-                                MoodTheme.glassBg
+                                MoodTheme.serverIconBg
                             )
-                            .clipShape(RoundedRectangle(cornerRadius: serverIconCornerRadius, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: showDMs ? serverIconCornerRadius : LayoutMetrics.serverIconSize / 2, style: .continuous))
+                            .animation(.easeInOut(duration: 0.2), value: showDMs)
 
                             // Badge mentions DMs
                             if dmUnreadCount > 0 {
@@ -152,7 +153,10 @@ struct SidebarIcon: View {
     @State private var markedAsRead = false
     @State private var hideMutedChannels = false
 
-    private let cornerRadius: CGFloat = serverIconCornerRadius
+    // Cercle au repos, carré arrondi quand sélectionné/survolé (comme Discord)
+    private var cornerRadius: CGFloat {
+        (isSelected || isHovered) ? serverIconCornerRadius : LayoutMetrics.serverIconSize / 2
+    }
 
     var body: some View {
         Button(action: action) {
@@ -171,7 +175,7 @@ struct SidebarIcon: View {
                 .background(
                     isSelected ? MoodTheme.brandAccent :
                     isHovered ? MoodTheme.brandAccent.opacity(0.5) :
-                    MoodTheme.glassBg
+                    MoodTheme.serverIconBg
                 )
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                 .animation(.easeInOut(duration: 0.2), value: isSelected)
@@ -299,7 +303,7 @@ struct ServerFolder: View {
                         }
                         .frame(width: LayoutMetrics.serverIconSize, height: LayoutMetrics.serverIconSize)
                         .background(
-                            isHovered ? MoodTheme.brandAccent.opacity(0.5) : MoodTheme.glassBg
+                            isHovered ? MoodTheme.brandAccent.opacity(0.5) : MoodTheme.serverIconBg
                         )
                         .clipShape(RoundedRectangle(cornerRadius: serverIconCornerRadius, style: .continuous))
 

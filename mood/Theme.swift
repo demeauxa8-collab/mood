@@ -9,7 +9,7 @@ enum AppTheme: String, CaseIterable {
 }
 
 enum AccentColor: String, CaseIterable {
-    case purple = "6e56cf"
+    case purple = "6d5df6"
     case blue = "2997ff"
     case green = "34c759"
     case yellow = "f0b232"
@@ -57,7 +57,7 @@ enum MoodTheme {
 
     static var serverBar: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "1e1f22")
+        case .dark:   return Color(hex: "111216")
         case .amoled: return Color(hex: "000000")
         case .light:  return Color(hex: "e3e5e8")
         }
@@ -65,7 +65,7 @@ enum MoodTheme {
 
     static var channelList: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "2b2d31")
+        case .dark:   return Color(hex: "111216")
         case .amoled: return Color(hex: "000000")
         case .light:  return Color(hex: "f2f3f5")
         }
@@ -73,7 +73,7 @@ enum MoodTheme {
 
     static var chatBackground: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "313338")
+        case .dark:   return Color(hex: "111216")
         case .amoled: return Color(hex: "050505")
         case .light:  return Color(hex: "ffffff")
         }
@@ -81,7 +81,7 @@ enum MoodTheme {
 
     static var memberList: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "2b2d31")
+        case .dark:   return Color(hex: "111216")
         case .amoled: return Color(hex: "000000")
         case .light:  return Color(hex: "f2f3f5")
         }
@@ -89,7 +89,7 @@ enum MoodTheme {
 
     static var inputBg: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "383a40")
+        case .dark:   return Color(hex: "1b1c20")
         case .amoled: return Color.white.opacity(0.06)
         case .light:  return Color(hex: "ebedef")
         }
@@ -105,7 +105,7 @@ enum MoodTheme {
 
     static var selectedBg: Color {
         switch shared.theme {
-        case .dark:   return Color.white.opacity(0.08)
+        case .dark:   return Color(hex: "2a2b31")
         case .amoled: return Color.white.opacity(0.10)
         case .light:  return Color.black.opacity(0.08)
         }
@@ -113,9 +113,17 @@ enum MoodTheme {
 
     static var popupBg: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "2b2d31")
+        case .dark:   return Color(hex: "17181c")
         case .amoled: return Color(hex: "000000")
         case .light:  return Color(hex: "ffffff")
+        }
+    }
+
+    static var userPanelBg: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "090a0d")
+        case .amoled: return Color(hex: "000000")
+        case .light:  return Color(hex: "e3e5e8")
         }
     }
 
@@ -123,7 +131,7 @@ enum MoodTheme {
 
     static var glassBg: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "2b2d31")
+        case .dark:   return Color(hex: "1b1c20")
         case .amoled: return Color.white.opacity(0.06)
         case .light:  return Color.black.opacity(0.04)
         }
@@ -131,7 +139,7 @@ enum MoodTheme {
 
     static var glassBorder: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "3f4147")
+        case .dark:   return Color(hex: "202126")
         case .amoled: return Color.white.opacity(0.10)
         case .light:  return Color.black.opacity(0.08)
         }
@@ -139,7 +147,7 @@ enum MoodTheme {
 
     static var glassHighlight: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "4e5058")
+        case .dark:   return Color(hex: "2a2b31")
         case .amoled: return Color.white.opacity(0.15)
         case .light:  return Color.black.opacity(0.06)
         }
@@ -149,24 +157,24 @@ enum MoodTheme {
 
     static var textPrimary: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "f5f5f7")
-        case .amoled: return Color(hex: "f5f5f7")
+        case .dark:   return Color(hex: "f2f3f5")
+        case .amoled: return Color(hex: "f2f3f5")
         case .light:  return Color(hex: "060607")
         }
     }
 
     static var textSecondary: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "949ba4")
-        case .amoled: return Color(hex: "949ba4")
+        case .dark:   return Color(hex: "b5bac1")
+        case .amoled: return Color(hex: "b5bac1")
         case .light:  return Color(hex: "4e5058")
         }
     }
 
     static var textMuted: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "5c6069")
-        case .amoled: return Color(hex: "5c6069")
+        case .dark:   return Color(hex: "7d828c")
+        case .amoled: return Color(hex: "7d828c")
         case .light:  return Color(hex: "a0a3a8")
         }
     }
@@ -175,17 +183,17 @@ enum MoodTheme {
 
     static var brandAccent: Color { shared.accent.color }
 
-    static var brandBlue: Color { Color(hex: "2997ff") }
+    static var brandBlue: Color { Color(hex: "7b8cff") }
 
     static var mentionBadge: Color { Color(hex: "da373c") }
 
-    static var onlineGreen: Color { Color(hex: "23a55a") }
+    static var onlineGreen: Color { Color(hex: "23a559") }
 
     // — Server icons —
 
     static var serverIconBg: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "313338")
+        case .dark:   return Color(hex: "17181c")
         case .amoled: return Color.white.opacity(0.06)
         case .light:  return Color.black.opacity(0.04)
         }
@@ -197,7 +205,7 @@ enum MoodTheme {
 
     static var divider: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "3f4147")
+        case .dark:   return Color(hex: "202126")
         case .amoled: return Color.white.opacity(0.08)
         case .light:  return Color.black.opacity(0.06)
         }
@@ -207,7 +215,7 @@ enum MoodTheme {
 
     static var messageHover: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "2e3035")
+        case .dark:   return Color(hex: "16171b")
         case .amoled: return Color.white.opacity(0.03)
         case .light:  return Color.black.opacity(0.02)
         }
@@ -217,7 +225,7 @@ enum MoodTheme {
 
     static var brandGradient: LinearGradient {
         LinearGradient(
-            colors: [shared.accent.color, Color(hex: "2997ff")],
+            colors: [shared.accent.color, Color(hex: "7b8cff")],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
