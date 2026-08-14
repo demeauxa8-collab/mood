@@ -43,7 +43,10 @@ struct ChatArea: View {
                     showPinnedMessages: $showPinnedMessages
                 )
 
-                Rectangle().fill(MoodTheme.divider).frame(height: 1)
+                Rectangle()
+                    .fill(MoodTheme.divider)
+                    .frame(height: 1 * LayoutMetrics.scale)
+                    .offset(y: 0.25 * LayoutMetrics.scale)
             }
 
             HStack(spacing: 0) {
@@ -210,8 +213,11 @@ struct ChannelHeader: View {
 
             Spacer()
 
-            HStack(spacing: 6 * LayoutMetrics.scale) {
-                HeaderButton(icon: "bell") { showNotifAlert = true }
+            HStack(spacing: 8 * LayoutMetrics.scale) {
+                HeaderButton(icon: "square.stack.3d.up.fill")
+                    .help("Threads")
+
+                HeaderButton(icon: "bell.fill") { showNotifAlert = true }
                     .help("Paramètres de notification")
                     .alert("Notifications", isPresented: $showNotifAlert) {
                         Button("OK", role: .cancel) {}
@@ -219,52 +225,35 @@ struct ChannelHeader: View {
                         Text("Les paramètres de notification seront disponibles dans une prochaine version.")
                     }
 
-                Button {
+                HeaderButton(icon: "pin.fill") {
                     withAnimation(.easeInOut(duration: 0.15)) {
                         showPinnedMessages.toggle()
                     }
-                } label: {
-                    Image(systemName: "pin")
-                        .font(.mood(16))
-                        .foregroundStyle(MoodTheme.textPrimary)
-                        .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
-                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
                 .help("Messages épinglés")
 
-                Button {
+                HeaderButton(icon: "person.2.fill") {
                     withAnimation(.easeInOut(duration: 0.15)) {
                         showMemberList.toggle()
                     }
-                } label: {
-                    Image(systemName: "person.2")
-                        .font(.mood(16))
-                        .foregroundStyle(MoodTheme.textPrimary)
-                        .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
-                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
                 .help("Liste des membres")
 
-                // Recherche
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) {
                         showSearch.toggle()
                     }
                 } label: {
-                    Image(systemName: "magnifyingglass")
-                        .font(.mood(16))
-                        .foregroundStyle(MoodTheme.textPrimary)
-                        .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
-                        .contentShape(Rectangle())
+                    HeaderSearchField(isActive: showSearch)
                 }
                 .buttonStyle(.plain)
+                .padding(.leading, 4 * LayoutMetrics.scale)
                 .help("Rechercher")
             }
         }
-        .padding(.horizontal, 16 * LayoutMetrics.scale)
-        .padding(.vertical, 10 * LayoutMetrics.scale)
+        .padding(.leading, 16 * LayoutMetrics.scale)
+        .padding(.trailing, 12 * LayoutMetrics.scale)
+        .frame(height: LayoutMetrics.desktopHeaderHeight)
         .background(MoodTheme.chatBackground)
     }
 }
@@ -272,16 +261,53 @@ struct ChannelHeader: View {
 struct HeaderButton: View {
     let icon: String
     var action: () -> Void = {}
+    @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.mood(16))
-                .foregroundStyle(MoodTheme.textPrimary)
-                .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
+                .foregroundStyle(isHovered ? MoodTheme.textPrimary : MoodTheme.textSecondary)
+                .frame(width: 32 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
+                .background(isHovered ? MoodTheme.hoverBg : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { hovering in isHovered = hovering }
+    }
+}
+
+struct HeaderSearchField: View {
+    let isActive: Bool
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 8 * LayoutMetrics.scale) {
+            Text(isActive ? "Recherche ouverte" : "Rechercher")
+                .font(.mood(15))
+                .foregroundStyle(isActive ? MoodTheme.textSecondary : MoodTheme.textMuted)
+                .lineLimit(1)
+
+            Spacer(minLength: 8 * LayoutMetrics.scale)
+
+            Image(systemName: isActive ? "xmark.circle.fill" : "magnifyingglass")
+                .font(.mood(15, weight: .semibold))
+                .foregroundStyle(isActive ? MoodTheme.textSecondary : MoodTheme.textMuted)
+        }
+        .padding(.horizontal, 10 * LayoutMetrics.scale)
+        .frame(width: 244 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
+        .background(isHovered || isActive ? MoodTheme.inputBg : MoodTheme.headerSearchBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous)
+                .strokeBorder(
+                    isActive ? MoodTheme.brandBlue.opacity(0.55) : MoodTheme.headerSearchBorder,
+                    lineWidth: 1 * LayoutMetrics.scale
+                )
+        )
+        .contentShape(Rectangle())
+        .onHover { hovering in isHovered = hovering }
     }
 }
 

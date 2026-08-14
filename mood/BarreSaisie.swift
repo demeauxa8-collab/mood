@@ -119,9 +119,14 @@ struct MessageInputBar: View {
                             .foregroundStyle(MoodTheme.brandAccent.opacity(0.4))
                     }
 
-                    TextField("Envoyer un message dans #\(channelName)", text: $text)
+                    TextField(
+                        "",
+                        text: $text,
+                        prompt: Text("Envoyer un message dans #\(channelName)")
+                            .foregroundStyle(MoodTheme.textMuted)
+                    )
                         .textFieldStyle(.plain)
-                        .font(.mood(14))
+                        .font(.mood(15))
                         .foregroundStyle(MoodTheme.textPrimary)
                         .onSubmit { onSend?() }
                 }
@@ -147,6 +152,9 @@ struct MessageInputBar: View {
                         GIFPicker(isPresented: $showGIFPicker)
                     }
 
+                    InputBarButton(icon: "face.dashed")
+                        .help("Autocollants")
+
                     Button {
                         showEmojiPicker.toggle()
                         showGIFPicker = false
@@ -164,16 +172,22 @@ struct MessageInputBar: View {
                             text += emoji
                         }
                     }
+
+                    InputBarButton(icon: "square.grid.2x2.fill")
+                        .help("Applications")
                 }
                 .fixedSize()
                 .padding(.trailing, 8 * LayoutMetrics.scale)
             }
-            .padding(.vertical, 6 * LayoutMetrics.scale)
-            .background(MoodTheme.glassBg)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .padding(.horizontal, 16 * LayoutMetrics.scale)
-            .padding(.bottom, 20 * LayoutMetrics.scale)
-            .padding(.top, 4)
+            .frame(height: LayoutMetrics.composerHeight)
+            .background(MoodTheme.inputBg)
+            .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous)
+                    .strokeBorder(MoodTheme.composerBorder, lineWidth: 1 * LayoutMetrics.scale)
+            }
+            .padding(.horizontal, LayoutMetrics.composerHorizontalInset)
+            .padding(.bottom, LayoutMetrics.composerBottomInset)
         }
         .background(MoodTheme.chatBackground)
     }

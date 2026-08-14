@@ -39,13 +39,19 @@ struct MoodUser: Identifiable, Hashable {
     }
 
     enum UserStatus: String {
-        case online, offline
+        case online = "En ligne"
+        case idle = "Inactif"
+        case dnd = "Ne pas déranger"
+        case invisible = "Invisible"
+        case offline = "Hors ligne"
     }
 
     var statusColor: Color {
         switch status {
         case .online: return MoodTheme.onlineGreen
-        case .offline: return MoodTheme.mentionBadge
+        case .idle: return Color(hex: "f0b232")
+        case .dnd: return MoodTheme.mentionBadge
+        case .invisible, .offline: return Color(hex: "80848e")
         }
     }
 
@@ -105,6 +111,34 @@ struct MoodServer: Identifiable, Hashable {
         memberRoles[user.id] ?? .member
     }
 
+    func channel(withID channelID: UUID) -> Channel? {
+        categories.lazy.flatMap(\.channels).first { $0.id == channelID }
+    }
+
+    func markingChannelAsRead(_ channelID: UUID) -> MoodServer {
+        let updatedCategories = categories.map { category in
+            ChannelCategory(
+                id: category.id,
+                name: category.name,
+                channels: category.channels.map { channel in
+                    channel.id == channelID ? channel.markingAsRead() : channel
+                }
+            )
+        }
+        let updatedChannels = updatedCategories.flatMap(\.channels)
+
+        return MoodServer(
+            id: id,
+            name: name,
+            iconEmoji: iconEmoji,
+            categories: updatedCategories,
+            members: members,
+            memberRoles: memberRoles,
+            hasUnread: updatedChannels.contains { $0.unreadCount > 0 },
+            mentionCount: updatedChannels.reduce(0) { $0 + $1.mentionCount }
+        )
+    }
+
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     static func == (lhs: MoodServer, rhs: MoodServer) -> Bool { lhs.id == rhs.id }
 }
@@ -128,7 +162,46 @@ struct Channel: Identifiable, Hashable {
     let type: ChannelType
     let topic: String
     let unreadCount: Int
+    let mentionCount: Int
     let isE2E: Bool
+    let latestEventId: String?
+    let unreadEventId: String?
+
+    init(
+        id: UUID,
+        name: String,
+        type: ChannelType,
+        topic: String,
+        unreadCount: Int,
+        mentionCount: Int = 0,
+        isE2E: Bool,
+        latestEventId: String? = nil,
+        unreadEventId: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.type = type
+        self.topic = topic
+        self.unreadCount = unreadCount
+        self.mentionCount = mentionCount
+        self.isE2E = isE2E
+        self.latestEventId = latestEventId
+        self.unreadEventId = unreadEventId
+    }
+
+    func markingAsRead() -> Channel {
+        Channel(
+            id: id,
+            name: name,
+            type: type,
+            topic: topic,
+            unreadCount: 0,
+            mentionCount: 0,
+            isE2E: isE2E,
+            latestEventId: latestEventId,
+            unreadEventId: unreadEventId
+        )
+    }
 
     enum ChannelType: String {
         case text, voice, announcement
@@ -250,6 +323,38 @@ struct DMConversation: Identifiable, Hashable {
     let lastMessage: String
     let lastMessageDate: Date
     let unreadCount: Int
+    let latestEventId: String?
+    let unreadEventId: String?
+
+    init(
+        id: UUID,
+        participant: MoodUser,
+        lastMessage: String,
+        lastMessageDate: Date,
+        unreadCount: Int,
+        latestEventId: String? = nil,
+        unreadEventId: String? = nil
+    ) {
+        self.id = id
+        self.participant = participant
+        self.lastMessage = lastMessage
+        self.lastMessageDate = lastMessageDate
+        self.unreadCount = unreadCount
+        self.latestEventId = latestEventId
+        self.unreadEventId = unreadEventId
+    }
+
+    func withUnreadCount(_ unreadCount: Int) -> DMConversation {
+        DMConversation(
+            id: id,
+            participant: participant,
+            lastMessage: lastMessage,
+            lastMessageDate: lastMessageDate,
+            unreadCount: unreadCount,
+            latestEventId: latestEventId,
+            unreadEventId: unreadEventId
+        )
+    }
 
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     static func == (lhs: DMConversation, rhs: DMConversation) -> Bool { lhs.id == rhs.id }
@@ -273,9 +378,9 @@ enum MockData {
     static let users: [MoodUser] = [
         testUser,
         MoodUser(id: UUID(), username: "clara", displayName: "Clara", avatarEmoji: "🌸", roleColor: .purple, status: .online, bio: "Designer & cat person", joinedDate: Date(), badges: ["Early Adopter"], activity: MoodUser.UserActivity(type: .playing, name: "Figma")),
-        MoodUser(id: UUID(), username: "maxime", displayName: "Maxime", avatarEmoji: "⚡", roleColor: .orange, status: .online, bio: "Full-stack dev", joinedDate: Date(), badges: [], activity: MoodUser.UserActivity(type: .listening, name: "Spotify")),
+        MoodUser(id: UUID(), username: "maxime", displayName: "Maxime", avatarEmoji: "⚡", roleColor: .orange, status: .idle, bio: "Full-stack dev", joinedDate: Date(), badges: [], activity: MoodUser.UserActivity(type: .listening, name: "Spotify")),
         MoodUser(id: UUID(), username: "lea", displayName: "Léa", avatarEmoji: "🎨", roleColor: .pink, status: .online, bio: "Illustrator", joinedDate: Date(), badges: ["Creator"], activity: nil),
-        MoodUser(id: UUID(), username: "thomas", displayName: "Thomas", avatarEmoji: "🎵", roleColor: .green, status: .offline, bio: "Music producer", joinedDate: Date(), badges: [], activity: nil),
+        MoodUser(id: UUID(), username: "thomas", displayName: "Thomas", avatarEmoji: "🎵", roleColor: .green, status: .dnd, bio: "Music producer", joinedDate: Date(), badges: [], activity: nil),
         MoodUser(id: UUID(), username: "sophie", displayName: "Sophie", avatarEmoji: "📚", roleColor: .red, status: .offline, bio: "Book lover & writer", joinedDate: Date(), badges: ["Moderator"], activity: MoodUser.UserActivity(type: .watching, name: "YouTube")),
     ]
 
@@ -284,7 +389,7 @@ enum MockData {
             id: UUID(), name: "Design Club", iconEmoji: "🎨",
             categories: [
                 ChannelCategory(id: UUID(), name: "TEXT CHANNELS", channels: [
-                    Channel(id: UUID(), name: "general", type: .text, topic: "General design discussion", unreadCount: 3, isE2E: true),
+                    Channel(id: UUID(), name: "general", type: .text, topic: "General design discussion", unreadCount: 3, mentionCount: 2, isE2E: true),
                     Channel(id: UUID(), name: "showcase", type: .text, topic: "Share your latest work", unreadCount: 0, isE2E: true),
                     Channel(id: UUID(), name: "feedback", type: .text, topic: "Get feedback on your designs", unreadCount: 1, isE2E: true),
                     Channel(id: UUID(), name: "resources", type: .text, topic: "Tools, plugins, and assets", unreadCount: 0, isE2E: true),
@@ -310,7 +415,7 @@ enum MockData {
             id: UUID(), name: "Swift Devs", iconEmoji: "🧑‍💻",
             categories: [
                 ChannelCategory(id: UUID(), name: "GENERAL", channels: [
-                    Channel(id: UUID(), name: "general", type: .text, topic: "Swift & iOS discussion", unreadCount: 12, isE2E: true),
+                    Channel(id: UUID(), name: "general", type: .text, topic: "Swift & iOS discussion", unreadCount: 12, mentionCount: 5, isE2E: true),
                     Channel(id: UUID(), name: "introductions", type: .text, topic: "Say hello!", unreadCount: 0, isE2E: true),
                 ]),
                 ChannelCategory(id: UUID(), name: "HELP", channels: [
@@ -358,7 +463,7 @@ enum MockData {
             id: UUID(), name: "Startup Café", iconEmoji: "🚀",
             categories: [
                 ChannelCategory(id: UUID(), name: "GENERAL", channels: [
-                    Channel(id: UUID(), name: "general", type: .text, topic: "Startup chat", unreadCount: 7, isE2E: true),
+                    Channel(id: UUID(), name: "general", type: .text, topic: "Startup chat", unreadCount: 7, mentionCount: 1, isE2E: true),
                     Channel(id: UUID(), name: "launches", type: .text, topic: "Ship it!", unreadCount: 1, isE2E: true),
                     Channel(id: UUID(), name: "funding", type: .text, topic: "Fundraising discussion", unreadCount: 0, isE2E: true),
                 ]),
@@ -485,15 +590,13 @@ enum MockData {
         ]
     }
 
-    static var dmConversations: [DMConversation] {
-        [
-            DMConversation(id: UUID(), participant: users[0], lastMessage: "The new designs are ready!", lastMessageDate: Date().addingTimeInterval(-300), unreadCount: 2),
-            DMConversation(id: UUID(), participant: users[1], lastMessage: "Can you review my PR?", lastMessageDate: Date().addingTimeInterval(-3600), unreadCount: 0),
-            DMConversation(id: UUID(), participant: users[2], lastMessage: "Here's the illustration", lastMessageDate: Date().addingTimeInterval(-7200), unreadCount: 1),
-            DMConversation(id: UUID(), participant: users[3], lastMessage: "Check out this beat!", lastMessageDate: Date().addingTimeInterval(-86400), unreadCount: 0),
-            DMConversation(id: UUID(), participant: users[4], lastMessage: "Finished the chapter review", lastMessageDate: Date().addingTimeInterval(-172800), unreadCount: 0),
-        ]
-    }
+    static let dmConversations: [DMConversation] = [
+        DMConversation(id: UUID(), participant: users[0], lastMessage: "The new designs are ready!", lastMessageDate: Date().addingTimeInterval(-300), unreadCount: 2),
+        DMConversation(id: UUID(), participant: users[1], lastMessage: "Can you review my PR?", lastMessageDate: Date().addingTimeInterval(-3600), unreadCount: 0),
+        DMConversation(id: UUID(), participant: users[2], lastMessage: "Here's the illustration", lastMessageDate: Date().addingTimeInterval(-7200), unreadCount: 1),
+        DMConversation(id: UUID(), participant: users[3], lastMessage: "Check out this beat!", lastMessageDate: Date().addingTimeInterval(-86400), unreadCount: 0),
+        DMConversation(id: UUID(), participant: users[4], lastMessage: "Finished the chapter review", lastMessageDate: Date().addingTimeInterval(-172800), unreadCount: 0),
+    ]
 }
 
 // MARK: - Role Badge View
@@ -553,4 +656,3 @@ extension Date {
         Calendar.current.isDate(self, inSameDayAs: other)
     }
 }
-

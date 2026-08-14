@@ -8,42 +8,66 @@ struct ChannelListColumn: View {
     @Binding var selectedChannel: Channel?
     @Binding var showSettings: Bool
     @State private var showServerMenu = false
+    @State private var showInviteModal = false
+    @State private var showAllChannels = true
+    @State private var hideMutedChannels = false
 
     var body: some View {
         VStack(spacing: 0) {
             // Header serveur
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    showServerMenu.toggle()
+            HStack(spacing: 0) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        showServerMenu.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 8 * LayoutMetrics.scale) {
+                        Text(server.name)
+                            .font(.mood(15, weight: .bold))
+                            .foregroundStyle(MoodTheme.textPrimary)
+                            .lineLimit(1)
+
+                        Image(systemName: showServerMenu ? "chevron.up" : "chevron.down")
+                            .font(.mood(10, weight: .semibold))
+                            .foregroundStyle(MoodTheme.textPrimary)
+
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.leading, 16 * LayoutMetrics.scale)
+                    .frame(height: LayoutMetrics.desktopHeaderHeight)
                 }
-            } label: {
-                HStack {
-                    Text(server.name)
-                        .font(.mood(15, weight: .bold))
+                .buttonStyle(.plain)
+
+                Button {
+                    showInviteModal = true
+                } label: {
+                    Image(systemName: "person.badge.plus")
+                        .font(.mood(17, weight: .semibold))
                         .foregroundStyle(MoodTheme.textPrimary)
-                    Spacer()
-                    Image(systemName: showServerMenu ? "xmark" : "chevron.down")
-                        .font(.mood(showServerMenu ? 11 : 10, weight: .semibold))
-                        .foregroundStyle(MoodTheme.textPrimary)
+                        .frame(width: 48 * LayoutMetrics.scale, height: LayoutMetrics.desktopHeaderHeight)
+                        .contentShape(Rectangle())
                 }
-                .padding(.horizontal, 16 * LayoutMetrics.scale)
-                .padding(.vertical, 14 * LayoutMetrics.scale)
+                .buttonStyle(.plain)
+                .help("Inviter sur le serveur")
             }
-            .buttonStyle(.plain)
 
             Rectangle()
                 .fill(MoodTheme.divider)
                 .frame(height: 1)
 
-            // Server settings dropdown
-            if showServerMenu {
-                ServerSettingsMenu()
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
-
             // Channels
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 2) {
+                    ServerQuickLinks()
+                        .padding(.top, 10 * LayoutMetrics.scale)
+                        .padding(.bottom, 10 * LayoutMetrics.scale)
+
+                    Rectangle()
+                        .fill(MoodTheme.divider)
+                        .frame(height: 1)
+                        .padding(.horizontal, 14 * LayoutMetrics.scale)
+                        .padding(.bottom, 10 * LayoutMetrics.scale)
+
                     ForEach(server.categories) { category in
                         CategorySection(
                             category: category,
@@ -53,51 +77,181 @@ struct ChannelListColumn: View {
                     }
                 }
                 .padding(.top, 10 * LayoutMetrics.scale)
-                .padding(.bottom, 16 * LayoutMetrics.scale)
+                .padding(.bottom, LayoutMetrics.channelBottomPadding)
             }
 
             Spacer(minLength: 0)
 
             // Voice connected panel
             VoiceConnectedPanel()
+                .padding(.bottom, LayoutMetrics.channelBottomPadding)
         }
-        .padding(.bottom, LayoutMetrics.channelBottomPadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(MoodTheme.channelList)
+        .overlay(alignment: .top) {
+            if showServerMenu {
+                ServerSettingsMenu(
+                    server: server,
+                    showAllChannels: $showAllChannels,
+                    hideMutedChannels: $hideMutedChannels
+                ) {
+                    withAnimation(.easeOut(duration: 0.14)) { showServerMenu = false }
+                    showInviteModal = true
+                }
+                .padding(.top, 53 * LayoutMetrics.scale)
+                .transition(
+                    .opacity.combined(
+                        with: .scale(scale: 0.985, anchor: .top)
+                    )
+                )
+                .zIndex(100)
+            }
+        }
+        .sheet(isPresented: $showInviteModal) {
+            InviteModal(isPresented: $showInviteModal, serverName: server.name)
+        }
+        .onChange(of: server.id) { _, _ in
+            showServerMenu = false
+        }
+    }
+}
+
+// MARK: - Discord-like Server Shortcuts
+
+struct ServerQuickLinks: View {
+    var body: some View {
+        VStack(spacing: 2) {
+            ServerQuickLinkRow(icon: "calendar.badge.plus", label: "Événements")
+            ServerQuickLinkRow(icon: "diamond.fill", label: "Boosts de serveur")
+        }
+    }
+}
+
+struct ServerQuickLinkRow: View {
+    let icon: String
+    let label: String
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 12 * LayoutMetrics.scale) {
+            Image(systemName: icon)
+                .font(.mood(16))
+                .foregroundStyle(MoodTheme.textSecondary)
+                .frame(width: 20 * LayoutMetrics.scale)
+
+            Text(label)
+                .font(.mood(14, weight: .medium))
+                .foregroundStyle(MoodTheme.textSecondary)
+
+            Spacer()
+        }
+        .padding(.horizontal, 12 * LayoutMetrics.scale)
+        .padding(.top, 7 * LayoutMetrics.scale)
+        .padding(.bottom, 9 * LayoutMetrics.scale)
+        .background(isHovered ? MoodTheme.hoverBg : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        .padding(.horizontal, 8)
+        .contentShape(Rectangle())
+        .onHover { hovering in isHovered = hovering }
     }
 }
 
 // MARK: - Server Settings Menu
 
 struct ServerSettingsMenu: View {
-    @State private var showInviteModal = false
+    let server: MoodServer
+    @Binding var showAllChannels: Bool
+    @Binding var hideMutedChannels: Bool
+    let onInvite: () -> Void
     @State private var showComingSoon = false
     @State private var showLeaveConfirm = false
-    @State private var hideMutedChannels = false
+    @State private var copiedServerID = false
+
+    private var serverTag: String {
+        let letters = server.name
+            .filter { $0.isLetter || $0.isNumber }
+            .prefix(3)
+        return String(letters).uppercased()
+    }
 
     var body: some View {
-        VStack(spacing: 2) {
-            ServerMenuItem(icon: "person.badge.plus", label: "Inviter des gens", color: MoodTheme.brandBlue) {
-                showInviteModal = true
+        VStack(spacing: 0) {
+            ServerMenuItem(icon: "hexagon", label: "Boosts de serveur") {
+                showComingSoon = true
             }
 
-            Rectangle().fill(MoodTheme.divider).frame(height: 1).padding(.horizontal, 8).padding(.vertical, 4)
+            ServerTagMenuItem(tag: serverTag) {
+                showComingSoon = true
+            }
 
-            ServerMenuItem(icon: "gearshape", label: "Paramètres du serveur", color: MoodTheme.textSecondary) { showComingSoon = true }
-            ServerMenuItem(icon: "folder", label: "Créer un channel", color: MoodTheme.textSecondary) { showComingSoon = true }
-            ServerMenuItem(icon: "folder.badge.plus", label: "Créer une catégorie", color: MoodTheme.textSecondary) { showComingSoon = true }
+            ServerMenuDivider()
 
-            Rectangle().fill(MoodTheme.divider).frame(height: 1).padding(.horizontal, 8).padding(.vertical, 4)
+            ServerMenuItem(icon: "person.badge.plus", label: "Inviter sur le serveur") {
+                onInvite()
+            }
+            ServerMenuItem(icon: "square.grid.2x2", label: "Répertoire d’applications") {
+                showComingSoon = true
+            }
 
-            ServerMenuItem(icon: "bell", label: "Paramètres de notification", color: MoodTheme.textSecondary) { showComingSoon = true }
-            ServerMenuItem(icon: "shield", label: "Confidentialité", color: MoodTheme.textSecondary) { showComingSoon = true }
-            ServerMenuItem(icon: hideMutedChannels ? "eye" : "eye.slash", label: hideMutedChannels ? "Afficher les channels muets" : "Masquer les channels muets", color: MoodTheme.textSecondary) { hideMutedChannels.toggle() }
+            ServerMenuDivider()
 
-            Rectangle().fill(MoodTheme.divider).frame(height: 1).padding(.horizontal, 8).padding(.vertical, 4)
+            ServerMenuItem(icon: "eye", label: "Montrer tous les salons", isChecked: showAllChannels) {
+                showAllChannels.toggle()
+            }
+            ServerMenuItem(icon: "bell.fill", label: "Paramètres de notification") {
+                showComingSoon = true
+            }
+            ServerMenuItem(icon: "shield", label: "Paramètres de confidentialité") {
+                showComingSoon = true
+            }
 
-            ServerMenuItem(icon: "rectangle.portrait.and.arrow.right", label: "Quitter le serveur", color: .red) { showLeaveConfirm = true }
+            ServerMenuDivider()
+
+            ServerMenuItem(icon: "pencil", label: "Modifier le profil par serveur") {
+                showComingSoon = true
+            }
+            ServerMenuItem(
+                icon: hideMutedChannels ? "eye" : "eye.slash",
+                label: "Masquer les salons muets",
+                isChecked: hideMutedChannels
+            ) {
+                hideMutedChannels.toggle()
+            }
+
+            ServerMenuDivider()
+
+            ServerMenuItem(
+                icon: "rectangle.portrait.and.arrow.right",
+                label: "Quitter le serveur",
+                color: MoodTheme.serverMenuDanger,
+                iconColor: MoodTheme.serverMenuDanger
+            ) {
+                showLeaveConfirm = true
+            }
+
+            ServerMenuDivider()
+
+            ServerMenuItem(
+                icon: copiedServerID ? "checkmark.square.fill" : "",
+                label: copiedServerID ? "Identifiant copié" : "Copier l’identifiant du serveur",
+                leadingBadge: copiedServerID ? nil : "ID"
+            ) {
+                UIPasteboard.general.string = server.id.uuidString
+                copiedServerID = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    copiedServerID = false
+                }
+            }
         }
-        .padding(.vertical, 8)
-        .background(MoodTheme.serverBar.opacity(0.95))
+        .padding(.vertical, 8 * LayoutMetrics.scale)
+        .frame(width: 220 * LayoutMetrics.scale)
+        .background(MoodTheme.serverMenuBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous)
+                .strokeBorder(MoodTheme.serverMenuBorder, lineWidth: 1 * LayoutMetrics.scale)
+        }
+        .shadow(color: .black.opacity(0.48), radius: 14 * LayoutMetrics.scale, y: 7 * LayoutMetrics.scale)
         .alert("Bientôt disponible", isPresented: $showComingSoon) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -115,29 +269,134 @@ struct ServerSettingsMenu: View {
 struct ServerMenuItem: View {
     let icon: String
     let label: String
-    let color: Color
+    var color: Color = MoodTheme.textPrimary
+    var iconColor: Color = MoodTheme.textSupporting
+    var isChecked: Bool? = nil
+    var leadingBadge: String? = nil
     var action: () -> Void = {}
     @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10 * LayoutMetrics.scale) {
+            HStack(spacing: 8 * LayoutMetrics.scale) {
+                Group {
+                    if let leadingBadge {
+                        Text(leadingBadge)
+                            .font(.mood(9, weight: .bold))
+                            .foregroundStyle(MoodTheme.serverMenuBackground)
+                            .frame(width: 16 * LayoutMetrics.scale, height: 16 * LayoutMetrics.scale)
+                            .background(MoodTheme.textSupporting)
+                            .clipShape(RoundedRectangle(cornerRadius: 2 * LayoutMetrics.scale, style: .continuous))
+                    } else {
+                        Image(systemName: icon)
+                            .font(.mood(16, weight: .medium))
+                            .foregroundStyle(isHovered ? .white : iconColor)
+                    }
+                }
+                .frame(width: 20 * LayoutMetrics.scale)
+
                 Text(label)
-                    .font(.mood(13))
+                    .font(.mood(14, weight: .medium))
                     .foregroundStyle(isHovered ? .white : color)
-                Spacer()
-                Image(systemName: icon)
-                    .font(.mood(12))
-                    .foregroundStyle(isHovered ? .white : color)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Spacer(minLength: 4 * LayoutMetrics.scale)
+
+                if let isChecked {
+                    ServerMenuCheckbox(isChecked: isChecked)
+                }
             }
-            .padding(.horizontal, 10 * LayoutMetrics.scale)
-            .padding(.vertical, 7 * LayoutMetrics.scale)
-            .background(isHovered ? MoodTheme.brandAccent : Color.clear)
+            .padding(.horizontal, 10.5 * LayoutMetrics.scale)
+            .frame(height: 36 * LayoutMetrics.scale)
+            .background(isHovered ? MoodTheme.serverMenuHover : Color.clear)
             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 6 * LayoutMetrics.scale)
         }
         .buttonStyle(.plain)
-        .onHover { hovering in isHovered = hovering }
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.1)) {
+                isHovered = hovering
+            }
+        }
+    }
+}
+
+struct ServerTagMenuItem: View {
+    let tag: String
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8 * LayoutMetrics.scale) {
+                HStack(spacing: 3 * LayoutMetrics.scale) {
+                    Image(systemName: "bolt.fill")
+                        .font(.mood(10, weight: .bold))
+                    Text(tag)
+                        .font(.mood(12, weight: .semibold))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(MoodTheme.textSupporting)
+                .padding(.horizontal, 6 * LayoutMetrics.scale)
+                .frame(height: 16 * LayoutMetrics.scale)
+                .background(MoodTheme.serverMenuTagBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 4 * LayoutMetrics.scale, style: .continuous))
+
+                Text("Tag du serveur")
+                    .font(.mood(14, weight: .medium))
+                    .foregroundStyle(isHovered ? .white : MoodTheme.textPrimary)
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10.5 * LayoutMetrics.scale)
+            .frame(height: 36 * LayoutMetrics.scale)
+            .background(isHovered ? MoodTheme.serverMenuHover : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            .padding(.horizontal, 6 * LayoutMetrics.scale)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.1)) {
+                isHovered = hovering
+            }
+        }
+    }
+}
+
+struct ServerMenuCheckbox: View {
+    let isChecked: Bool
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 4 * LayoutMetrics.scale, style: .continuous)
+                .fill(isChecked ? MoodTheme.brandAccent : MoodTheme.serverMenuCheckboxBackground)
+                .overlay {
+                    if !isChecked {
+                        RoundedRectangle(cornerRadius: 4 * LayoutMetrics.scale, style: .continuous)
+                            .strokeBorder(MoodTheme.serverMenuCheckboxBorder, lineWidth: 1 * LayoutMetrics.scale)
+                    }
+                }
+
+            if isChecked {
+                Image(systemName: "checkmark")
+                    .font(.mood(12, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+        }
+        .frame(width: 20 * LayoutMetrics.scale, height: 20 * LayoutMetrics.scale)
+        .animation(.easeInOut(duration: 0.12), value: isChecked)
+    }
+}
+
+struct ServerMenuDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(MoodTheme.serverMenuSeparator)
+            .frame(height: 1 * LayoutMetrics.scale)
+            .padding(.horizontal, 9 * LayoutMetrics.scale)
+            .padding(.vertical, 8 * LayoutMetrics.scale)
     }
 }
 
@@ -148,6 +407,17 @@ struct CategorySection: View {
     let server: MoodServer
     @Binding var selectedChannel: Channel?
     @State private var isExpanded = true
+
+    private var categoryTitle: String {
+        let channels = category.channels
+        if !channels.isEmpty && channels.allSatisfy({ $0.type == .voice }) {
+            return "SALONS VOCAUX"
+        }
+        if channels.contains(where: { $0.type == .text || $0.type == .announcement }) {
+            return "SALONS TEXTUELS"
+        }
+        return category.name.uppercased()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
@@ -161,7 +431,7 @@ struct CategorySection: View {
                         .font(.mood(8, weight: .bold))
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
 
-                    Text(category.name)
+                    Text(categoryTitle)
                         .font(.mood(11, weight: .semibold))
                         .tracking(0.5)
 
@@ -247,19 +517,20 @@ struct ChannelRow: View {
     @State private var showComingSoon = false
     @State private var showDeleteConfirm = false
 
-    private var isUnread: Bool { channel.unreadCount > 0 }
+    private var unreadBadgeCount: Int { max(channel.unreadCount, channel.mentionCount) }
+    private var isUnread: Bool { unreadBadgeCount > 0 }
 
     var body: some View {
-        HStack(spacing: 6 * LayoutMetrics.scale) {
+        HStack(spacing: 8 * LayoutMetrics.scale) {
             Image(systemName: channel.icon)
-                .font(.mood(14))
-                .foregroundStyle(isSelected || isUnread ? MoodTheme.textPrimary : MoodTheme.textSecondary)
+                .font(.mood(15))
+                .foregroundStyle(isUnread ? MoodTheme.textPrimary : MoodTheme.textSecondary)
                 .frame(width: 20 * LayoutMetrics.scale)
 
             Text(channel.name)
-                .font(.mood(14))
+                .font(.mood(15))
                 .fontWeight(isUnread ? .semibold : .regular)
-                .foregroundStyle(isSelected || isUnread ? MoodTheme.textPrimary : MoodTheme.textSecondary)
+                .foregroundStyle(isUnread ? MoodTheme.textPrimary : MoodTheme.textSecondary)
                 .lineLimit(1)
 
             if channel.isE2E {
@@ -270,8 +541,20 @@ struct ChannelRow: View {
 
             Spacer()
 
-            if channel.unreadCount > 0 && !isSelected {
-                Text("\(channel.unreadCount)")
+            if isSelected || isHovered {
+                HStack(spacing: 5 * LayoutMetrics.scale) {
+                    Image(systemName: "person.badge.plus")
+                        .font(.mood(13, weight: .semibold))
+                        .foregroundStyle(MoodTheme.textPrimary)
+                        .frame(width: 16 * LayoutMetrics.scale)
+
+                    Image(systemName: "gearshape.fill")
+                        .font(.mood(13, weight: .semibold))
+                        .foregroundStyle(MoodTheme.textPrimary)
+                        .frame(width: 16 * LayoutMetrics.scale)
+                }
+            } else if isUnread {
+                Text("\(unreadBadgeCount)")
                     .font(.mood(10, weight: .bold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 5 * LayoutMetrics.scale)
@@ -281,14 +564,14 @@ struct ChannelRow: View {
             }
         }
         .padding(.horizontal, 8 * LayoutMetrics.scale)
-        .padding(.vertical, 6 * LayoutMetrics.scale)
+        .frame(height: 32 * LayoutMetrics.scale)
         .background(
-            isSelected ? MoodTheme.selectedBg :
+            isSelected && isUnread ? MoodTheme.channelSelectedBg :
             isHovered ? MoodTheme.hoverBg :
             Color.clear
         )
-        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-        .padding(.horizontal, 6)
+        .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
+        .padding(.horizontal, 8 * LayoutMetrics.scale)
         .contentShape(Rectangle())
         .onHover { hovering in isHovered = hovering }
         .contextMenu {
@@ -332,7 +615,9 @@ struct VoiceConnectedPanel: View {
     @State private var isScreenSharing = false
     @State private var isCameraOn = false
     @State private var isInActivity = false
-    @State private var isConnected = true
+    // The panel only appears after a real voice join. Starting disconnected
+    // matches Discord's normal text-channel state and avoids a phantom call.
+    @State private var isConnected = false
 
     var body: some View {
         if isConnected {
@@ -352,7 +637,7 @@ struct VoiceConnectedPanel: View {
                     // Timer
                     Text(formattedDuration)
                         .font(.mood(11, weight: .medium, design: .monospaced))
-                        .foregroundStyle(MoodTheme.textSecondary)
+                        .foregroundStyle(MoodTheme.textSupporting)
 
                     // Barres signal
                     HStack(spacing: 1.5) {
@@ -530,11 +815,12 @@ struct UserStatusPanel: View {
     private var user: MoodUser { matrixStore.currentUser ?? MockData.currentUser }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 8) {
             // Status picker popup
             if showStatusPicker {
                 StatusPickerMenu(showPicker: $showStatusPicker)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .padding(.leading, 2)
             }
 
             HStack(spacing: 8 * LayoutMetrics.scale) {
@@ -548,10 +834,10 @@ struct UserStatusPanel: View {
                         Text(user.avatarEmoji)
                             .font(.mood(18))
                             .frame(width: 32 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
-                            .background(MoodTheme.glassBg)
+                            .background(MoodTheme.hoverBg)
                             .clipShape(Circle())
 
-                        StatusIndicator(status: .online, size: 8 * LayoutMetrics.scale, borderColor: MoodTheme.channelList)
+                        StatusIndicator(status: .online, size: 8 * LayoutMetrics.scale, borderColor: MoodTheme.inputBg)
                             .offset(x: 2, y: 2)
                     }
                 }
@@ -560,45 +846,112 @@ struct UserStatusPanel: View {
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(user.displayName)
-                        .font(.mood(13, weight: .semibold))
+                        .font(.mood(14, weight: .semibold))
                         .foregroundStyle(MoodTheme.textPrimary)
                         .lineLimit(1)
                     Text("En ligne")
-                        .font(.mood(11))
-                        .foregroundStyle(MoodTheme.textSecondary)
+                        .font(.mood(12))
+                        .foregroundStyle(MoodTheme.textSupporting)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack(spacing: 4 * LayoutMetrics.scale) {
-                    StatusPanelIcon(isMuted: $isMicMuted, iconOn: "mic.fill", iconOff: "mic.slash.fill", tooltip: "Micro")
-                    StatusPanelIcon(isMuted: $isDeafened, iconOn: "headphones", iconOff: "speaker.slash.fill", tooltip: "Casque")
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape.fill")
-                            .font(.mood(13))
-                            .foregroundStyle(MoodTheme.textSecondary)
-                            .frame(width: 32 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
-                            .background(Color.clear)
-                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                            .contentShape(Rectangle())
+                HStack(spacing: 8 * LayoutMetrics.scale) {
+                    HStack(spacing: 1 * LayoutMetrics.scale) {
+                        UserPanelControl(
+                            icon: isMicMuted ? "mic.slash.fill" : "mic.fill",
+                            isActive: isMicMuted,
+                            isDestructive: isMicMuted,
+                            help: "Micro"
+                        ) { isMicMuted.toggle() }
+
+                        UserPanelControl(
+                            icon: "chevron.down",
+                            compact: true,
+                            isActive: isMicMuted,
+                            isDestructive: isMicMuted,
+                            help: "Périphériques d’entrée"
+                        ) {}
                     }
-                    .buttonStyle(.plain)
-                    .help("Paramètres utilisateur")
+
+                    HStack(spacing: 1 * LayoutMetrics.scale) {
+                        UserPanelControl(
+                            icon: isDeafened ? "speaker.slash.fill" : "headphones",
+                            isActive: isDeafened,
+                            isDestructive: isDeafened,
+                            help: "Casque"
+                        ) {
+                            isDeafened.toggle()
+                            if isDeafened { isMicMuted = true }
+                        }
+
+                        UserPanelControl(
+                            icon: "chevron.down",
+                            compact: true,
+                            isActive: isDeafened,
+                            isDestructive: isDeafened,
+                            help: "Périphériques de sortie"
+                        ) {}
+                    }
+
+                    UserPanelControl(icon: "gearshape.fill", help: "Paramètres utilisateur") {
+                        showSettings = true
+                    }
                 }
             }
-            .padding(.horizontal, 10 * LayoutMetrics.scale)
-            .padding(.vertical, 8 * LayoutMetrics.scale)
+            .padding(.leading, 12 * LayoutMetrics.scale)
+            .padding(.trailing, 13 * LayoutMetrics.scale)
+            .frame(height: LayoutMetrics.userPanelHeight)
+            .background(MoodTheme.glassBg)
+            .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous)
+                    .strokeBorder(MoodTheme.glassBorder, lineWidth: 1 * LayoutMetrics.scale)
+            }
+            .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
         }
-        .background(MoodTheme.glassBg)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(MoodTheme.glassBorder, lineWidth: 1)
+        .frame(width: LayoutMetrics.userPanelWidth, alignment: .bottomLeading)
+        .zIndex(10)
+    }
+}
+
+struct UserPanelControl: View {
+    let icon: String
+    var compact = false
+    var isActive = false
+    var isDestructive = false
+    let help: String
+    let action: () -> Void
+    @State private var isHovered = false
+
+    private var foreground: Color {
+        if isDestructive { return Color(hex: "da3e44") }
+        if isActive { return MoodTheme.textPrimary }
+        return MoodTheme.textSupporting
+    }
+
+    private var background: Color {
+        if isDestructive {
+            return isHovered ? Color(hex: "432b2f") : Color(hex: "372327")
         }
-        .shadow(color: .black.opacity(0.4), radius: 12, x: 0, y: 2)
-        .padding(.horizontal, 8)
-        .padding(.bottom, 8)
+        if isActive {
+            return MoodTheme.selectedBg
+        }
+        return isHovered ? MoodTheme.hoverBg : Color.clear
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.mood(compact ? 10 : 14, weight: .semibold))
+                .foregroundStyle(foreground)
+                .frame(width: (compact ? 16 : 32) * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
+                .background(background)
+                .clipShape(RoundedRectangle(cornerRadius: 6 * LayoutMetrics.scale, style: .continuous))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in isHovered = hovering }
+        .help(help)
     }
 }
 
@@ -698,7 +1051,7 @@ struct StatusPanelIcon: View {
                     .frame(width: 18 * LayoutMetrics.scale, height: 18 * LayoutMetrics.scale)
             }
             .frame(width: 32 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
-            .background(isHovered ? MoodTheme.hoverBg : Color.clear)
+            .background(isMuted ? MoodTheme.mentionBadge.opacity(0.18) : (isHovered ? MoodTheme.hoverBg : Color.clear))
             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             .contentShape(Rectangle())
         }

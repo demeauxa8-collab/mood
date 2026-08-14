@@ -20,7 +20,11 @@ struct moodApp: App {
         WindowGroup {
             RootView(showSplash: $showSplash, authState: authState, matrixStore: matrixStore)
                 .task {
-                    if matrixStore.restoreSession() {
+                    // UI preview mode opens directly on the deterministic mock data.
+                    if ProcessInfo.processInfo.arguments.contains("-uiPreview") {
+                        showSplash = false
+                        authState.isLoggedIn = true
+                    } else if matrixStore.restoreSession() {
                         authState.isLoggedIn = true
                     }
                 }
@@ -45,8 +49,11 @@ class MacSceneDelegate: NSObject, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession,
                options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
-        windowScene.titlebar?.titleVisibility = .hidden
-        windowScene.titlebar?.toolbarStyle = .unifiedCompact
+        if let titlebar = windowScene.titlebar {
+            titlebar.titleVisibility = .hidden
+            titlebar.toolbar = nil
+            titlebar.separatorStyle = .none
+        }
         windowScene.sizeRestrictions?.minimumSize = CGSize(width: 1200, height: 720)
     }
 }
@@ -88,7 +95,6 @@ struct RootView: View {
             }
         }
         .animation(.easeOut(duration: 0.3), value: authState.isLoggedIn)
-        .ignoresSafeArea(layoutMode == .regular ? .all : [])
         .preferredColorScheme(MoodTheme.shared.theme == .light ? .light : .dark)
     }
 }
@@ -210,4 +216,3 @@ struct SplashScreen: View {
         }
     }
 }
-
