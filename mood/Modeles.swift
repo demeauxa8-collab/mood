@@ -44,6 +44,15 @@ struct MoodUser: Identifiable, Hashable {
         case dnd = "Ne pas déranger"
         case invisible = "Invisible"
         case offline = "Hors ligne"
+
+        var isOfflineLike: Bool {
+            self == .offline || self == .invisible
+        }
+
+        /// Invisible users must look offline outside their own status picker.
+        var publicLabel: String {
+            isOfflineLike ? Self.offline.rawValue : rawValue
+        }
     }
 
     var statusColor: Color {

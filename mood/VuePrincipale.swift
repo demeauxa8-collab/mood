@@ -143,6 +143,12 @@ struct ContentView: View {
             }
         }
         .onAppear {
+            // Mode -uiPreview : ouvre directement un serveur pour montrer la vue channel
+            if ProcessInfo.processInfo.arguments.contains("-uiPreview"), let first = servers.first {
+                showDMs = false
+                selectedServer = first
+                selectedChannel = first.categories.first?.channels.first
+            }
             if selectedServer == nil, !showDMs, let first = servers.first {
                 selectedServer = first
                 selectedChannel = first.categories.first?.channels.first
@@ -855,7 +861,7 @@ struct CompactDMListView: View {
     private var onlineFriendsCarousel: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 16) {
-                ForEach(MockData.users.filter { $0.status == .online }) { user in
+                ForEach(MockData.users.filter { !$0.status.isOfflineLike }) { user in
                     VStack(spacing: 4) {
                         ZStack(alignment: .bottomTrailing) {
                             Text(user.avatarEmoji)
@@ -863,7 +869,7 @@ struct CompactDMListView: View {
                                 .frame(width: 44, height: 44)
                                 .background(MoodTheme.glassBg)
                                 .clipShape(Circle())
-                            StatusIndicator(status: .online, size: 10, borderColor: MoodTheme.channelList)
+                            StatusIndicator(status: user.status, size: 10, borderColor: MoodTheme.channelList)
                                 .offset(x: 2, y: 2)
                         }
                         Text(user.displayName)
@@ -1183,7 +1189,7 @@ struct FriendsPlaceholderView: View {
     }
 
     var onlineFriends: [MoodUser] {
-        friends.filter { $0.status != .offline }
+        friends.filter { !$0.status.isOfflineLike }
     }
 
     var body: some View {
@@ -1556,7 +1562,7 @@ struct FriendRow: View {
                     .frame(width: 40 * LayoutMetrics.scale, height: 40 * LayoutMetrics.scale)
                     .background(MoodTheme.glassBg)
                     .clipShape(Circle())
-                    .opacity(user.status == .offline ? 0.5 : 1)
+                    .opacity(user.status.isOfflineLike ? 0.5 : 1)
 
                 StatusIndicator(status: user.status, size: 10 * LayoutMetrics.scale, borderColor: MoodTheme.chatBackground)
                     .offset(x: 3 * LayoutMetrics.scale, y: 3 * LayoutMetrics.scale)
@@ -1566,9 +1572,9 @@ struct FriendRow: View {
             VStack(alignment: .leading, spacing: 2 * LayoutMetrics.scale) {
                 Text(user.displayName)
                     .font(.mood(14, weight: .semibold))
-                    .foregroundStyle(user.status == .offline ? MoodTheme.textMuted : MoodTheme.textPrimary)
+                    .foregroundStyle(user.status.isOfflineLike ? MoodTheme.textMuted : MoodTheme.textPrimary)
 
-                Text(user.status == .online ? "En ligne" : "Hors ligne")
+                Text(user.status.publicLabel)
                     .font(.mood(12))
                     .foregroundStyle(MoodTheme.textSecondary)
             }
@@ -1637,10 +1643,10 @@ struct AllFriendRow: View {
     @State private var showBlockConfirm = false
 
     private var subtitle: String {
-        if let activity = user.activity {
+        if !user.status.isOfflineLike, let activity = user.activity {
             return "\(activity.type.rawValue) \(activity.name)"
         }
-        return user.status == .online ? "En ligne" : "Hors ligne"
+        return user.status.publicLabel
     }
 
     private var rowBackground: Color {
@@ -1782,21 +1788,11 @@ private struct FriendPresenceIndicator: View {
     let background: Color
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(background)
-                .frame(width: 14 * LayoutMetrics.scale, height: 14 * LayoutMetrics.scale)
-
-            if status == .online {
-                Circle()
-                    .fill(MoodTheme.onlineGreen)
-                    .frame(width: 10 * LayoutMetrics.scale, height: 10 * LayoutMetrics.scale)
-            } else {
-                Circle()
-                    .strokeBorder(MoodTheme.friendOfflineStatus, lineWidth: 3 * LayoutMetrics.scale)
-                    .frame(width: 10 * LayoutMetrics.scale, height: 10 * LayoutMetrics.scale)
-            }
-        }
+        StatusIndicator(
+            status: status,
+            size: 10 * LayoutMetrics.scale,
+            borderColor: background
+        )
         .offset(x: 2 * LayoutMetrics.scale, y: 2 * LayoutMetrics.scale)
     }
 }

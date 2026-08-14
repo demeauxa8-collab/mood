@@ -189,7 +189,7 @@ struct DMRow: View {
                         .font(.mood(14, weight: .medium))
                         .foregroundStyle(conversation.unreadCount > 0 ? MoodTheme.textPrimary : MoodTheme.textSecondary)
 
-                    Text(conversation.participant.status.rawValue.capitalized)
+                    Text(conversation.participant.status.publicLabel)
                         .font(.mood(11))
                         .foregroundStyle(MoodTheme.textMuted)
                 }
