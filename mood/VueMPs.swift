@@ -13,57 +13,71 @@ struct DMListView: View {
         VStack(spacing: 0) {
             // Barre de recherche
             Button { showQuickSwitcher = true } label: {
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .font(.mood(11))
+                HStack(spacing: 0) {
+                    Spacer(minLength: 0)
                     Text("Recherche ou lance une conversation")
-                        .font(.mood(12))
-                    Spacer()
+                        .font(.mood(13))
+                    Spacer(minLength: 0)
                 }
                 .foregroundStyle(MoodTheme.textPrimary)
                 .padding(.horizontal, 10 * LayoutMetrics.scale)
-                .padding(.vertical, 8 * LayoutMetrics.scale)
-                .background(MoodTheme.glassBg)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .frame(height: 32 * LayoutMetrics.scale)
+                .background(MoodTheme.dmSearchBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous)
+                        .strokeBorder(MoodTheme.dmSearchBorder, lineWidth: 1 * LayoutMetrics.scale)
+                }
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 12 * LayoutMetrics.scale)
-            .frame(height: LayoutMetrics.headerHeight)
+            .padding(.leading, 9 * LayoutMetrics.scale)
+            .padding(.trailing, 8 * LayoutMetrics.scale)
+            .frame(height: LayoutMetrics.desktopHeaderHeight)
 
-            Rectangle().fill(MoodTheme.divider).frame(height: 1)
+            Rectangle()
+                .fill(MoodTheme.divider)
+                .frame(height: 1 * LayoutMetrics.scale)
+                .offset(y: 0.25 * LayoutMetrics.scale)
 
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 2) {
-                    SidebarNavItem(icon: "person.2.fill", label: "Amis", isSelected: selectedDM == nil) {
+                VStack(spacing: 2 * LayoutMetrics.scale) {
+                    SidebarNavItem(icon: "figure.wave", label: "Amis", iconSize: 17, isSelected: selectedDM == nil) {
                         selectedDM = nil
                     }
 
-                    SidebarNavItem(icon: "sparkles", label: "Nitro", isSelected: false) { showComingSoon = true }
+                    SidebarNavItem(icon: "circle.hexagongrid.fill", label: "Nitro", isSelected: false) { showComingSoon = true }
 
-                    SidebarNavItem(icon: "bag.fill", label: "Boutique", isSelected: false) { showComingSoon = true }
+                    SidebarNavItem(icon: "bag.fill", label: "Boutique", badgeText: "NOUVEAU", isSelected: false) { showComingSoon = true }
 
                     SidebarNavItem(icon: "flag.fill", label: "Quêtes", isSelected: false) { showComingSoon = true }
 
+                    Rectangle()
+                        .fill(MoodTheme.workspaceBorder)
+                        .frame(height: 1 * LayoutMetrics.scale)
+                        .padding(.leading, 9 * LayoutMetrics.scale)
+                        .padding(.trailing, 8 * LayoutMetrics.scale)
+                        .padding(.top, 11 * LayoutMetrics.scale)
+                        .padding(.bottom, 6 * LayoutMetrics.scale)
+
                     // Header messages privés
                     HStack {
-                        Text("MESSAGES PRIVÉS")
-                            .font(.mood(11, weight: .semibold))
-                            .tracking(0.4)
-                            .foregroundStyle(MoodTheme.textSecondary)
+                        Text("Messages privés")
+                            .font(.mood(12, weight: .medium))
+                            .foregroundStyle(MoodTheme.textSubtle)
 
                         Spacer()
 
                         Button { showComingSoon = true } label: {
                             Image(systemName: "plus")
-                                .font(.mood(11))
+                                .font(.mood(12))
                                 .foregroundStyle(MoodTheme.textPrimary)
                         }
                         .buttonStyle(.plain)
                         .help("Nouveau message")
                     }
                     .padding(.horizontal, 16 * LayoutMetrics.scale)
-                    .padding(.top, 16 * LayoutMetrics.scale)
-                    .padding(.bottom, 4)
+                    .padding(.top, 7 * LayoutMetrics.scale)
+                    .padding(.bottom, 4 * LayoutMetrics.scale)
 
                     ForEach(conversations) { convo in
                         DMRow(
@@ -74,6 +88,7 @@ struct DMListView: View {
                         }
                     }
                 }
+                .padding(.top, 9 * LayoutMetrics.scale)
             }
 
             Spacer(minLength: 0)
@@ -97,32 +112,45 @@ struct DMListView: View {
 struct SidebarNavItem: View {
     let icon: String
     let label: String
+    var badgeText: String? = nil
+    var iconSize: CGFloat = 15
     let isSelected: Bool
     let action: () -> Void
     @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12 * LayoutMetrics.scale) {
+            HStack(spacing: 9 * LayoutMetrics.scale) {
                 Image(systemName: icon)
-                    .font(.mood(15))
+                    .font(.mood(iconSize))
                     .frame(width: 20 * LayoutMetrics.scale)
 
                 Text(label)
-                    .font(.mood(14, weight: .medium))
+                    .font(.mood(15, weight: .medium))
 
                 Spacer()
+
+                if let badgeText {
+                    Text(badgeText)
+                        .font(.mood(11, weight: .bold))
+                        .foregroundStyle(Color(hex: "34343a"))
+                        .padding(.horizontal, 10 * LayoutMetrics.scale)
+                        .frame(height: 16 * LayoutMetrics.scale)
+                        .background(MoodTheme.textPrimary)
+                        .clipShape(Capsule())
+                }
             }
             .foregroundStyle(isSelected ? MoodTheme.textPrimary : MoodTheme.textSecondary)
-            .padding(.horizontal, 12 * LayoutMetrics.scale)
-            .padding(.vertical, 8 * LayoutMetrics.scale)
+            .padding(.horizontal, 10.5 * LayoutMetrics.scale)
+            .frame(height: 38 * LayoutMetrics.scale)
             .background(
                 isSelected ? MoodTheme.selectedBg :
                 isHovered ? MoodTheme.hoverBg :
                 Color.clear
             )
-            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-            .padding(.horizontal, 8)
+            .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
+            .padding(.leading, 9 * LayoutMetrics.scale)
+            .padding(.trailing, 8 * LayoutMetrics.scale)
         }
         .buttonStyle(.plain)
         .onHover { hovering in isHovered = hovering }
@@ -159,9 +187,9 @@ struct DMRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(conversation.participant.displayName)
                         .font(.mood(14, weight: .medium))
-                        .foregroundStyle(isSelected || conversation.unreadCount > 0 ? MoodTheme.textPrimary : MoodTheme.textSecondary)
+                        .foregroundStyle(conversation.unreadCount > 0 ? MoodTheme.textPrimary : MoodTheme.textSecondary)
 
-                    Text(conversation.participant.status.rawValue)
+                    Text(conversation.participant.status.publicLabel)
                         .font(.mood(11))
                         .foregroundStyle(MoodTheme.textMuted)
                 }
@@ -196,7 +224,7 @@ struct DMRow: View {
             .padding(.horizontal, 10 * LayoutMetrics.scale)
             .padding(.vertical, 8 * LayoutMetrics.scale)
             .background(
-                isSelected ? MoodTheme.selectedBg :
+                isSelected && conversation.unreadCount > 0 ? MoodTheme.selectedBg :
                 isHovered ? MoodTheme.hoverBg :
                 Color.clear
             )
@@ -255,19 +283,9 @@ struct DMChatArea: View {
             // Header DM — masqué sur compact (NavigationStack fournit le titre)
             if layoutMode == .regular {
                 HStack(spacing: 10 * LayoutMetrics.scale) {
-                    Button { onBack?() } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.mood(16, weight: .medium))
-                            .foregroundStyle(MoodTheme.textPrimary)
-                            .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help("Retour aux amis")
-
                     Text(conversation.participant.avatarEmoji)
                         .font(.mood(14))
-                        .frame(width: 28 * LayoutMetrics.scale, height: 28 * LayoutMetrics.scale)
+                        .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
                         .background(MoodTheme.glassBg)
                         .clipShape(Circle())
 
@@ -290,11 +308,11 @@ struct DMChatArea: View {
                     Spacer()
 
                     HStack(spacing: 6 * LayoutMetrics.scale) {
-                        HeaderButton(icon: "phone") {
+                        HeaderButton(icon: "phone.fill") {
                             activeCall = .voice
                         }
                         .help("Appel vocal")
-                        HeaderButton(icon: "video") {
+                        HeaderButton(icon: "video.fill") {
                             activeCall = .video
                         }
                         .help("Appel vidéo")
@@ -306,16 +324,9 @@ struct DMChatArea: View {
                         }
                         .help("Messages épinglés")
 
-                        Button {
+                        HeaderButton(icon: "person.crop.circle") {
                             showInlineProfile.toggle()
-                        } label: {
-                            Image(systemName: "person.crop.circle")
-                                .font(.mood(16))
-                                .foregroundStyle(MoodTheme.textPrimary)
-                                .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
-                                .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
                         .popover(isPresented: $showInlineProfile, arrowEdge: .top) {
                             UserProfilePopup(user: conversation.participant)
                                 .adaptiveFrame(width: 320, height: 400, mode: layoutMode)
@@ -331,7 +342,7 @@ struct DMChatArea: View {
                     }
                 }
                 .padding(.horizontal, 16 * LayoutMetrics.scale)
-                .frame(height: LayoutMetrics.headerHeight)
+                .frame(height: LayoutMetrics.desktopHeaderHeight)
 
                 Rectangle().fill(MoodTheme.divider).frame(height: 1)
             }

@@ -49,6 +49,11 @@ class MatrixStore {
     // Raw event tracking for reactions/edits/redactions
     private var reactionEvents: [String: [(emoji: String, sender: String, eventId: String)]] = [:] // targetEventId -> reactions
     private var redactedEventIds: Set<String> = []
+    private var latestEventIdByRoom: [String: String] = [:]
+    private var latestUnreadEventIdByRoom: [String: String] = [:]
+    private var readThroughUnreadEventIdByRoom: [String: String] = [:]
+    private var pendingReadReceipts: [String: String] = [:]
+    private var isSendingReadReceipts = false
 
     // Room metadata
     struct MatrixRoom {
@@ -142,6 +147,11 @@ class MatrixStore {
         pendingInvites = []
         reactionEvents = [:]
         redactedEventIds = []
+        latestEventIdByRoom = [:]
+        latestUnreadEventIdByRoom = [:]
+        readThroughUnreadEventIdByRoom = [:]
+        pendingReadReceipts = [:]
+        isSendingReadReceipts = false
         clearCredentials()
     }
 
@@ -184,6 +194,7 @@ class MatrixStore {
                 let response = try await client.sync(since: nil, timeout: 0)
                 self.processSyncResponse(response)
                 self.syncToken = response.nextBatch
+                await self.retryPendingReadReceipts()
             } catch {
                 if !Task.isCancelled {
                     self.errorMessage = "Sync initiale échouée : \(error.localizedDescription)"
@@ -201,6 +212,7 @@ class MatrixStore {
                     let response = try await client.sync(since: self.syncToken, timeout: 30000)
                     self.processSyncResponse(response)
                     self.syncToken = response.nextBatch
+                    await self.retryPendingReadReceipts()
                 } catch {
                     if !Task.isCancelled {
                         try? await Task.sleep(for: .seconds(5))
@@ -323,8 +335,15 @@ class MatrixStore {
 
             // Unread counts
             if let notifs = roomData.unreadNotifications {
-                room.unreadCount = notifs.notificationCount ?? 0
-                room.mentionCount = notifs.highlightCount ?? 0
+                if let readEventId = readThroughUnreadEventIdByRoom[roomId],
+                   readEventId == latestUnreadEventIdByRoom[roomId] {
+                    room.unreadCount = 0
+                    room.mentionCount = 0
+                } else {
+                    readThroughUnreadEventIdByRoom.removeValue(forKey: roomId)
+                    room.unreadCount = notifs.notificationCount ?? 0
+                    room.mentionCount = notifs.highlightCount ?? 0
+                }
             }
 
             // Fallback room name from members
@@ -403,6 +422,10 @@ class MatrixStore {
 
     private func processTimelineEvent(_ event: MatrixEvent, roomId: String) {
         guard let eventId = event.eventId else { return }
+        latestEventIdByRoom[roomId] = eventId
+        if isUnreadRelevant(event) {
+            latestUnreadEventIdByRoom[roomId] = eventId
+        }
 
         // Redaction
         if event.type == "m.room.redaction" {
@@ -469,6 +492,23 @@ class MatrixStore {
             let chatMessage = convertToChatMessage(event, roomId: roomId)
             if messagesByRoom[roomId] == nil { messagesByRoom[roomId] = [] }
             messagesByRoom[roomId]!.append(chatMessage)
+        }
+    }
+
+    private func isUnreadRelevant(_ event: MatrixEvent) -> Bool {
+        guard event.stateKey == nil else { return false }
+
+        if event.type == "m.room.message",
+           let relatesTo = event.content?["m.relates_to"]?.dictValue,
+           relatesTo["rel_type"]?.stringValue == "m.replace" {
+            return false
+        }
+
+        switch event.type {
+        case "m.reaction", "m.room.redaction", "m.receipt", "m.typing":
+            return false
+        default:
+            return true
         }
     }
 
@@ -641,7 +681,10 @@ class MatrixStore {
                     type: .text,
                     topic: room.topic,
                     unreadCount: room.unreadCount,
-                    isE2E: room.isEncrypted
+                    mentionCount: room.mentionCount,
+                    isE2E: room.isEncrypted,
+                    latestEventId: latestEventIdByRoom[room.roomId],
+                    unreadEventId: latestUnreadEventIdByRoom[room.roomId]
                 )
             }
 
@@ -678,7 +721,10 @@ class MatrixStore {
                     type: .text,
                     topic: room.topic,
                     unreadCount: room.unreadCount,
-                    isE2E: room.isEncrypted
+                    mentionCount: room.mentionCount,
+                    isE2E: room.isEncrypted,
+                    latestEventId: latestEventIdByRoom[room.roomId],
+                    unreadEventId: latestUnreadEventIdByRoom[room.roomId]
                 )
             }
 
@@ -734,7 +780,9 @@ class MatrixStore {
                 participant: participant,
                 lastMessage: lastMessage,
                 lastMessageDate: lastDate,
-                unreadCount: room.unreadCount
+                unreadCount: room.unreadCount,
+                latestEventId: latestEventIdByRoom[room.roomId],
+                unreadEventId: latestUnreadEventIdByRoom[room.roomId]
             )
         }.sorted { $0.lastMessageDate > $1.lastMessageDate }
     }
@@ -778,9 +826,58 @@ class MatrixStore {
         try? await client.sendTyping(roomId: roomId, userId: userId, typing: typing)
     }
 
-    func markAsRead(roomId: String, eventId: String) async {
-        try? await client.sendReadReceipt(roomId: roomId, eventId: eventId)
-        try? await client.setReadMarker(roomId: roomId, fullyRead: eventId, read: eventId)
+    func markDMAsRead(_ conversation: DMConversation) {
+        guard let roomId = roomId(for: conversation) else { return }
+        let eventId = conversation.latestEventId ?? latestEventIdByRoom[roomId]
+        let unreadEventId = conversation.unreadEventId ?? latestUnreadEventIdByRoom[roomId]
+        markRoomAsRead(roomId: roomId, eventId: eventId, unreadEventId: unreadEventId)
+    }
+
+    func markChannelAsRead(_ channel: Channel) {
+        guard let roomId = roomId(for: channel) else { return }
+        let eventId = channel.latestEventId ?? latestEventIdByRoom[roomId]
+        let unreadEventId = channel.unreadEventId ?? latestUnreadEventIdByRoom[roomId]
+        markRoomAsRead(roomId: roomId, eventId: eventId, unreadEventId: unreadEventId)
+    }
+
+    private func markRoomAsRead(roomId: String, eventId: String?, unreadEventId: String?) {
+        guard let roomIndex = rooms.firstIndex(where: { $0.roomId == roomId }) else { return }
+
+        rooms[roomIndex].unreadCount = 0
+        rooms[roomIndex].mentionCount = 0
+
+        if let unreadEventId {
+            readThroughUnreadEventIdByRoom[roomId] = unreadEventId
+        }
+
+        if let eventId {
+            pendingReadReceipts[roomId] = eventId
+        }
+
+        rebuildUIModels()
+
+        if eventId != nil {
+            Task { await retryPendingReadReceipts() }
+        }
+    }
+
+    private func retryPendingReadReceipts() async {
+        guard !isSendingReadReceipts, !pendingReadReceipts.isEmpty else { return }
+        isSendingReadReceipts = true
+        defer { isSendingReadReceipts = false }
+
+        let receiptsToSend = pendingReadReceipts
+        for (roomId, eventId) in receiptsToSend {
+            do {
+                try await client.sendReadReceipt(roomId: roomId, eventId: eventId)
+                try await client.setReadMarker(roomId: roomId, fullyRead: eventId, read: eventId)
+                if pendingReadReceipts[roomId] == eventId {
+                    pendingReadReceipts.removeValue(forKey: roomId)
+                }
+            } catch {
+                // Keep the receipt queued; the next successful sync retries it.
+            }
+        }
     }
 
     func setPresenceStatus(presence: String, statusMsg: String? = nil) async {

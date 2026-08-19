@@ -7,51 +7,51 @@ enum LayoutMode {
     case regular   // Mac / iPad
 }
 
-// MARK: - Mac Catalyst Layout Metrics
-// Mac Catalyst scales the entire UI by 0.77x. To match Discord desktop dimensions,
-// we compensate with a 1.28x factor (≈ 1/0.77) on Catalyst only.
+// MARK: - Layout Metrics
+// Mac Catalyst renders UIKit/SwiftUI geometry at roughly 0.7707× in
+// "Optimized for Mac" mode. The values below are measured Discord screen
+// points, so the Catalyst build compensates once at the design-system boundary.
 
 enum LayoutMetrics {
     #if targetEnvironment(macCatalyst)
-    static let scale: CGFloat = 1.28
+    static let scale: CGFloat = 1.298
     #else
     static let scale: CGFloat = 1.0
     #endif
 
-    // Server bar
+    // Desktop geometry — Discord reference captured at Retina 2×.
+    static let desktopTitleBarHeight: CGFloat = 33 * scale
+    static let workspaceCornerRadius: CGFloat = 12 * scale
+
+    // Server rail
     static let serverBarWidth: CGFloat = 72 * scale
-    static let serverIconSize: CGFloat = 48 * scale
-    static let serverIconCornerRadius: CGFloat = 13 * scale
-    static let serverPillOffset: CGFloat = -12 * scale
+    static let serverIconSize: CGFloat = 40 * scale
+    static let serverIconCornerRadius: CGFloat = 12 * scale
+    static let serverPillOffset: CGFloat = -17 * scale
     static let serverSeparatorWidth: CGFloat = 32 * scale
 
     // Channel / DM list
-    static let channelListWidth: CGFloat = 240 * scale
+    static let channelListWidth: CGFloat = 303 * scale
+    static let desktopHeaderHeight: CGFloat = 48 * scale
 
-    // Carte principale (coin arrondi haut-gauche) + bande de titre
-    static let cardCornerRadius: CGFloat = 18 * scale
-    static let titleBarInset: CGFloat = 28 * scale
+    // Floating user panel spans the rail and the channel list in Discord desktop.
+    static let userPanelWidth: CGFloat = 359 * scale
+    static let userPanelHeight: CGFloat = 58 * scale
+    static let userPanelInset: CGFloat = 8 * scale
 
-    // Headers (hauteur unifiée pour un trait fin continu sur toute la largeur)
-    static let headerHeight: CGFloat = 38 * scale
-
-    // Dock bas (pilules flottantes : panneau utilisateur + barre de saisie)
-    static let dockMargin: CGFloat = 8 * scale
-    static let dockCornerRadius: CGFloat = 11 * scale
-    // Hauteur visible des pilules (utilisateur et saisie alignées)
-    static let dockPillHeight: CGFloat = 52 * scale
-    // Hauteur réservée en bas du rail + panneau pour la pilule utilisateur flottante
-    static let dockReserve: CGFloat = 66 * scale
+    // Bottom composer aligns exactly with the floating user panel.
+    static let composerHeight: CGFloat = 58 * scale
+    static let composerHorizontalInset: CGFloat = 8 * scale
+    static let composerBottomInset: CGFloat = 8 * scale
 
     // Side panels
     static let memberListWidth: CGFloat = 240 * scale
-    static let threadPanelWidth: CGFloat = 340 * scale
+    static let threadPanelWidth: CGFloat = 360 * scale
+    // Discord's right column is 360 pt including its 1 pt leading divider.
+    static let friendsActivityPanelWidth: CGFloat = 359 * scale
 
-    // Combined widths
-    static var userPanelWidth: CGFloat { serverBarWidth + channelListWidth }
-
-    // Bottom padding
-    static let channelBottomPadding: CGFloat = 0
+    // Bottom padding to leave room for user status panel at bottom of channel list
+    static let channelBottomPadding: CGFloat = userPanelHeight + 18 * scale
 }
 
 // MARK: - Scaled Font helper

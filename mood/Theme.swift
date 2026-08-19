@@ -9,11 +9,11 @@ enum AppTheme: String, CaseIterable {
 }
 
 enum AccentColor: String, CaseIterable {
-    case red = "ff383c"
     case purple = "6e56cf"
     case blue = "2997ff"
     case green = "34c759"
     case yellow = "f0b232"
+    case red = "da373c"
     case pink = "e879f9"
 
     var color: Color { Color(hex: rawValue) }
@@ -39,7 +39,7 @@ class ThemeManager {
            let a = AccentColor(rawValue: raw) {
             accent = a
         } else {
-            accent = .red
+            accent = .purple
         }
     }
 }
@@ -55,49 +55,69 @@ enum MoodTheme {
 
     // — Backgrounds —
 
+    /// Global desktop chrome sampled from the Figma Discord reference.
+    static var windowBackground: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "121214")
+        case .amoled: return Color(hex: "000000")
+        case .light:  return Color(hex: "e3e5e8")
+        }
+    }
+
+    static var titleBar: Color { windowBackground }
+
     static var serverBar: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "000000")
+        case .dark:   return Color(hex: "121214")
         case .amoled: return Color(hex: "000000")
-        case .light:  return Color(hex: "e9e9eb")
+        case .light:  return Color(hex: "e3e5e8")
         }
     }
 
     static var channelList: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "000000")
+        case .dark:   return Color(hex: "121214")
         case .amoled: return Color(hex: "000000")
-        case .light:  return Color(hex: "f4f4f5")
+        case .light:  return Color(hex: "f2f3f5")
         }
     }
 
     static var chatBackground: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "161616")
-        case .amoled: return Color(hex: "0a0a0a")
+        case .dark:   return Color(hex: "1a1a1e")
+        case .amoled: return Color(hex: "000000")
         case .light:  return Color(hex: "ffffff")
         }
     }
 
     static var memberList: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "161616")
-        case .amoled: return Color(hex: "0a0a0a")
-        case .light:  return Color(hex: "fafafa")
+        case .dark:   return Color(hex: "17171a")
+        case .amoled: return Color(hex: "000000")
+        case .light:  return Color(hex: "f2f3f5")
         }
     }
 
     static var inputBg: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "262626")
-        case .amoled: return Color(hex: "1c1c1c")
-        case .light:  return Color(hex: "ececee")
+        case .dark:   return Color(hex: "222327")
+        case .amoled: return Color(hex: "101114")
+        case .light:  return Color(hex: "ebedef")
+        }
+    }
+
+    /// One-pixel outline around Discord's desktop message composer.
+    static var composerBorder: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "27282c")
+        case .amoled: return Color.white.opacity(0.10)
+        case .light:  return Color.black.opacity(0.10)
         }
     }
 
     static var hoverBg: Color {
         switch shared.theme {
-        case .dark:   return Color.white.opacity(0.04)
+        case .dark:   return Color(hex: "202024")
         case .amoled: return Color.white.opacity(0.05)
         case .light:  return Color.black.opacity(0.04)
         }
@@ -105,126 +125,256 @@ enum MoodTheme {
 
     static var selectedBg: Color {
         switch shared.theme {
-        case .dark:   return Color.white.opacity(0.08)
+        case .dark:   return Color(hex: "222225")
         case .amoled: return Color.white.opacity(0.10)
         case .light:  return Color.black.opacity(0.08)
         }
     }
 
+    /// Selected text/voice channel surface in Discord's server sidebar.
+    static var channelSelectedBg: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "2c2c30")
+        case .amoled: return Color.white.opacity(0.14)
+        case .light:  return Color.black.opacity(0.10)
+        }
+    }
+
+    static var headerSearchBackground: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "17171a")
+        case .amoled: return Color(hex: "0c0c0e")
+        case .light:  return Color(hex: "ffffff")
+        }
+    }
+
+    static var headerSearchBorder: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "303035")
+        case .amoled: return Color.white.opacity(0.14)
+        case .light:  return Color.black.opacity(0.12)
+        }
+    }
+
+    // — Friends list —
+
+    /// Search placeholder sampled from Discord's desktop friends view.
+    static var friendsSearchPlaceholder: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "8f9097")
+        case .amoled: return Color(hex: "949ba4")
+        case .light:  return Color(hex: "5c5e66")
+        }
+    }
+
+    /// Hover surface used by a full row in the desktop friends list.
+    static var friendRowHover: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "29292d")
+        case .amoled: return Color.white.opacity(0.10)
+        case .light:  return Color.black.opacity(0.07)
+        }
+    }
+
+    static var friendRowSeparator: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "29292d")
+        case .amoled: return Color.white.opacity(0.08)
+        case .light:  return Color.black.opacity(0.08)
+        }
+    }
+
+    static var friendOfflineStatus: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "84858c")
+        case .amoled: return Color(hex: "80848e")
+        case .light:  return Color(hex: "80848e")
+        }
+    }
+
+    // — Floating server menu —
+
+    static var serverMenuBackground: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "28282d")
+        case .amoled: return Color(hex: "151519")
+        case .light:  return Color(hex: "ffffff")
+        }
+    }
+
+    static var serverMenuHover: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "38393f")
+        case .amoled: return Color.white.opacity(0.12)
+        case .light:  return Color.black.opacity(0.07)
+        }
+    }
+
+    static var serverMenuBorder: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "36363b")
+        case .amoled: return Color.white.opacity(0.14)
+        case .light:  return Color.black.opacity(0.12)
+        }
+    }
+
+    static var serverMenuSeparator: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "36363b")
+        case .amoled: return Color.white.opacity(0.14)
+        case .light:  return Color.black.opacity(0.10)
+        }
+    }
+
+    static var serverMenuDanger: Color {
+        switch shared.theme {
+        case .dark, .amoled: return Color(hex: "f87f7a")
+        case .light:         return Color(hex: "d83c3e")
+        }
+    }
+
+    static var serverMenuTagBackground: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "3e3e44")
+        case .amoled: return Color.white.opacity(0.14)
+        case .light:  return Color.black.opacity(0.09)
+        }
+    }
+
+    static var serverMenuCheckboxBackground: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "252529")
+        case .amoled: return Color(hex: "18181c")
+        case .light:  return Color.white
+        }
+    }
+
+    static var serverMenuCheckboxBorder: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "6e6e75")
+        case .amoled: return Color.white.opacity(0.42)
+        case .light:  return Color.black.opacity(0.32)
+        }
+    }
+
+    /// Search field surface sampled from the Discord desktop DM sidebar.
+    static var dmSearchBackground: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "222225")
+        case .amoled: return Color.white.opacity(0.10)
+        case .light:  return Color(hex: "ebedef")
+        }
+    }
+
+    static var dmSearchBorder: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "262629")
+        case .amoled: return Color.white.opacity(0.12)
+        case .light:  return Color.black.opacity(0.10)
+        }
+    }
+
     static var popupBg: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "1a1a1a")
-        case .amoled: return Color(hex: "0f0f0f")
+        case .dark:   return Color(hex: "242428")
+        case .amoled: return Color(hex: "000000")
         case .light:  return Color(hex: "ffffff")
         }
     }
 
-    // — Pilules flottantes du dock (panneau utilisateur, barre de saisie) —
-
-    static var dockPill: Color {
-        switch shared.theme {
-        case .dark:   return Color(hex: "1a1a1a")
-        case .amoled: return Color(hex: "101010")
-        case .light:  return Color(hex: "ffffff")
-        }
-    }
-
-    // — Liseré lumineux en haut de la carte principale —
-
-    static var cardStroke: Color {
-        switch shared.theme {
-        case .dark:   return Color.white.opacity(0.30)
-        case .amoled: return Color.white.opacity(0.25)
-        case .light:  return Color.black.opacity(0.10)
-        }
-    }
-
-    // — Contour biseauté des pilules (lumière en haut, fondu en bas) —
-
-    static var pillStrokeTop: Color {
-        switch shared.theme {
-        case .dark:   return Color.white.opacity(0.18)
-        case .amoled: return Color.white.opacity(0.16)
-        case .light:  return Color.black.opacity(0.10)
-        }
-    }
-
-    static var pillStrokeBottom: Color {
-        switch shared.theme {
-        case .dark:   return Color.white.opacity(0.04)
-        case .amoled: return Color.white.opacity(0.04)
-        case .light:  return Color.black.opacity(0.04)
-        }
-    }
-
-    // — Glass surfaces —
+    // — Glass surfaces (Discord-style solid fills) —
 
     static var glassBg: Color {
         switch shared.theme {
-        case .dark:   return Color.white.opacity(0.07)
-        case .amoled: return Color.white.opacity(0.06)
+        case .dark:   return Color(hex: "202024")
+        case .amoled: return Color.white.opacity(0.055)
         case .light:  return Color.black.opacity(0.04)
         }
     }
 
     static var glassBorder: Color {
         switch shared.theme {
-        case .dark:   return Color.white.opacity(0.10)
+        case .dark:   return Color(hex: "252529")
         case .amoled: return Color.white.opacity(0.10)
+        case .light:  return Color.black.opacity(0.08)
+        }
+    }
+
+    /// The workspace outline is darker than floating-panel outlines.
+    static var workspaceBorder: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "222225")
+        case .amoled: return Color.white.opacity(0.08)
         case .light:  return Color.black.opacity(0.08)
         }
     }
 
     static var glassHighlight: Color {
         switch shared.theme {
-        case .dark:   return Color.white.opacity(0.16)
+        case .dark:   return Color(hex: "303036")
         case .amoled: return Color.white.opacity(0.15)
         case .light:  return Color.black.opacity(0.06)
         }
     }
 
-    // — Texte —
+    // — Texte (Discord exact) —
 
     static var textPrimary: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "f5f5f7")
-        case .amoled: return Color(hex: "f5f5f7")
+        case .dark:   return Color(hex: "fbfbfb")
+        case .amoled: return Color(hex: "dbdee1")
         case .light:  return Color(hex: "060607")
         }
     }
 
     static var textSecondary: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "949ba4")
+        case .dark:   return Color(hex: "96979e")
         case .amoled: return Color(hex: "949ba4")
         case .light:  return Color(hex: "4e5058")
         }
     }
 
+    static var textSupporting: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "abacb2")
+        case .amoled: return Color(hex: "b5bac1")
+        case .light:  return Color(hex: "5c5e66")
+        }
+    }
+
+    static var textSubtle: Color {
+        switch shared.theme {
+        case .dark:   return Color(hex: "818289")
+        case .amoled: return Color(hex: "6d6f78")
+        case .light:  return Color(hex: "80848e")
+        }
+    }
+
     static var textMuted: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "5c6069")
-        case .amoled: return Color(hex: "5c6069")
+        case .dark:   return Color(hex: "7d828c")
+        case .amoled: return Color(hex: "6d6f78")
         case .light:  return Color(hex: "a0a3a8")
         }
     }
 
-    // — Accents —
+    // — Accents (Discord exact) —
 
     static var brandAccent: Color { shared.accent.color }
 
-    static var brandBlue: Color { Color(hex: "2997ff") }
+    static var brandBlue: Color { Color(hex: "5865f2") }
 
-    static var mentionBadge: Color { Color(hex: "ff383c") }
+    static var mentionBadge: Color { Color(hex: "da373c") }
 
-    static var onlineGreen: Color { Color(hex: "23a55a") }
+    static var onlineGreen: Color { Color(hex: "23a559") }
 
     // — Server icons —
 
     static var serverIconBg: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "1a1a1a")
-        case .amoled: return Color(hex: "121212")
+        case .dark:   return Color(hex: "202024")
+        case .amoled: return Color.white.opacity(0.06)
         case .light:  return Color.black.opacity(0.04)
         }
     }
@@ -235,9 +385,9 @@ enum MoodTheme {
 
     static var divider: Color {
         switch shared.theme {
-        case .dark:   return Color.white.opacity(0.16)
-        case .amoled: return Color.white.opacity(0.12)
-        case .light:  return Color.black.opacity(0.10)
+        case .dark:   return Color(hex: "29292e")
+        case .amoled: return Color.white.opacity(0.08)
+        case .light:  return Color.black.opacity(0.06)
         }
     }
 
@@ -245,7 +395,7 @@ enum MoodTheme {
 
     static var messageHover: Color {
         switch shared.theme {
-        case .dark:   return Color(hex: "1d1d1d")
+        case .dark:   return Color(hex: "1f1f23")
         case .amoled: return Color.white.opacity(0.03)
         case .light:  return Color.black.opacity(0.02)
         }
@@ -255,7 +405,7 @@ enum MoodTheme {
 
     static var brandGradient: LinearGradient {
         LinearGradient(
-            colors: [shared.accent.color, Color(hex: "2997ff")],
+            colors: [shared.accent.color, Color(hex: "5865f2")],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -263,38 +413,11 @@ enum MoodTheme {
 
     static var subtleGlow: RadialGradient {
         RadialGradient(
-            colors: [shared.accent.color.opacity(0.15), Color.clear],
+            colors: [shared.accent.color.opacity(0.10), Color.clear],
             center: .top,
             startRadius: 0,
             endRadius: 300
         )
-    }
-}
-
-// MARK: - Style des pilules flottantes du dock
-
-extension View {
-    /// Pilule flottante : fond, coins continus, contour biseauté et ombre portée.
-    /// `emphasized` accentue le contour (ex. champ de saisie avec focus).
-    func dockPillStyle(background: Color, emphasized: Bool = false) -> some View {
-        self
-            .background(background)
-            .clipShape(RoundedRectangle(cornerRadius: LayoutMetrics.dockCornerRadius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: LayoutMetrics.dockCornerRadius, style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                emphasized ? MoodTheme.glassHighlight : MoodTheme.pillStrokeTop,
-                                MoodTheme.pillStrokeBottom
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        lineWidth: 1
-                    )
-            )
-            .shadow(color: .black.opacity(0.45), radius: 12, y: 5)
     }
 }
 

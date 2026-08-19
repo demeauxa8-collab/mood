@@ -11,7 +11,6 @@ struct MessageInputBar: View {
     @State private var showGIFPicker = false
     @State private var showAttachMenu = false
     @State private var showAttachAlert = false
-    @FocusState private var isInputFocused: Bool
 
     init(text: Binding<String>, channelName: String, isE2E: Bool, typingUsers: [String] = [], replyingTo: Binding<ChatMessage?> = .constant(nil), onSend: (() -> Void)? = nil) {
         self._text = text
@@ -37,148 +36,158 @@ struct MessageInputBar: View {
                 .padding(.bottom, 4)
             }
 
-            // Pilule flottante : reply bar + champ de saisie
-            VStack(spacing: 0) {
-                // Reply bar
-                if let reply = replyingTo {
-                    HStack(spacing: 8 * LayoutMetrics.scale) {
-                        Image(systemName: "arrowshape.turn.up.left.fill")
+            // Reply bar
+            if let reply = replyingTo {
+                HStack(spacing: 8 * LayoutMetrics.scale) {
+                    Image(systemName: "arrowshape.turn.up.left.fill")
+                        .font(.mood(10))
+                        .foregroundStyle(MoodTheme.brandAccent)
+
+                    Text("Répondre à")
+                        .font(.mood(12))
+                        .foregroundStyle(MoodTheme.textSecondary)
+
+                    Text(reply.sender.displayName)
+                        .font(.mood(12, weight: .semibold))
+                        .foregroundStyle(reply.sender.roleColor)
+
+                    Text("— \(reply.content)")
+                        .font(.mood(12))
+                        .foregroundStyle(MoodTheme.textMuted)
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.12)) { replyingTo = nil }
+                    } label: {
+                        Image(systemName: "xmark")
                             .font(.mood(10))
-                            .foregroundStyle(MoodTheme.brandAccent)
-
-                        Text("Répondre à")
-                            .font(.mood(12))
-                            .foregroundStyle(MoodTheme.textSecondary)
-
-                        Text(reply.sender.displayName)
-                            .font(.mood(12, weight: .semibold))
-                            .foregroundStyle(reply.sender.roleColor)
-
-                        Text("— \(reply.content)")
-                            .font(.mood(12))
-                            .foregroundStyle(MoodTheme.textMuted)
-                            .lineLimit(1)
-
-                        Spacer()
-
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.12)) { replyingTo = nil }
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.mood(10))
-                                .foregroundStyle(MoodTheme.textPrimary)
-                        }
-                        .buttonStyle(.plain)
+                            .foregroundStyle(MoodTheme.textPrimary)
                     }
-                    .padding(.horizontal, 16 * LayoutMetrics.scale)
-                    .padding(.vertical, 8 * LayoutMetrics.scale)
-                    .background(MoodTheme.glassBg)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 16 * LayoutMetrics.scale)
+                .padding(.vertical, 8 * LayoutMetrics.scale)
+                .background(MoodTheme.glassBg)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            HStack(spacing: 0) {
+                // Bouton +
+                Button { showAttachMenu.toggle() } label: {
+                    Image(systemName: "plus")
+                        .font(.mood(16, weight: .medium))
+                        .foregroundStyle(MoodTheme.textPrimary)
+                        .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 8 * LayoutMetrics.scale)
+                .padding(.trailing, 10 * LayoutMetrics.scale)
+                .help("Joindre un fichier")
+                .popover(isPresented: $showAttachMenu, arrowEdge: .top) {
+                    VStack(spacing: 2) {
+                        AttachMenuItem(icon: "doc", label: "Importer un fichier", color: MoodTheme.brandAccent) {
+                            showAttachMenu = false
+                            showAttachAlert = true
+                        }
+                        AttachMenuItem(icon: "photo", label: "Importer une photo", color: MoodTheme.onlineGreen) {
+                            showAttachMenu = false
+                            showAttachAlert = true
+                        }
+                        AttachMenuItem(icon: "text.bubble", label: "Créer un fil", color: MoodTheme.brandBlue) {
+                            showAttachMenu = false
+                            showAttachAlert = true
+                        }
+                    }
+                    .padding(8)
+                    .frame(width: 220)
+                    .background(MoodTheme.channelList)
+                }
+                .alert("Bientôt disponible", isPresented: $showAttachAlert) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text("L'envoi de fichiers sera disponible dans une prochaine version.")
                 }
 
-                HStack(spacing: 0) {
-                    // Bouton +
-                    Button { showAttachMenu.toggle() } label: {
-                        Image(systemName: "plus")
-                            .font(.mood(16, weight: .medium))
+                // Champ texte
+                HStack(spacing: 6 * LayoutMetrics.scale) {
+                    if isE2E {
+                        Image(systemName: "lock.fill")
+                            .font(.mood(9))
+                            .foregroundStyle(MoodTheme.brandAccent.opacity(0.4))
+                    }
+
+                    TextField(
+                        "",
+                        text: $text,
+                        prompt: Text("Envoyer un message dans #\(channelName)")
+                            .foregroundStyle(MoodTheme.textMuted)
+                    )
+                        .textFieldStyle(.plain)
+                        .font(.mood(15))
+                        .foregroundStyle(MoodTheme.textPrimary)
+                        .onSubmit { onSend?() }
+                }
+
+                // Boutons droite
+                HStack(spacing: 4 * LayoutMetrics.scale) {
+                    InputBarButton(icon: "gift")
+                        .help("Envoyer un cadeau")
+
+                    Button {
+                        showGIFPicker.toggle()
+                        showEmojiPicker = false
+                    } label: {
+                        Text("GIF")
+                            .font(.mood(10, weight: .bold))
                             .foregroundStyle(MoodTheme.textPrimary)
                             .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .padding(.leading, 8 * LayoutMetrics.scale)
-                    .padding(.trailing, 10 * LayoutMetrics.scale)
-                    .help("Joindre un fichier")
-                    .popover(isPresented: $showAttachMenu, arrowEdge: .top) {
-                        VStack(spacing: 2) {
-                            AttachMenuItem(icon: "doc", label: "Importer un fichier", color: MoodTheme.brandAccent) {
-                                showAttachMenu = false
-                                showAttachAlert = true
-                            }
-                            AttachMenuItem(icon: "photo", label: "Importer une photo", color: MoodTheme.onlineGreen) {
-                                showAttachMenu = false
-                                showAttachAlert = true
-                            }
-                            AttachMenuItem(icon: "text.bubble", label: "Créer un fil", color: MoodTheme.brandBlue) {
-                                showAttachMenu = false
-                                showAttachAlert = true
-                            }
-                        }
-                        .padding(8)
-                        .frame(width: 220)
-                        .background(MoodTheme.channelList)
-                    }
-                    .alert("Bientôt disponible", isPresented: $showAttachAlert) {
-                        Button("OK", role: .cancel) {}
-                    } message: {
-                        Text("L'envoi de fichiers sera disponible dans une prochaine version.")
+                    .help("GIF")
+                    .popover(isPresented: $showGIFPicker, arrowEdge: .bottom) {
+                        GIFPicker(isPresented: $showGIFPicker)
                     }
 
-                    // Champ texte
-                    HStack(spacing: 6 * LayoutMetrics.scale) {
-                        if isE2E {
-                            Image(systemName: "lock.fill")
-                                .font(.mood(9))
-                                .foregroundStyle(MoodTheme.brandAccent.opacity(0.4))
-                        }
+                    InputBarButton(icon: "face.dashed")
+                        .help("Autocollants")
 
-                        TextField("Envoyer un message dans #\(channelName)", text: $text)
-                            .textFieldStyle(.plain)
-                            .font(.mood(14))
+                    Button {
+                        showEmojiPicker.toggle()
+                        showGIFPicker = false
+                    } label: {
+                        Image(systemName: "face.smiling")
+                            .font(.mood(16))
                             .foregroundStyle(MoodTheme.textPrimary)
-                            .focused($isInputFocused)
-                            .onSubmit { onSend?() }
+                            .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Emoji")
+                    .popover(isPresented: $showEmojiPicker, arrowEdge: .bottom) {
+                        EmojiPicker(isPresented: $showEmojiPicker) { emoji in
+                            text += emoji
+                        }
                     }
 
-                    // Boutons droite
-                    HStack(spacing: 4 * LayoutMetrics.scale) {
-                        InputBarButton(icon: "gift")
-                            .help("Envoyer un cadeau")
-
-                        Button {
-                            showGIFPicker.toggle()
-                            showEmojiPicker = false
-                        } label: {
-                            Text("GIF")
-                                .font(.mood(10, weight: .bold))
-                                .foregroundStyle(MoodTheme.textPrimary)
-                                .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .help("GIF")
-                        .popover(isPresented: $showGIFPicker, arrowEdge: .bottom) {
-                            GIFPicker(isPresented: $showGIFPicker)
-                        }
-
-                        Button {
-                            showEmojiPicker.toggle()
-                            showGIFPicker = false
-                        } label: {
-                            Image(systemName: "face.smiling")
-                                .font(.mood(16))
-                                .foregroundStyle(MoodTheme.textPrimary)
-                                .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .help("Emoji")
-                        .popover(isPresented: $showEmojiPicker, arrowEdge: .bottom) {
-                            EmojiPicker(isPresented: $showEmojiPicker) { emoji in
-                                text += emoji
-                            }
-                        }
-                    }
-                    .fixedSize()
-                    .padding(.trailing, 8 * LayoutMetrics.scale)
+                    InputBarButton(icon: "square.grid.2x2.fill")
+                        .help("Applications")
                 }
-                .frame(minHeight: LayoutMetrics.dockPillHeight)
+                .fixedSize()
+                .padding(.trailing, 8 * LayoutMetrics.scale)
             }
-            .dockPillStyle(background: MoodTheme.inputBg, emphasized: isInputFocused)
-            .animation(.easeOut(duration: 0.15), value: isInputFocused)
-            .padding(.horizontal, LayoutMetrics.dockMargin)
-            .padding(.bottom, LayoutMetrics.dockMargin)
-            .padding(.top, 4)
+            .frame(height: LayoutMetrics.composerHeight)
+            .background(MoodTheme.inputBg)
+            .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous)
+                    .strokeBorder(MoodTheme.composerBorder, lineWidth: 1 * LayoutMetrics.scale)
+            }
+            .padding(.horizontal, LayoutMetrics.composerHorizontalInset)
+            .padding(.bottom, LayoutMetrics.composerBottomInset)
         }
         .background(MoodTheme.chatBackground)
     }

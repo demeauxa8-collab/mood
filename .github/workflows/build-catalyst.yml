@@ -6,6 +6,9 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/build-catalyst.yml'
+      - 'mood/**'
+      - 'mood.xcodeproj/**'
+      - 'scripts/**'
 
 jobs:
   build:

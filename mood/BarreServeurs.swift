@@ -17,7 +17,7 @@ struct ServerSidebarView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 6) {
+                VStack(spacing: 8 * LayoutMetrics.scale) {
                     // Home / DMs — Logo Mood (deux points)
                     Button {
                         showDMs = true
@@ -30,11 +30,14 @@ struct ServerSidebarView: View {
                             .frame(width: LayoutMetrics.serverIconSize, height: LayoutMetrics.serverIconSize)
                             .background(
                                 showDMs ? MoodTheme.brandAccent :
-                                MoodTheme.glassBg
+                                MoodTheme.serverIconBg
                             )
-                            .clipShape(RoundedRectangle(cornerRadius: serverIconCornerRadius, style: .continuous))
-                            .shadow(color: showDMs ? MoodTheme.brandAccent.opacity(0.45) : .clear, radius: 9, y: 2)
-                            .animation(.easeInOut(duration: 0.2), value: showDMs)
+                            .clipShape(
+                                RoundedRectangle(
+                                    cornerRadius: LayoutMetrics.serverIconCornerRadius,
+                                    style: .continuous
+                                )
+                            )
 
                             // Badge mentions DMs
                             if dmUnreadCount > 0 {
@@ -60,19 +63,18 @@ struct ServerSidebarView: View {
                         if showDMs {
                             RoundedRectangle(cornerRadius: 3, style: .continuous)
                                 .fill(MoodTheme.textPrimary)
-                                .frame(width: 3 * LayoutMetrics.scale, height: 36 * LayoutMetrics.scale)
+                                .frame(width: 4 * LayoutMetrics.scale, height: 40 * LayoutMetrics.scale)
                                 .offset(x: LayoutMetrics.serverPillOffset)
                         }
                     }
 
                     // Séparateur
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(MoodTheme.divider)
-                        .frame(width: LayoutMetrics.serverSeparatorWidth, height: 2)
-                        .padding(.vertical, 4)
+                    RoundedRectangle(cornerRadius: 0.5 * LayoutMetrics.scale)
+                        .fill(MoodTheme.workspaceBorder)
+                        .frame(width: LayoutMetrics.serverSeparatorWidth, height: 1 * LayoutMetrics.scale)
 
-                    // Serveurs (premiers 3 individuels)
-                    ForEach(servers.prefix(3)) { server in
+                    // Serveurs
+                    ForEach(servers) { server in
                         SidebarIcon(
                             emoji: server.iconEmoji,
                             isSelected: !showDMs && selectedServer?.id == server.id,
@@ -86,19 +88,10 @@ struct ServerSidebarView: View {
                         .help(server.name)
                     }
 
-                    // Dossier de serveurs (derniers 2)
-                    ServerFolder(
-                        servers: Array(servers.suffix(2)),
-                        selectedServer: $selectedServer,
-                        showDMs: $showDMs,
-                        selectedChannel: $selectedChannel
-                    )
-
                     // Séparateur
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(MoodTheme.divider)
-                        .frame(width: LayoutMetrics.serverSeparatorWidth, height: 2)
-                        .padding(.vertical, 4)
+                    RoundedRectangle(cornerRadius: 0.5 * LayoutMetrics.scale)
+                        .fill(MoodTheme.workspaceBorder)
+                        .frame(width: LayoutMetrics.serverSeparatorWidth, height: 1 * LayoutMetrics.scale)
 
                     // Ajouter
                     SidebarIcon(
@@ -123,10 +116,18 @@ struct ServerSidebarView: View {
                         selectedServer = nil
                     }
                     .help("Explorer les serveurs")
+
+                    SidebarIcon(
+                        systemIcon: "arrow.down.to.line",
+                        isSelected: false,
+                        hasUnread: false,
+                        mentionCount: 0,
+                        iconColor: MoodTheme.textSecondary
+                    ) {}
+                    .help("Télécharger l'application")
                 }
-                .padding(.top, 12 * LayoutMetrics.scale)
-                .padding(.bottom, LayoutMetrics.dockReserve)
-                .padding(.horizontal, 10 * LayoutMetrics.scale)
+                .padding(.bottom, 12 * LayoutMetrics.scale)
+                .padding(.horizontal, 15 * LayoutMetrics.scale)
             }
 
             Spacer()
@@ -173,14 +174,12 @@ struct SidebarIcon: View {
                 .frame(width: LayoutMetrics.serverIconSize, height: LayoutMetrics.serverIconSize)
                 .background(
                     isSelected ? MoodTheme.brandAccent :
-                    isHovered ? MoodTheme.brandAccent.opacity(0.5) :
-                    MoodTheme.glassBg
+                    isHovered ? MoodTheme.brandAccent :
+                    MoodTheme.serverIconBg
                 )
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                .shadow(color: isSelected ? MoodTheme.brandAccent.opacity(0.45) : .clear, radius: 9, y: 2)
-                .scaleEffect(isHovered ? 1.05 : 1)
-                .animation(.easeInOut(duration: 0.2), value: isSelected)
-                .animation(.easeInOut(duration: 0.2), value: isHovered)
+                .animation(.easeInOut(duration: 0.15), value: isSelected)
+                .animation(.easeInOut(duration: 0.15), value: isHovered)
 
                 // Badge mentions
                 if mentionCount > 0 {
@@ -200,13 +199,15 @@ struct SidebarIcon: View {
             }
         }
         .buttonStyle(.plain)
-        .onHover { hovering in isHovered = hovering }
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.12)) { isHovered = hovering }
+        }
         // Pill indicator gauche
         .overlay(alignment: .leading) {
             if hasUnread || isSelected {
                 RoundedRectangle(cornerRadius: 3, style: .continuous)
                     .fill(MoodTheme.textPrimary)
-                    .frame(width: 3 * LayoutMetrics.scale, height: (isSelected ? 36 : (isHovered ? 18 : 6)) * LayoutMetrics.scale)
+                    .frame(width: 4 * LayoutMetrics.scale, height: (isSelected ? 40 : (isHovered ? 20 : 8)) * LayoutMetrics.scale)
                     .offset(x: LayoutMetrics.serverPillOffset)
                     .animation(.easeInOut(duration: 0.2), value: isSelected)
                     .animation(.easeInOut(duration: 0.2), value: isHovered)
@@ -304,9 +305,15 @@ struct ServerFolder: View {
                         }
                         .frame(width: LayoutMetrics.serverIconSize, height: LayoutMetrics.serverIconSize)
                         .background(
-                            isHovered ? MoodTheme.brandAccent.opacity(0.5) : MoodTheme.glassBg
+                            isHovered ? MoodTheme.brandAccent.opacity(0.5) : MoodTheme.serverIconBg
                         )
-                        .clipShape(RoundedRectangle(cornerRadius: serverIconCornerRadius, style: .continuous))
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: LayoutMetrics.serverIconCornerRadius,
+                                style: .continuous
+                            )
+                        )
+                        .animation(.easeInOut(duration: 0.15), value: isHovered)
 
                         if totalMentions > 0 {
                             Text("\(totalMentions)")
