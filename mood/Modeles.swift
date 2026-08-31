@@ -143,7 +143,7 @@ struct MoodServer: Identifiable, Hashable {
             categories: updatedCategories,
             members: members,
             memberRoles: memberRoles,
-            hasUnread: updatedChannels.contains { $0.unreadCount > 0 },
+            hasUnread: updatedChannels.contains { $0.unreadCount > 0 || $0.mentionCount > 0 },
             mentionCount: updatedChannels.reduce(0) { $0 + $1.mentionCount }
         )
     }

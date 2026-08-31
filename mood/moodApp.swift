@@ -66,9 +66,15 @@ struct RootView: View {
     var authState: AuthState
     var matrixStore: MatrixStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @AppStorage(MoodMotion.reduceMotionPreferenceKey) private var userReduceMotion = false
 
     private var layoutMode: LayoutMode {
         horizontalSizeClass == .compact ? .compact : .regular
+    }
+
+    private var reduceMotion: Bool {
+        systemReduceMotion || userReduceMotion
     }
 
     var body: some View {
@@ -87,14 +93,15 @@ struct RootView: View {
 
             if showSplash {
                 SplashScreen {
-                    withAnimation(.easeOut(duration: 0.5)) {
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.5)) {
                         showSplash = false
                     }
                 }
                 .transition(.opacity)
             }
         }
-        .animation(.easeOut(duration: 0.3), value: authState.isLoggedIn)
+        .environment(\.moodReduceMotion, reduceMotion)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: authState.isLoggedIn)
         .preferredColorScheme(MoodTheme.shared.theme == .light ? .light : .dark)
     }
 }
@@ -104,6 +111,8 @@ struct RootView: View {
 
 struct SplashScreen: View {
     let onFinish: () -> Void
+
+    @Environment(\.moodReduceMotion) private var reduceMotion
 
     // Phase 1 : deux points apparaissent (écartés)
     @State private var dotsVisible = false
@@ -184,6 +193,20 @@ struct SplashScreen: View {
     }
 
     private func runAnimation() {
+        if reduceMotion {
+            dotsVisible = true
+            dotsClose = true
+            becomeInfinity = true
+            showM = true
+            showD = true
+            glowOn = true
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                onFinish()
+            }
+            return
+        }
+
         // 1. Les deux points apparaissent (écartés)
         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
             dotsVisible = true

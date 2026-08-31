@@ -263,6 +263,7 @@ struct DMRow: View {
 struct DMChatArea: View {
     @Environment(MatrixStore.self) private var matrixStore
     @Environment(\.layoutMode) private var layoutMode
+    @Environment(\.moodReduceMotion) private var reduceMotion
     let conversation: DMConversation
     @Binding var showProfilePopup: Bool
     @Binding var profileUser: MoodUser?
@@ -276,6 +277,12 @@ struct DMChatArea: View {
     private var messages: [ChatMessage] {
         let storeMessages = matrixStore.messages(forDM: conversation)
         return storeMessages.isEmpty ? MockData.dmMessages(for: conversation) : storeMessages
+    }
+
+    private var floatingPanelTransition: AnyTransition {
+        reduceMotion
+            ? .opacity
+            : .opacity.combined(with: .scale(scale: 0.97, anchor: .topTrailing))
     }
 
     var body: some View {
@@ -316,26 +323,32 @@ struct DMChatArea: View {
                             activeCall = .video
                         }
                         .help("Appel vidéo")
-                        HeaderButton(icon: "pin") {
-                            withAnimation(.easeInOut(duration: 0.15)) {
+                        HeaderButton(icon: "pin", isActive: showPinnedMessages) {
+                            withAnimation(reduceMotion ? nil : MoodMotion.popover) {
                                 showPinnedMessages.toggle()
                                 showSearch = false
+                                showInlineProfile = false
                             }
                         }
                         .help("Messages épinglés")
 
-                        HeaderButton(icon: "person.crop.circle") {
-                            showInlineProfile.toggle()
+                        HeaderButton(icon: "person.crop.circle", isActive: showInlineProfile) {
+                            withAnimation(reduceMotion ? nil : MoodMotion.popover) {
+                                showInlineProfile.toggle()
+                                showSearch = false
+                                showPinnedMessages = false
+                            }
                         }
                         .popover(isPresented: $showInlineProfile, arrowEdge: .top) {
                             UserProfilePopup(user: conversation.participant)
                                 .adaptiveFrame(width: 320, height: 400, mode: layoutMode)
                         }
 
-                        HeaderButton(icon: "magnifyingglass") {
-                            withAnimation(.easeInOut(duration: 0.15)) {
+                        HeaderButton(icon: "magnifyingglass", isActive: showSearch) {
+                            withAnimation(reduceMotion ? nil : MoodMotion.popover) {
                                 showSearch.toggle()
                                 showPinnedMessages = false
+                                showInlineProfile = false
                             }
                         }
                         .help("Rechercher")
@@ -347,24 +360,12 @@ struct DMChatArea: View {
                 Rectangle().fill(MoodTheme.divider).frame(height: 1)
             }
 
-            // Search panel
-            if showSearch {
-                SearchPanel(showSearch: $showSearch)
-            }
-
-            // Pinned messages panel
-            if showPinnedMessages {
-                PinnedMessagesPanel(
-                    messages: messages.filter { $0.isPinned },
-                    server: nil,
-                    showPanel: $showPinnedMessages
-                )
-            }
-
-            // Messages
-            ScrollView {
-                ScrollViewReader { proxy in
-                    LazyVStack(spacing: 0) {
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 0) {
+                    // Messages
+                    ScrollView {
+                        ScrollViewReader { proxy in
+                            LazyVStack(spacing: 0) {
                         VStack(spacing: 10 * LayoutMetrics.scale) {
                             Text(conversation.participant.avatarEmoji)
                                 .font(.mood(50))
@@ -404,34 +405,87 @@ struct DMChatArea: View {
                             }
                             .id(message.id)
                         }
-                    }
-                    .onAppear {
-                        if let lastID = messages.last?.id {
-                            proxy.scrollTo(lastID, anchor: .bottom)
+                            }
+                            .onAppear {
+                                if let lastID = messages.last?.id {
+                                    proxy.scrollTo(lastID, anchor: .bottom)
+                                }
+                            }
                         }
                     }
+                    .scrollDismissesKeyboard(.interactively)
+
+                    MessageInputBar(
+                        text: $messageText,
+                        channelName: conversation.participant.displayName,
+                        isE2E: true,
+                        onSend: {
+                            let trimmed = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !trimmed.isEmpty else { return }
+                            let text = trimmed
+                            messageText = ""
+                            Task {
+                                if let roomId = matrixStore.roomId(for: conversation) {
+                                    await matrixStore.sendMessage(roomId: roomId, text: text)
+                                }
+                            }
+                        }
+                    )
+                }
+
+                if layoutMode == .regular, showSearch || showPinnedMessages {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(reduceMotion ? nil : MoodMotion.popover) {
+                                showSearch = false
+                                showPinnedMessages = false
+                            }
+                        }
+                        .zIndex(19)
+                }
+
+                if layoutMode == .regular, showSearch {
+                    SearchPanel(showSearch: $showSearch)
+                        .frame(width: LayoutMetrics.threadPanelWidth)
+                        .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous)
+                                .strokeBorder(MoodTheme.glassBorder, lineWidth: 1 * LayoutMetrics.scale)
+                        }
+                        .shadow(color: .black.opacity(0.5), radius: 20, y: 8)
+                        .padding(.top, 8 * LayoutMetrics.scale)
+                        .padding(.trailing, 12 * LayoutMetrics.scale)
+                        .transition(floatingPanelTransition)
+                        .zIndex(20)
+                } else if layoutMode == .regular, showPinnedMessages {
+                    PinnedMessagesPanel(
+                        messages: messages.filter { $0.isPinned },
+                        server: nil,
+                        showPanel: $showPinnedMessages
+                    )
+                    .frame(width: LayoutMetrics.threadPanelWidth)
+                    .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous)
+                            .strokeBorder(MoodTheme.glassBorder, lineWidth: 1 * LayoutMetrics.scale)
+                    }
+                    .shadow(color: .black.opacity(0.5), radius: 20, y: 8)
+                    .padding(.top, 8 * LayoutMetrics.scale)
+                    .padding(.trailing, 12 * LayoutMetrics.scale)
+                    .transition(floatingPanelTransition)
+                    .zIndex(20)
                 }
             }
-            .scrollDismissesKeyboard(.interactively)
-
-            MessageInputBar(
-                text: $messageText,
-                channelName: conversation.participant.displayName,
-                isE2E: true,
-                onSend: {
-                    let trimmed = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !trimmed.isEmpty else { return }
-                    let text = trimmed
-                    messageText = ""
-                    Task {
-                        if let roomId = matrixStore.roomId(for: conversation) {
-                            await matrixStore.sendMessage(roomId: roomId, text: text)
-                        }
-                    }
-                }
-            )
         }
         .background(MoodTheme.chatBackground)
+        .onChange(of: conversation.id) { _, _ in
+            activeCall = nil
+            showPinnedMessages = false
+            showSearch = false
+            showInlineProfile = false
+            messageText = ""
+        }
         .overlay {
             if let call = activeCall {
                 Group {

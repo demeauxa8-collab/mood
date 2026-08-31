@@ -4,6 +4,8 @@ struct ContentView: View {
     @Environment(MatrixStore.self) private var matrixStore
     @Environment(AuthState.self) private var authState
     @Environment(\.layoutMode) private var layoutMode
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.moodReduceMotion) private var reduceMotion
     @State private var selectedServer: MoodServer?
     @State private var selectedChannel: Channel?
     @State private var showDMs = true
@@ -44,9 +46,7 @@ struct ContentView: View {
                 if let conversation {
                     openDM(conversation)
                 } else {
-                    withAnimation(.snappy(duration: 0.2)) {
-                        selectedDM = nil
-                    }
+                    selectedDM = nil
                 }
             }
         )
@@ -86,6 +86,18 @@ struct ContentView: View {
         .background(MoodTheme.chatBackground)
         .preferredColorScheme(.dark)
         .overlay {
+            if layoutMode == .regular, showSettings {
+                AccountSettingsView(isPresented: $showSettings, authState: authState)
+                    .environment(matrixStore)
+                    .environment(\.layoutMode, layoutMode)
+                    .preferredColorScheme(.dark)
+                    .padding(.top, LayoutMetrics.desktopTitleBarHeight)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .trailing)))
+                    .zIndex(200)
+            }
+        }
+        .overlay {
             if showProfilePopup, let user = profileUser {
                 ZStack {
                     // Dim background
@@ -107,7 +119,10 @@ struct ContentView: View {
                 .animation(.easeOut(duration: 0.15), value: showProfilePopup)
             }
         }
-        .sheet(isPresented: $showSettings) {
+        .sheet(isPresented: Binding(
+            get: { layoutMode == .compact && showSettings },
+            set: { if !$0 { showSettings = false } }
+        )) {
             AccountSettingsView(isPresented: $showSettings, authState: authState)
                 .environment(matrixStore)
                 .environment(\.layoutMode, layoutMode)
@@ -168,8 +183,14 @@ struct ContentView: View {
         }
         .onChange(of: selectedDMUnreadSignature) { _, _ in
             guard layoutMode == .regular,
+                  scenePhase == .active,
                   showDMs,
                   !showExplore,
+                  !showSettings,
+                  !showQuickSwitcher,
+                  !showProfilePopup,
+                  !showCreateServer,
+                  callingUser == nil,
                   let selectedDM,
                   let conversation = conversations.first(where: { $0.id == selectedDM.id }),
                   conversation.unreadCount > 0
@@ -179,13 +200,48 @@ struct ContentView: View {
         }
         .onChange(of: selectedChannelUnreadSignature) { _, _ in
             guard layoutMode == .regular,
+                  scenePhase == .active,
                   !showDMs,
                   !showExplore,
+                  !showSettings,
+                  !showQuickSwitcher,
+                  !showProfilePopup,
+                  !showCreateServer,
+                  callingUser == nil,
                   activeServer != nil,
                   let channel = activeChannel,
                   channel.unreadCount > 0 || channel.mentionCount > 0
             else { return }
             selectedChannel = markChannelRead(channel)
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active,
+                  layoutMode == .regular,
+                  !showSettings,
+                  !showQuickSwitcher,
+                  !showProfilePopup,
+                  !showCreateServer,
+                  callingUser == nil
+            else { return }
+
+            if showDMs,
+               !showExplore,
+               let selectedDM,
+               let conversation = conversations.first(where: { $0.id == selectedDM.id }),
+               conversation.unreadCount > 0 {
+                self.selectedDM = markConversationRead(conversation)
+            } else if !showDMs,
+                      !showExplore,
+                      let channel = activeChannel,
+                      channel.unreadCount > 0 || channel.mentionCount > 0 {
+                selectedChannel = markChannelRead(channel)
+            }
+        }
+        .onChange(of: showSettings) { _, isShowing in
+            guard isShowing else { return }
+            showProfilePopup = false
+            showQuickSwitcher = false
+            showCreateServer = false
         }
     }
 
@@ -208,7 +264,8 @@ struct ContentView: View {
                     selectedChannel: selectedChannelBinding,
                     showCreateServer: $showCreateServer,
                     showExplore: $showExplore,
-                    dmUnreadCount: conversations.reduce(0) { $0 + $1.unreadCount }
+                    dmUnreadCount: conversations.reduce(0) { $0 + $1.unreadCount },
+                    onMarkServerRead: markServerRead
                 )
                 .frame(width: LayoutMetrics.serverBarWidth)
 
@@ -232,11 +289,9 @@ struct ContentView: View {
                         .frame(width: LayoutMetrics.channelListWidth)
                         .frame(maxHeight: .infinity)
                         .background(MoodTheme.channelList)
-                        .transition(.move(edge: .leading).combined(with: .opacity))
                     }
 
                     desktopMainContent
-                        .transition(.opacity.combined(with: .scale(scale: 0.995)))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .clipShape(
@@ -270,10 +325,6 @@ struct ContentView: View {
                 .padding(.bottom, LayoutMetrics.composerBottomInset)
         }
         .ignoresSafeArea()
-        .animation(.snappy(duration: 0.24), value: showDMs)
-        .animation(.snappy(duration: 0.22), value: selectedServer?.id)
-        .animation(.snappy(duration: 0.20), value: selectedChannel?.id)
-        .animation(.snappy(duration: 0.20), value: selectedDM?.id)
         .overlay {
             if showCreateServer {
                 ZStack {
@@ -308,17 +359,15 @@ struct ContentView: View {
     }
 
     private func desktopBack() {
-        withAnimation(.snappy(duration: 0.2)) {
-            if showExplore {
-                showExplore = false
-                showDMs = true
-            } else if selectedDM != nil {
-                selectedDM = nil
-            } else if !showDMs {
-                showDMs = true
-                selectedServer = nil
-                selectedChannel = nil
-            }
+        if showExplore {
+            showExplore = false
+            showDMs = true
+        } else if selectedDM != nil {
+            selectedDM = nil
+        } else if !showDMs {
+            showDMs = true
+            selectedServer = nil
+            selectedChannel = nil
         }
     }
 
@@ -333,7 +382,7 @@ struct ContentView: View {
                     showProfilePopup: $showProfilePopup,
                     profileUser: $profileUser,
                     onBack: {
-                        withAnimation(.snappy(duration: 0.2)) { selectedDM = nil }
+                        selectedDM = nil
                     }
                 )
             } else {
@@ -448,9 +497,7 @@ struct ContentView: View {
 
     private func openDM(_ conversation: DMConversation) {
         let readConversation = markConversationRead(conversation)
-        withAnimation(.snappy(duration: 0.2)) {
-            selectedDM = readConversation
-        }
+        selectedDM = readConversation
     }
 
     @discardableResult
@@ -472,8 +519,13 @@ struct ContentView: View {
 
     private func openChannel(_ channel: Channel) {
         let readChannel = markChannelRead(channel)
-        withAnimation(.snappy(duration: 0.2)) {
-            selectedChannel = readChannel
+        selectedChannel = readChannel
+    }
+
+    private func markServerRead(_ server: MoodServer) {
+        for channel in server.categories.flatMap(\.channels)
+        where channel.unreadCount > 0 || channel.mentionCount > 0 {
+            _ = markChannelRead(channel)
         }
     }
 
@@ -491,7 +543,8 @@ struct ContentView: View {
             matrixStore.markChannelAsRead(channel)
         }
 
-        if let refreshedServer = servers.first(where: { $0.channel(withID: channel.id) != nil }) {
+        if let refreshedServer = servers.first(where: { $0.channel(withID: channel.id) != nil }),
+           selectedServer?.id == refreshedServer.id {
             selectedServer = refreshedServer
         }
 

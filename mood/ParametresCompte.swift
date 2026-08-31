@@ -194,7 +194,6 @@ struct AccountSettingsView: View {
             .background(MoodTheme.chatBackground)
         }
         .frame(minWidth: 700, minHeight: 500)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var compactSettingsLayout: some View {
@@ -770,7 +769,7 @@ struct AppearanceContent: View {
 // MARK: - Accessibility Content
 
 struct AccessibilityContent: View {
-    @State private var reduceMotion = false
+    @AppStorage(MoodMotion.reduceMotionPreferenceKey) private var reduceMotion = false
     @State private var highContrast = false
     @State private var largerText = false
 

@@ -3,24 +3,99 @@ import UIKit
 
 // MARK: - Chat Area
 
+private enum ChatStructuralPanel {
+    case none
+    case members
+    case threads
+    case thread
+}
+
+private enum ChatFloatingPanel {
+    case none
+    case search
+    case pinned
+}
+
 struct ChatArea: View {
     @Environment(MatrixStore.self) private var matrixStore
     @Environment(\.layoutMode) private var layoutMode
+    @Environment(\.moodReduceMotion) private var reduceMotion
     let channel: Channel
     let server: MoodServer
     @Binding var showProfilePopup: Bool
     @Binding var profileUser: MoodUser?
     @State private var messageText = ""
-    @State private var showMemberList = false
-    @State private var showSearch = false
-    @State private var showPinnedMessages = false
-    @State private var showThreadPanel = false
+    @State private var structuralPanel: ChatStructuralPanel = .none
+    @State private var floatingPanel: ChatFloatingPanel = .none
     @State private var activeThread: ChatMessage?
     @State private var replyingTo: ChatMessage?
 
     private var messages: [ChatMessage] {
         let storeMessages = matrixStore.messages(for: channel)
         return storeMessages.isEmpty ? MockData.messages(for: channel) : storeMessages
+    }
+
+    private var showMemberListBinding: Binding<Bool> {
+        Binding(
+            get: { structuralPanel == .members },
+            set: { isShowing in
+                structuralPanel = isShowing ? .members : .none
+                if isShowing { floatingPanel = .none }
+            }
+        )
+    }
+
+    private var showThreadPanelBinding: Binding<Bool> {
+        Binding(
+            get: { structuralPanel == .thread },
+            set: { isShowing in
+                structuralPanel = isShowing && activeThread != nil ? .thread : .none
+                if isShowing { floatingPanel = .none }
+            }
+        )
+    }
+
+    private var showThreadsBrowserBinding: Binding<Bool> {
+        Binding(
+            get: { structuralPanel == .threads || structuralPanel == .thread },
+            set: { isShowing in
+                structuralPanel = isShowing ? .threads : .none
+                if isShowing {
+                    activeThread = nil
+                    floatingPanel = .none
+                }
+            }
+        )
+    }
+
+    private var showSearchBinding: Binding<Bool> {
+        Binding(
+            get: { floatingPanel == .search },
+            set: { isShowing in
+                floatingPanel = isShowing ? .search : .none
+                if isShowing { structuralPanel = .none }
+            }
+        )
+    }
+
+    private var showPinnedMessagesBinding: Binding<Bool> {
+        Binding(
+            get: { floatingPanel == .pinned },
+            set: { isShowing in
+                floatingPanel = isShowing ? .pinned : .none
+                if isShowing { structuralPanel = .none }
+            }
+        )
+    }
+
+    private var sidePanelTransition: AnyTransition {
+        reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity)
+    }
+
+    private var floatingPanelTransition: AnyTransition {
+        reduceMotion
+            ? .opacity
+            : .opacity.combined(with: .scale(scale: 0.97, anchor: .topTrailing))
     }
 
     var body: some View {
@@ -38,9 +113,10 @@ struct ChatArea: View {
             if layoutMode == .regular {
                 ChannelHeader(
                     channel: channel,
-                    showMemberList: $showMemberList,
-                    showSearch: $showSearch,
-                    showPinnedMessages: $showPinnedMessages
+                    showThreadPanel: showThreadsBrowserBinding,
+                    showMemberList: showMemberListBinding,
+                    showSearch: showSearchBinding,
+                    showPinnedMessages: showPinnedMessagesBinding
                 )
 
                 Rectangle()
@@ -49,22 +125,9 @@ struct ChatArea: View {
                     .offset(y: 0.25 * LayoutMetrics.scale)
             }
 
-            HStack(spacing: 0) {
-                VStack(spacing: 0) {
-                    // Search panel
-                    if showSearch {
-                        SearchPanel(showSearch: $showSearch)
-                    }
-
-                    // Pinned messages panel
-                    if showPinnedMessages {
-                        PinnedMessagesPanel(
-                            messages: messages.filter { $0.isPinned },
-                            server: server,
-                            showPanel: $showPinnedMessages
-                        )
-                    }
-
+            ZStack(alignment: .topTrailing) {
+                HStack(spacing: 0) {
+                    VStack(spacing: 0) {
                     MessageList(
                         messages: messages,
                         channel: channel,
@@ -73,7 +136,7 @@ struct ChatArea: View {
                         profileUser: $profileUser,
                         replyingTo: $replyingTo,
                         activeThread: $activeThread,
-                        showThreadPanel: $showThreadPanel
+                        showThreadPanel: showThreadPanelBinding
                     )
 
                     MessageInputBar(
@@ -93,21 +156,35 @@ struct ChatArea: View {
                             }
                         }
                     )
-                }
+                    }
 
-                // Panels inline sur desktop uniquement
-                if layoutMode == .regular {
-                    if showThreadPanel, let thread = activeThread {
+                    // Panels inline sur desktop uniquement
+                    if layoutMode == .regular {
+                    if structuralPanel == .threads {
+                        Rectangle().fill(MoodTheme.divider).frame(width: 1)
+
+                        ThreadBrowserPanel(
+                            messages: messages.filter { $0.threadInfo != nil },
+                            server: server,
+                            showPanel: showThreadsBrowserBinding,
+                            onSelect: { message in
+                                activeThread = message
+                                structuralPanel = .thread
+                            }
+                        )
+                        .frame(width: LayoutMetrics.threadPanelWidth)
+                        .transition(sidePanelTransition)
+                    } else if structuralPanel == .thread, let thread = activeThread {
                         Rectangle().fill(MoodTheme.divider).frame(width: 1)
 
                         ThreadPanel(
                             message: thread,
                             server: server,
-                            showPanel: $showThreadPanel
+                            showPanel: showThreadPanelBinding
                         )
                         .frame(width: LayoutMetrics.threadPanelWidth)
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
-                    } else if showMemberList {
+                        .transition(sidePanelTransition)
+                    } else if structuralPanel == .members {
                         Rectangle().fill(MoodTheme.divider).frame(width: 1)
 
                         MemberListPanel(
@@ -117,28 +194,99 @@ struct ChatArea: View {
                             profileUser: $profileUser
                         )
                         .frame(width: LayoutMetrics.memberListWidth)
+                        .transition(sidePanelTransition)
                     }
+                    }
+                }
+
+                if layoutMode == .regular, floatingPanel != .none {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(reduceMotion ? nil : MoodMotion.popover) {
+                                floatingPanel = .none
+                            }
+                        }
+                        .zIndex(19)
+                }
+
+                if layoutMode == .regular, floatingPanel == .search {
+                    SearchPanel(showSearch: showSearchBinding)
+                        .frame(width: LayoutMetrics.threadPanelWidth)
+                        .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous)
+                                .strokeBorder(MoodTheme.glassBorder, lineWidth: 1 * LayoutMetrics.scale)
+                        }
+                        .shadow(color: .black.opacity(0.5), radius: 20, y: 8)
+                        .padding(.top, 8 * LayoutMetrics.scale)
+                        .padding(.trailing, 12 * LayoutMetrics.scale)
+                        .transition(floatingPanelTransition)
+                        .zIndex(20)
+                } else if layoutMode == .regular, floatingPanel == .pinned {
+                    PinnedMessagesPanel(
+                        messages: messages.filter { $0.isPinned },
+                        server: server,
+                        showPanel: showPinnedMessagesBinding
+                    )
+                    .frame(width: LayoutMetrics.threadPanelWidth)
+                    .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous)
+                            .strokeBorder(MoodTheme.glassBorder, lineWidth: 1 * LayoutMetrics.scale)
+                    }
+                    .shadow(color: .black.opacity(0.5), radius: 20, y: 8)
+                    .padding(.top, 8 * LayoutMetrics.scale)
+                    .padding(.trailing, 12 * LayoutMetrics.scale)
+                    .transition(floatingPanelTransition)
+                    .zIndex(20)
                 }
             }
         }
         .background(MoodTheme.chatBackground)
+        .onChange(of: channel.id) { _, _ in
+            structuralPanel = .none
+            floatingPanel = .none
+            activeThread = nil
+            replyingTo = nil
+            messageText = ""
+        }
+        .sheet(isPresented: Binding(
+            get: { layoutMode == .compact && structuralPanel == .threads },
+            set: { if !$0 { structuralPanel = .none } }
+        )) {
+            NavigationStack {
+                ThreadBrowserPanel(
+                    messages: messages.filter { $0.threadInfo != nil },
+                    server: server,
+                    showPanel: showThreadsBrowserBinding,
+                    onSelect: { message in
+                        activeThread = message
+                        structuralPanel = .thread
+                    }
+                )
+                .navigationTitle("Threads")
+                .navigationBarTitleDisplayMode(.inline)
+            }
+            .presentationDetents([.medium, .large])
+        }
         // Sheets pour les panels sur compact
         .sheet(isPresented: Binding(
-            get: { layoutMode == .compact && showThreadPanel && activeThread != nil },
-            set: { if !$0 { showThreadPanel = false } }
+            get: { layoutMode == .compact && structuralPanel == .thread && activeThread != nil },
+            set: { if !$0 { structuralPanel = .none } }
         )) {
             if let thread = activeThread {
                 NavigationStack {
                     ThreadPanel(
                         message: thread,
                         server: server,
-                        showPanel: $showThreadPanel
+                        showPanel: showThreadPanelBinding
                     )
                     .navigationTitle("Fil de discussion")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
-                            Button("Fermer") { showThreadPanel = false }
+                            Button("Fermer") { structuralPanel = .none }
                         }
                     }
                 }
@@ -146,8 +294,8 @@ struct ChatArea: View {
             }
         }
         .sheet(isPresented: Binding(
-            get: { layoutMode == .compact && showMemberList },
-            set: { if !$0 { showMemberList = false } }
+            get: { layoutMode == .compact && structuralPanel == .members },
+            set: { if !$0 { structuralPanel = .none } }
         )) {
             NavigationStack {
                 MemberListPanel(
@@ -160,7 +308,7 @@ struct ChatArea: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("Fermer") { showMemberList = false }
+                        Button("Fermer") { structuralPanel = .none }
                     }
                 }
             }
@@ -172,7 +320,10 @@ struct ChatArea: View {
 // MARK: - Channel Header
 
 struct ChannelHeader: View {
+    @Environment(\.moodReduceMotion) private var reduceMotion
+
     let channel: Channel
+    @Binding var showThreadPanel: Bool
     @Binding var showMemberList: Bool
     @Binding var showSearch: Bool
     @Binding var showPinnedMessages: Bool
@@ -214,7 +365,11 @@ struct ChannelHeader: View {
             Spacer()
 
             HStack(spacing: 8 * LayoutMetrics.scale) {
-                HeaderButton(icon: "square.stack.3d.up.fill")
+                HeaderButton(icon: "square.stack.3d.up.fill", isActive: showThreadPanel) {
+                    withAnimation(reduceMotion ? nil : MoodMotion.panel) {
+                        showThreadPanel.toggle()
+                    }
+                }
                     .help("Threads")
 
                 HeaderButton(icon: "bell.fill") { showNotifAlert = true }
@@ -225,28 +380,28 @@ struct ChannelHeader: View {
                         Text("Les paramètres de notification seront disponibles dans une prochaine version.")
                     }
 
-                HeaderButton(icon: "pin.fill") {
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                HeaderButton(icon: "pin.fill", isActive: showPinnedMessages) {
+                    withAnimation(reduceMotion ? nil : MoodMotion.popover) {
                         showPinnedMessages.toggle()
                     }
                 }
                 .help("Messages épinglés")
 
-                HeaderButton(icon: "person.2.fill") {
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                HeaderButton(icon: "person.2.fill", isActive: showMemberList) {
+                    withAnimation(reduceMotion ? nil : MoodMotion.panel) {
                         showMemberList.toggle()
                     }
                 }
                 .help("Liste des membres")
 
                 Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                    withAnimation(reduceMotion ? nil : MoodMotion.popover) {
                         showSearch.toggle()
                     }
                 } label: {
                     HeaderSearchField(isActive: showSearch)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(MoodPressButtonStyle())
                 .padding(.leading, 4 * LayoutMetrics.scale)
                 .help("Rechercher")
             }
@@ -259,7 +414,10 @@ struct ChannelHeader: View {
 }
 
 struct HeaderButton: View {
+    @Environment(\.moodReduceMotion) private var reduceMotion
+
     let icon: String
+    var isActive = false
     var action: () -> Void = {}
     @State private var isHovered = false
 
@@ -267,18 +425,24 @@ struct HeaderButton: View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.mood(16))
-                .foregroundStyle(isHovered ? MoodTheme.textPrimary : MoodTheme.textSecondary)
+                .foregroundStyle(isHovered || isActive ? MoodTheme.textPrimary : MoodTheme.textSecondary)
                 .frame(width: 32 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
-                .background(isHovered ? MoodTheme.hoverBg : Color.clear)
+                .background(isHovered || isActive ? MoodTheme.hoverBg : Color.clear)
                 .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .onHover { hovering in isHovered = hovering }
+        .buttonStyle(MoodPressButtonStyle())
+        .onHover { hovering in
+            withAnimation(reduceMotion ? nil : MoodMotion.hover) {
+                isHovered = hovering
+            }
+        }
     }
 }
 
 struct HeaderSearchField: View {
+    @Environment(\.moodReduceMotion) private var reduceMotion
+
     let isActive: Bool
     @State private var isHovered = false
 
@@ -307,13 +471,19 @@ struct HeaderSearchField: View {
                 )
         )
         .contentShape(Rectangle())
-        .onHover { hovering in isHovered = hovering }
+        .onHover { hovering in
+            withAnimation(reduceMotion ? nil : MoodMotion.hover) {
+                isHovered = hovering
+            }
+        }
     }
 }
 
 // MARK: - Message List
 
 struct MessageList: View {
+    @Environment(\.moodReduceMotion) private var reduceMotion
+
     let messages: [ChatMessage]
     let channel: Channel
     let server: MoodServer
@@ -375,11 +545,6 @@ struct MessageList: View {
                                 DateSeparator(date: message.timestamp)
                             }
 
-                            // Séparateur NOUVEAU (avant les 3 derniers messages)
-                            if index == messages.count - 3 {
-                                NewMessagesSeparator()
-                            }
-
                             if message.isSystemMessage {
                                 SystemMessageRow(message: message)
                                     .id(message.id)
@@ -388,7 +553,7 @@ struct MessageList: View {
                                     replyingTo = message
                                 }, onThread: {
                                     activeThread = message
-                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                    withAnimation(reduceMotion ? nil : MoodMotion.panel) {
                                         showThreadPanel = true
                                     }
                                 }) {
@@ -446,7 +611,6 @@ struct MessageRow: View {
     @State private var showPinnedFeedback = false
     @State private var showEllipsisMenu = false
     @State private var showDeleteConfirm = false
-    @State private var showMarkedUnread = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -783,12 +947,6 @@ struct MessageRow: View {
             } label: { Label(message.isPinned ? "Désépingler" : "Épingler le message", systemImage: message.isPinned ? "pin.slash" : "pin") }
             Divider()
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) { showMarkedUnread = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    withAnimation { showMarkedUnread = false }
-                }
-            } label: { Label("Marquer comme non lu", systemImage: "circle.fill") }
-            Button {
                 UIPasteboard.general.string = message.content
                 copiedMessage = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) { copiedMessage = false }
@@ -973,6 +1131,8 @@ struct MemberRow: View {
 // MARK: - Search Panel
 
 struct SearchPanel: View {
+    @Environment(\.moodReduceMotion) private var reduceMotion
+
     @Binding var showSearch: Bool
     @State private var searchText = ""
 
@@ -989,7 +1149,7 @@ struct SearchPanel: View {
                     .foregroundStyle(MoodTheme.textPrimary)
 
                 Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                    withAnimation(reduceMotion ? nil : MoodMotion.popover) {
                         showSearch = false
                     }
                 } label: {
@@ -997,7 +1157,7 @@ struct SearchPanel: View {
                         .font(.mood(11))
                         .foregroundStyle(MoodTheme.textPrimary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(MoodPressButtonStyle())
             }
             .padding(.horizontal, 12 * LayoutMetrics.scale)
             .padding(.vertical, 8 * LayoutMetrics.scale)
@@ -1174,6 +1334,8 @@ struct DateSeparator: View {
 // MARK: - Pinned Messages Panel
 
 struct PinnedMessagesPanel: View {
+    @Environment(\.moodReduceMotion) private var reduceMotion
+
     let messages: [ChatMessage]
     let server: MoodServer?
     @Binding var showPanel: Bool
@@ -1189,13 +1351,15 @@ struct PinnedMessagesPanel: View {
                     .foregroundStyle(MoodTheme.textPrimary)
                 Spacer()
                 Button {
-                    withAnimation(.easeInOut(duration: 0.15)) { showPanel = false }
+                    withAnimation(reduceMotion ? nil : MoodMotion.popover) {
+                        showPanel = false
+                    }
                 } label: {
                     Image(systemName: "xmark")
                         .font(.mood(11))
                         .foregroundStyle(MoodTheme.textPrimary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(MoodPressButtonStyle())
             }
             .padding(.horizontal, 16 * LayoutMetrics.scale)
             .padding(.vertical, 10 * LayoutMetrics.scale)
@@ -1252,6 +1416,128 @@ struct PinnedMessagesPanel: View {
         }
         .background(MoodTheme.chatBackground)
         .overlay(Rectangle().fill(MoodTheme.divider).frame(height: 1), alignment: .bottom)
+    }
+}
+
+// MARK: - Thread Browser
+
+struct ThreadBrowserPanel: View {
+    @Environment(\.moodReduceMotion) private var reduceMotion
+
+    let messages: [ChatMessage]
+    let server: MoodServer?
+    @Binding var showPanel: Bool
+    let onSelect: (ChatMessage) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8 * LayoutMetrics.scale) {
+                Image(systemName: "square.stack.3d.up.fill")
+                    .font(.mood(13))
+                    .foregroundStyle(MoodTheme.textSecondary)
+
+                Text("Threads")
+                    .font(.mood(14, weight: .bold))
+                    .foregroundStyle(MoodTheme.textPrimary)
+
+                Spacer()
+
+                Button {
+                    withAnimation(reduceMotion ? nil : MoodMotion.panel) {
+                        showPanel = false
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.mood(11, weight: .semibold))
+                        .foregroundStyle(MoodTheme.textPrimary)
+                        .frame(width: 28 * LayoutMetrics.scale, height: 28 * LayoutMetrics.scale)
+                        .background(MoodTheme.glassBg)
+                        .clipShape(RoundedRectangle(cornerRadius: 6 * LayoutMetrics.scale, style: .continuous))
+                }
+                .buttonStyle(MoodPressButtonStyle())
+                .help("Fermer les threads")
+            }
+            .padding(.horizontal, 14 * LayoutMetrics.scale)
+            .frame(height: LayoutMetrics.desktopHeaderHeight)
+
+            Rectangle().fill(MoodTheme.divider).frame(height: 1)
+
+            if messages.isEmpty {
+                VStack(spacing: 10 * LayoutMetrics.scale) {
+                    Image(systemName: "bubble.left.and.bubble.right")
+                        .font(.mood(30, weight: .medium))
+                        .foregroundStyle(MoodTheme.textMuted)
+
+                    Text("Aucun thread actif")
+                        .font(.mood(14, weight: .semibold))
+                        .foregroundStyle(MoodTheme.textPrimary)
+
+                    Text("Les réponses organisées en thread apparaîtront ici.")
+                        .font(.mood(12))
+                        .foregroundStyle(MoodTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 230 * LayoutMetrics.scale)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(24 * LayoutMetrics.scale)
+            } else {
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(spacing: 4 * LayoutMetrics.scale) {
+                        ForEach(messages) { message in
+                            Button {
+                                onSelect(message)
+                            } label: {
+                                HStack(alignment: .top, spacing: 10 * LayoutMetrics.scale) {
+                                    Text(message.sender.avatarEmoji)
+                                        .font(.mood(15))
+                                        .frame(width: 34 * LayoutMetrics.scale, height: 34 * LayoutMetrics.scale)
+                                        .background(MoodTheme.glassBg)
+                                        .clipShape(Circle())
+
+                                    VStack(alignment: .leading, spacing: 4 * LayoutMetrics.scale) {
+                                        HStack(spacing: 6 * LayoutMetrics.scale) {
+                                            Text(message.sender.displayName)
+                                                .font(.mood(12, weight: .semibold))
+                                                .foregroundStyle(message.sender.roleColor)
+                                                .lineLimit(1)
+
+                                            RoleBadge(
+                                                role: server?.roleFor(message.sender) ?? .member,
+                                                size: 10 * LayoutMetrics.scale
+                                            )
+
+                                            Spacer(minLength: 0)
+
+                                            Text("\(message.threadInfo?.replyCount ?? 0)")
+                                                .font(.mood(11, weight: .semibold))
+                                                .foregroundStyle(MoodTheme.brandAccent)
+
+                                            Image(systemName: "chevron.right")
+                                                .font(.mood(9, weight: .bold))
+                                                .foregroundStyle(MoodTheme.textMuted)
+                                        }
+
+                                        Text(message.content)
+                                            .font(.mood(12))
+                                            .foregroundStyle(MoodTheme.textPrimary)
+                                            .lineLimit(2)
+                                            .multilineTextAlignment(.leading)
+                                    }
+                                }
+                                .padding(10 * LayoutMetrics.scale)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(MoodPressButtonStyle())
+                            .background(MoodTheme.glassBg.opacity(0.45))
+                            .clipShape(RoundedRectangle(cornerRadius: 7 * LayoutMetrics.scale, style: .continuous))
+                        }
+                    }
+                    .padding(10 * LayoutMetrics.scale)
+                }
+            }
+        }
+        .background(MoodTheme.chatBackground)
     }
 }
 

@@ -4,6 +4,8 @@ import UIKit
 // MARK: - Channel List Column
 
 struct ChannelListColumn: View {
+    @Environment(\.moodReduceMotion) private var reduceMotion
+
     let server: MoodServer
     @Binding var selectedChannel: Channel?
     @Binding var showSettings: Bool
@@ -17,7 +19,7 @@ struct ChannelListColumn: View {
             // Header serveur
             HStack(spacing: 0) {
                 Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                    withAnimation(reduceMotion ? nil : MoodMotion.popover) {
                         showServerMenu.toggle()
                     }
                 } label: {
@@ -36,7 +38,7 @@ struct ChannelListColumn: View {
                     .padding(.leading, 16 * LayoutMetrics.scale)
                     .frame(height: LayoutMetrics.desktopHeaderHeight)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(MoodPressButtonStyle())
 
                 Button {
                     showInviteModal = true
@@ -47,7 +49,7 @@ struct ChannelListColumn: View {
                         .frame(width: 48 * LayoutMetrics.scale, height: LayoutMetrics.desktopHeaderHeight)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(MoodPressButtonStyle())
                 .help("Inviter sur le serveur")
             }
 
@@ -88,22 +90,36 @@ struct ChannelListColumn: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(MoodTheme.channelList)
-        .overlay(alignment: .top) {
+        .overlay {
             if showServerMenu {
-                ServerSettingsMenu(
-                    server: server,
-                    showAllChannels: $showAllChannels,
-                    hideMutedChannels: $hideMutedChannels
-                ) {
-                    withAnimation(.easeOut(duration: 0.14)) { showServerMenu = false }
-                    showInviteModal = true
-                }
-                .padding(.top, 53 * LayoutMetrics.scale)
-                .transition(
-                    .opacity.combined(
-                        with: .scale(scale: 0.985, anchor: .top)
+                ZStack(alignment: .top) {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(reduceMotion ? nil : MoodMotion.popover) {
+                                showServerMenu = false
+                            }
+                        }
+
+                    ServerSettingsMenu(
+                        server: server,
+                        showAllChannels: $showAllChannels,
+                        hideMutedChannels: $hideMutedChannels
+                    ) {
+                        withAnimation(reduceMotion ? nil : MoodMotion.popover) {
+                            showServerMenu = false
+                        }
+                        showInviteModal = true
+                    }
+                    .padding(.top, 53 * LayoutMetrics.scale)
+                    .transition(
+                        reduceMotion
+                            ? .opacity
+                            : .opacity.combined(
+                                with: .scale(scale: 0.97, anchor: .topLeading)
+                            )
                     )
-                )
+                }
                 .zIndex(100)
             }
         }
@@ -453,7 +469,8 @@ struct CategorySection: View {
                     VStack(spacing: 0) {
                         ChannelRow(
                             channel: channel,
-                            isSelected: selectedChannel?.id == channel.id
+                            isSelected: selectedChannel?.id == channel.id,
+                            onMarkRead: { selectedChannel = channel }
                         )
                         .onTapGesture {
                             selectedChannel = channel
@@ -511,14 +528,15 @@ struct CategorySection: View {
 struct ChannelRow: View {
     let channel: Channel
     let isSelected: Bool
+    var onMarkRead: () -> Void = {}
     @State private var isHovered = false
     @State private var isMuted = false
-    @State private var markedAsRead = false
     @State private var showComingSoon = false
     @State private var showDeleteConfirm = false
 
-    private var unreadBadgeCount: Int { max(channel.unreadCount, channel.mentionCount) }
-    private var isUnread: Bool { unreadBadgeCount > 0 }
+    private var isUnread: Bool {
+        channel.unreadCount > 0 || channel.mentionCount > 0
+    }
 
     var body: some View {
         HStack(spacing: 8 * LayoutMetrics.scale) {
@@ -553,8 +571,8 @@ struct ChannelRow: View {
                         .foregroundStyle(MoodTheme.textPrimary)
                         .frame(width: 16 * LayoutMetrics.scale)
                 }
-            } else if isUnread {
-                Text("\(unreadBadgeCount)")
+            } else if channel.mentionCount > 0 {
+                Text("\(channel.mentionCount)")
                     .font(.mood(10, weight: .bold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 5 * LayoutMetrics.scale)
@@ -572,16 +590,22 @@ struct ChannelRow: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
         .padding(.horizontal, 8 * LayoutMetrics.scale)
+        .overlay(alignment: .leading) {
+            if channel.unreadCount > 0, channel.mentionCount == 0, !isSelected {
+                RoundedRectangle(cornerRadius: 2 * LayoutMetrics.scale, style: .continuous)
+                    .fill(MoodTheme.textPrimary)
+                    .frame(width: 4 * LayoutMetrics.scale, height: 8 * LayoutMetrics.scale)
+            }
+        }
         .contentShape(Rectangle())
         .onHover { hovering in isHovered = hovering }
         .contextMenu {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) { markedAsRead = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    withAnimation { markedAsRead = false }
+            if isUnread {
+                Button(action: onMarkRead) {
+                    Label("Marquer comme lu", systemImage: "checkmark.circle")
                 }
-            } label: { Label(markedAsRead ? "Marqué !" : "Marquer comme lu", systemImage: markedAsRead ? "checkmark.circle.fill" : "checkmark.circle") }
-            Divider()
+                Divider()
+            }
             Button { showComingSoon = true } label: { Label("Modifier le channel", systemImage: "pencil") }
             Button { showComingSoon = true } label: { Label("Paramètres de notification", systemImage: "bell") }
             Button { isMuted.toggle() } label: { Label(isMuted ? "Rétablir le son" : "Rendre muet", systemImage: isMuted ? "bell" : "bell.slash") }

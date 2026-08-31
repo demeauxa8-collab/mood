@@ -6,6 +6,8 @@ private let serverIconCornerRadius: CGFloat = LayoutMetrics.serverIconCornerRadi
 // MARK: - Server Sidebar
 
 struct ServerSidebarView: View {
+    @Environment(\.moodReduceMotion) private var reduceMotion
+
     let servers: [MoodServer]
     @Binding var selectedServer: MoodServer?
     @Binding var showDMs: Bool
@@ -13,6 +15,13 @@ struct ServerSidebarView: View {
     @Binding var showCreateServer: Bool
     @Binding var showExplore: Bool
     var dmUnreadCount: Int = 0
+    var onMarkServerRead: (MoodServer) -> Void = { _ in }
+    @State private var isHomeHovered = false
+
+    private var homePillScale: CGFloat {
+        if showDMs { return 1 }
+        return isHomeHovered ? 0.5 : 0.2
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,7 +38,7 @@ struct ServerSidebarView: View {
                             }
                             .frame(width: LayoutMetrics.serverIconSize, height: LayoutMetrics.serverIconSize)
                             .background(
-                                showDMs ? MoodTheme.brandAccent :
+                                showDMs || isHomeHovered ? MoodTheme.brandAccent :
                                 MoodTheme.serverIconBg
                             )
                             .clipShape(
@@ -56,15 +65,22 @@ struct ServerSidebarView: View {
                             }
                         }
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(MoodPressButtonStyle())
+                    .onHover { hovering in
+                        withAnimation(reduceMotion ? nil : MoodMotion.hover) {
+                            isHomeHovered = hovering
+                        }
+                    }
                     .help("Messages privés")
                     // Pill indicator gauche
                     .overlay(alignment: .leading) {
-                        if showDMs {
+                        if showDMs || dmUnreadCount > 0 {
                             RoundedRectangle(cornerRadius: 3, style: .continuous)
                                 .fill(MoodTheme.textPrimary)
                                 .frame(width: 4 * LayoutMetrics.scale, height: 40 * LayoutMetrics.scale)
+                                .scaleEffect(x: 1, y: homePillScale, anchor: .center)
                                 .offset(x: LayoutMetrics.serverPillOffset)
+                                .animation(reduceMotion ? nil : MoodMotion.hover, value: homePillScale)
                         }
                     }
 
@@ -79,7 +95,8 @@ struct ServerSidebarView: View {
                             emoji: server.iconEmoji,
                             isSelected: !showDMs && selectedServer?.id == server.id,
                             hasUnread: server.hasUnread,
-                            mentionCount: server.mentionCount
+                            mentionCount: server.mentionCount,
+                            onMarkRead: { onMarkServerRead(server) }
                         ) {
                             selectedServer = server
                             showDMs = false
@@ -141,22 +158,29 @@ struct ServerSidebarView: View {
 // MARK: - Sidebar Icon (carré arrondi / squircle)
 
 struct SidebarIcon: View {
+    @Environment(\.moodReduceMotion) private var reduceMotion
+
     var emoji: String?
     var systemIcon: String?
     let isSelected: Bool
     let hasUnread: Bool
     let mentionCount: Int
     var iconColor: Color = MoodTheme.textPrimary
+    var onMarkRead: () -> Void = {}
     let action: () -> Void
 
     @State private var isHovered = false
     @State private var isMuted = false
     @State private var showComingSoon = false
     @State private var showLeaveConfirm = false
-    @State private var markedAsRead = false
     @State private var hideMutedChannels = false
 
     private let cornerRadius: CGFloat = serverIconCornerRadius
+
+    private var unreadPillScale: CGFloat {
+        if isSelected { return 1 }
+        return isHovered ? 0.5 : 0.2
+    }
 
     var body: some View {
         Button(action: action) {
@@ -178,8 +202,7 @@ struct SidebarIcon: View {
                     MoodTheme.serverIconBg
                 )
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                .animation(.easeInOut(duration: 0.15), value: isSelected)
-                .animation(.easeInOut(duration: 0.15), value: isHovered)
+                .animation(reduceMotion ? nil : MoodMotion.hover, value: isHovered)
 
                 // Badge mentions
                 if mentionCount > 0 {
@@ -198,29 +221,30 @@ struct SidebarIcon: View {
                 }
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(MoodPressButtonStyle())
         .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.12)) { isHovered = hovering }
+            withAnimation(reduceMotion ? nil : MoodMotion.hover) {
+                isHovered = hovering
+            }
         }
         // Pill indicator gauche
         .overlay(alignment: .leading) {
             if hasUnread || isSelected {
                 RoundedRectangle(cornerRadius: 3, style: .continuous)
                     .fill(MoodTheme.textPrimary)
-                    .frame(width: 4 * LayoutMetrics.scale, height: (isSelected ? 40 : (isHovered ? 20 : 8)) * LayoutMetrics.scale)
+                    .frame(width: 4 * LayoutMetrics.scale, height: 40 * LayoutMetrics.scale)
+                    .scaleEffect(x: 1, y: unreadPillScale, anchor: .center)
                     .offset(x: LayoutMetrics.serverPillOffset)
-                    .animation(.easeInOut(duration: 0.2), value: isSelected)
-                    .animation(.easeInOut(duration: 0.2), value: isHovered)
+                    .animation(reduceMotion ? nil : MoodMotion.hover, value: unreadPillScale)
             }
         }
         .contextMenu {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) { markedAsRead = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    withAnimation { markedAsRead = false }
+            if hasUnread || mentionCount > 0 {
+                Button(action: onMarkRead) {
+                    Label("Marquer comme lu", systemImage: "checkmark.circle")
                 }
-            } label: { Label(markedAsRead ? "Marqué !" : "Marquer comme lu", systemImage: markedAsRead ? "checkmark.circle.fill" : "checkmark.circle") }
-            Divider()
+                Divider()
+            }
             Button { showComingSoon = true } label: { Label("Inviter des gens", systemImage: "person.badge.plus") }
             Button { isMuted.toggle() } label: { Label(isMuted ? "Rétablir le son" : "Rendre muet", systemImage: isMuted ? "bell" : "bell.slash") }
             Button { showComingSoon = true } label: { Label("Paramètres de notification", systemImage: "bell") }
