@@ -5,6 +5,7 @@ import SwiftUI
 // Animation : les deux points s'écartent et les lettres m et d apparaissent
 
 struct MoodLogo: View {
+    @Environment(\.moodReduceMotion) private var reduceMotion
     var size: CGFloat = 28
     var animated: Bool = true
     @State private var expanded = false
@@ -51,7 +52,7 @@ struct MoodLogo: View {
                 .scaleEffect(expanded ? 1 : 0.3)
                 .offset(x: expanded ? 0 : -size * 0.35)
         }
-        .animation(.spring(response: 0.6, dampingFraction: 0.75), value: expanded)
+        .animation(reduceMotion ? nil : MoodMotion.popover, value: expanded)
         .onHover { hovering in
             if animated {
                 expanded = hovering
@@ -82,6 +83,7 @@ struct MoodLogoDots: View {
 // MARK: - Splash Screen Logo Animation
 
 struct MoodSplashLogo: View {
+    @Environment(\.moodReduceMotion) private var reduceMotion
     @State private var phase: SplashPhase = .dots
     @State private var dotScale: CGFloat = 0
     @State private var dotOpacity: Double = 0
@@ -139,6 +141,12 @@ struct MoodSplashLogo: View {
             }
         }
         .onAppear {
+            if reduceMotion {
+                showText = true
+                dotScale = 1
+                dotOpacity = 1
+                return
+            }
             // Phase 1 : les points apparaissent
             withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
                 dotScale = 1

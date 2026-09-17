@@ -507,7 +507,6 @@ struct VoiceCallView: View {
     @State private var isDeafened = false
     @State private var callDuration: TimeInterval = 0
     @State private var timer: Timer?
-    @State private var pulseScale: CGFloat = 1.0
 
     var body: some View {
         ZStack {
@@ -559,11 +558,8 @@ struct VoiceCallView: View {
 
             ZStack {
                 if callState == .ringing {
-                    Circle()
-                        .stroke(MoodTheme.textSecondary.opacity(0.15), lineWidth: 2)
+                    MoodRingingPulse()
                         .frame(width: 120, height: 120)
-                        .scaleEffect(pulseScale)
-                        .opacity(2 - pulseScale)
                 }
                 if callState == .connected {
                     Circle()
@@ -778,13 +774,9 @@ struct VoiceCallView: View {
 
     private func startCall() {
         callState = .ringing
-        withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: false)) {
-            pulseScale = 1.8
-        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             withAnimation(.easeInOut(duration: 0.3)) {
                 callState = .connected
-                pulseScale = 1.0
             }
             timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in callDuration += 1 }
         }
@@ -851,7 +843,6 @@ struct VideoCallView: View {
     @State private var callDuration: TimeInterval = 0
     @State private var timer: Timer?
     @State private var showControls = true
-    @State private var pulseScale: CGFloat = 1.0
 
     var body: some View {
         ZStack {
@@ -892,11 +883,8 @@ struct VideoCallView: View {
             if callState == .ringing || callState == .connecting {
                 VStack(spacing: 16) {
                     ZStack {
-                        Circle()
-                            .stroke(MoodTheme.textSecondary.opacity(0.15), lineWidth: 2)
+                        MoodRingingPulse()
                             .frame(width: 120, height: 120)
-                            .scaleEffect(pulseScale)
-                            .opacity(2 - pulseScale)
 
                         Text(participant.avatarEmoji)
                             .font(.system(size: 48))
@@ -1004,13 +992,9 @@ struct VideoCallView: View {
 
     private func startCall() {
         callState = .ringing
-        withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: false)) {
-            pulseScale = 1.8
-        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             withAnimation(.easeInOut(duration: 0.3)) {
                 callState = .connected
-                pulseScale = 1.0
             }
             timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in callDuration += 1 }
         }

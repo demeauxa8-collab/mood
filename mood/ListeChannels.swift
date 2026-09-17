@@ -1048,23 +1048,16 @@ struct StatusPickerMenu: View {
 }
 
 struct StatusPanelIcon: View {
+    @Environment(\.moodReduceMotion) private var reduceMotion
     @Binding var isMuted: Bool
     let iconOn: String
     let iconOff: String
     let tooltip: String
     @State private var isHovered = false
-    @State private var slashProgress: CGFloat = 0
 
     var body: some View {
         Button {
-            if isMuted {
-                withAnimation(.easeIn(duration: 0.2)) { slashProgress = 0 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { isMuted = false }
-            } else {
-                isMuted = true
-                slashProgress = 0
-                withAnimation(.easeOut(duration: 0.25)) { slashProgress = 1 }
-            }
+            isMuted.toggle()
         } label: {
             ZStack {
                 Image(systemName: iconOn)
@@ -1072,9 +1065,10 @@ struct StatusPanelIcon: View {
                     .foregroundStyle(isMuted ? MoodTheme.mentionBadge : MoodTheme.textSecondary)
                     .animation(.easeInOut(duration: 0.15), value: isMuted)
 
-                AnimatedSlash(progress: slashProgress)
+                AnimatedSlash(progress: isMuted ? 1 : 0)
                     .stroke(MoodTheme.mentionBadge, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
                     .frame(width: 18 * LayoutMetrics.scale, height: 18 * LayoutMetrics.scale)
+                    .animation(reduceMotion ? nil : MoodMotion.feedback, value: isMuted)
             }
             .frame(width: 32 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
             .background(isMuted ? MoodTheme.mentionBadge.opacity(0.18) : (isHovered ? MoodTheme.hoverBg : Color.clear))
@@ -1088,30 +1082,15 @@ struct StatusPanelIcon: View {
 }
 
 struct MuteButton: View {
+    @Environment(\.moodReduceMotion) private var reduceMotion
     @Binding var isMuted: Bool
     let iconOn: String
     let iconOff: String
     let tooltip: String
-    @State private var slashProgress: CGFloat = 0
 
     var body: some View {
         Button {
-            if isMuted {
-                // Unmute : rétracte la barre puis change l'état
-                withAnimation(.easeIn(duration: 0.2)) {
-                    slashProgress = 0
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    isMuted = false
-                }
-            } else {
-                // Mute : change l'état puis trace la barre
-                isMuted = true
-                slashProgress = 0
-                withAnimation(.easeOut(duration: 0.25)) {
-                    slashProgress = 1
-                }
-            }
+            isMuted.toggle()
         } label: {
             ZStack {
                 // Icône — toujours la même, change juste de couleur
@@ -1121,12 +1100,13 @@ struct MuteButton: View {
                     .animation(.easeInOut(duration: 0.15), value: isMuted)
 
                 // Barre rouge diagonale qui se trace
-                AnimatedSlash(progress: slashProgress)
+                AnimatedSlash(progress: isMuted ? 1 : 0)
                     .stroke(
                         MoodTheme.mentionBadge,
                         style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
                     )
                     .frame(width: 20, height: 20)
+                    .animation(reduceMotion ? nil : MoodMotion.feedback, value: isMuted)
             }
             .frame(width: 30, height: 30)
             .contentShape(Rectangle())

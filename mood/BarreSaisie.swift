@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct MessageInputBar: View {
+    @Environment(\.moodReduceMotion) private var reduceMotion
     @Binding var text: String
     let channelName: String
     let isE2E: Bool
@@ -59,7 +60,7 @@ struct MessageInputBar: View {
                     Spacer()
 
                     Button {
-                        withAnimation(.easeInOut(duration: 0.12)) { replyingTo = nil }
+                        withAnimation(reduceMotion ? nil : MoodMotion.feedback) { replyingTo = nil }
                     } label: {
                         Image(systemName: "xmark")
                             .font(.mood(10))
@@ -70,7 +71,7 @@ struct MessageInputBar: View {
                 .padding(.horizontal, 16 * LayoutMetrics.scale)
                 .padding(.vertical, 8 * LayoutMetrics.scale)
                 .background(MoodTheme.glassBg)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
 
             HStack(spacing: 0) {
@@ -204,6 +205,7 @@ struct MessageInputBar: View {
 // MARK: - Typing Dots Animation
 
 struct TypingDots: View {
+    @Environment(\.moodReduceMotion) private var reduceMotion
     @State private var phase = 0
 
     var body: some View {
@@ -212,17 +214,21 @@ struct TypingDots: View {
                 Circle()
                     .fill(MoodTheme.textSecondary)
                     .frame(width: 5, height: 5)
-                    .offset(y: phase == i ? -3 : 0)
+                    .opacity(reduceMotion || phase == i ? 1 : 0.45)
+                    .offset(y: !reduceMotion && phase == i ? -2 : 0)
             }
         }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 0.4).repeatForever(autoreverses: true)) {
-                phase = 1
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(.easeInOut(duration: 0.4).repeatForever(autoreverses: true)) {
-                    phase = 2
+        .accessibilityHidden(true)
+        .task(id: reduceMotion) {
+            // One cancellable sequence; stops when typing ends or motion is reduced.
+            guard !reduceMotion else { return }
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .milliseconds(240))
+                } catch {
+                    return
                 }
+                withAnimation(MoodMotion.feedback) { phase = (phase + 1) % 3 }
             }
         }
     }

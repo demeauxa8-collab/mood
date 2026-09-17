@@ -765,6 +765,7 @@ struct SignupView: View {
 // MARK: - Auth Container
 
 struct AuthContainer: View {
+    @Environment(\.moodReduceMotion) private var reduceMotion
     @Bindable var authState: AuthState
     var matrixStore: MatrixStore
 
@@ -773,13 +774,13 @@ struct AuthContainer: View {
             switch authState.currentScreen {
             case .login:
                 LoginView(authState: authState, matrixStore: matrixStore)
-                    .transition(.move(edge: .leading).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .move(edge: .leading).combined(with: .opacity))
             case .signup:
                 SignupView(authState: authState, matrixStore: matrixStore)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: authState.currentScreen)
+        .animation(reduceMotion ? nil : MoodMotion.screen, value: authState.currentScreen)
     }
 }
 

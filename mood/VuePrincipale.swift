@@ -153,7 +153,7 @@ struct ContentView: View {
         }
         .background {
             if layoutMode == .regular {
-                Button { withAnimation(.easeOut(duration: 0.15)) { showQuickSwitcher.toggle() } } label: { EmptyView() }
+                Button { showQuickSwitcher.toggle() } label: { EmptyView() }
                     .keyboardShortcut("k", modifiers: .command)
             }
         }

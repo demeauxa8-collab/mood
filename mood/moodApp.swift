@@ -102,6 +102,13 @@ struct RootView: View {
         }
         .environment(\.moodReduceMotion, reduceMotion)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: authState.isLoggedIn)
+        .transaction { transaction in
+            // Cover legacy descendants as well as views using MoodMotion directly.
+            if reduceMotion {
+                transaction.animation = nil
+                transaction.disablesAnimations = true
+            }
+        }
         .preferredColorScheme(MoodTheme.shared.theme == .light ? .light : .dark)
     }
 }
