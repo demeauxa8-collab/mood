@@ -311,6 +311,11 @@ struct DMChatArea: View {
         return storeMessages
     }
 
+    private func attach(_ url: URL) {
+        guard let roomId else { return }
+        Task { await matrixStore.sendAttachment(roomId: roomId, fileURL: url) }
+    }
+
     private var roomId: String? {
         matrixStore.roomId(for: conversation)
     }
@@ -465,7 +470,8 @@ struct DMChatArea: View {
                 isE2E: isEncrypted,
                 typingUsers: roomId.flatMap { matrixStore.typingUsersByRoom[$0] } ?? [],
                 isDisabled: isEncrypted,
-                onSend: sendCurrentMessage
+                onSend: sendCurrentMessage,
+                onAttachFile: attach
             )
         }
         .background(MoodTheme.chatBackground)

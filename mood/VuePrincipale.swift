@@ -13,6 +13,8 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var showQuickSwitcher = false
     @State private var showCreateServer = false
+    /// Server just created or joined; opened as soon as the next sync delivers it.
+    @State private var pendingServerID: UUID?
     @State private var showExplore = false
     @State private var callingUser: MoodUser?
     @State private var selectedTab: CompactTab = .servers
@@ -123,7 +125,7 @@ struct ContentView: View {
             get: { layoutMode == .compact && showCreateServer },
             set: { showCreateServer = $0 }
         )) {
-            CreateServerModal(isPresented: $showCreateServer)
+            CreateServerModal(isPresented: $showCreateServer, onOpenServer: openServer(withID:))
                 .environment(matrixStore)
                 .environment(\.layoutMode, layoutMode)
                 .presentationDetents(layoutMode == .compact ? [.large] : [.medium])
@@ -164,7 +166,10 @@ struct ContentView: View {
             if newValue != nil { showExplore = false }
         }
         .onChange(of: matrixStore.servers) { _, newServers in
-            if selectedServer == nil, let first = newServers.first {
+            if let pendingServerID, let server = newServers.first(where: { $0.id == pendingServerID }) {
+                self.pendingServerID = nil
+                openServer(server)
+            } else if selectedServer == nil, let first = newServers.first {
                 selectedServer = first
                 selectedChannel = first.categories.first?.channels.first
             }
@@ -278,7 +283,7 @@ struct ContentView: View {
                     Color.black.opacity(0.5)
                         .ignoresSafeArea()
                         .onTapGesture { showCreateServer = false }
-                    CreateServerModal(isPresented: $showCreateServer)
+                    CreateServerModal(isPresented: $showCreateServer, onOpenServer: openServer(withID:))
                 }
                 .transition(.opacity)
             }
@@ -344,6 +349,12 @@ struct ContentView: View {
                                 unreadCount: 0
                             )
                         openDM(conversation)
+                    },
+                    onOpenConversation: { id in
+                        showDMs = true
+                        if let conversation = conversations.first(where: { $0.id == id }) {
+                            openDM(conversation)
+                        }
                     },
                     onShowProfile: { user in
                         profileUser = user
@@ -440,6 +451,24 @@ struct ContentView: View {
         .tint(MoodTheme.textPrimary)
         .toolbarBackground(MoodTheme.serverBar, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
+    }
+
+    private func openServer(withID id: UUID) {
+        if let server = servers.first(where: { $0.id == id }) {
+            openServer(server)
+        } else {
+            pendingServerID = id
+        }
+    }
+
+    private func openServer(_ server: MoodServer) {
+        showDMs = false
+        showExplore = false
+        selectedDM = nil
+        selectedServer = server
+        if let channel = server.categories.first?.channels.first {
+            openChannel(channel)
+        }
     }
 
     private func openDM(_ conversation: DMConversation) {
@@ -1235,6 +1264,7 @@ struct FriendsPlaceholderView: View {
 
     let friends = MockData.users
     var onOpenDM: ((MoodUser) -> Void)?
+    var onOpenConversation: ((UUID) -> Void)?
     var onShowProfile: ((MoodUser) -> Void)?
     var onCall: ((MoodUser) -> Void)?
     @State private var searchText = ""
@@ -1370,7 +1400,7 @@ struct FriendsPlaceholderView: View {
                         .ignoresSafeArea()
                         .onTapGesture { showAddFriend = false }
 
-                    AddFriendModal(isPresented: $showAddFriend)
+                    AddFriendModal(isPresented: $showAddFriend, onOpenConversation: { id in onOpenConversation?(id) })
                 }
                 .transition(.opacity)
             }
@@ -1521,11 +1551,36 @@ struct FriendsTabButton: View {
 
 // MARK: - Add Friend Modal
 
+/// Matrix has no friend requests: "adding a friend" opens a DM with them,
+/// which sends them an invite — the closest honest equivalent.
 struct AddFriendModal: View {
     @Environment(\.layoutMode) private var layoutMode
+    @Environment(MatrixStore.self) private var matrixStore
     @Binding var isPresented: Bool
+    var onOpenConversation: (UUID) -> Void = { _ in }
     @State private var username = ""
-    @State private var showSent = false
+    @State private var isWorking = false
+    @State private var failure: String?
+
+    private func send() {
+        guard !isWorking else { return }
+        guard let userId = matrixStore.matrixUserId(from: username) else {
+            failure = "Entre un identifiant valide, par exemple clara ou @clara:matrix.org."
+            return
+        }
+        isWorking = true
+        failure = nil
+        Task {
+            let conversationId = await matrixStore.openOrCreateDM(with: userId)
+            isWorking = false
+            if let conversationId {
+                isPresented = false
+                onOpenConversation(conversationId)
+            } else {
+                failure = matrixStore.errorMessage ?? "Impossible de contacter \(userId)."
+            }
+        }
+    }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -1545,12 +1600,13 @@ struct AddFriendModal: View {
                 .buttonStyle(.plain)
             }
 
-            Text("Tu peux ajouter des amis avec leur nom d'utilisateur Mood.")
+            Text("Entre son identifiant Matrix : ça ouvre une conversation privée et lui envoie une invitation.")
                 .font(.system(size: 13))
                 .foregroundStyle(MoodTheme.textSecondary)
 
             HStack {
-                TextField("Entre un nom d'utilisateur", text: $username)
+                TextField("clara ou @clara:matrix.org", text: $username)
+                    .onSubmit(send)
                     .textFieldStyle(.plain)
                     .font(.system(size: 14))
                     .foregroundStyle(MoodTheme.textPrimary)
@@ -1563,29 +1619,29 @@ struct AddFriendModal: View {
                             .stroke(MoodTheme.glassBorder, lineWidth: 0.5)
                     )
 
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { showSent = true }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        isPresented = false
-                    }
-                } label: {
+                Button(action: send) {
                     HStack(spacing: 6) {
-                        if showSent {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 11, weight: .bold))
+                        if isWorking {
+                            ProgressView().controlSize(.small).tint(.white)
                         }
-                        Text(showSent ? "Envoyé !" : "Envoyer")
+                        Text("Envoyer un message")
                             .font(.system(size: 13, weight: .semibold))
                     }
                     .foregroundStyle(.white)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .background(showSent ? MoodTheme.onlineGreen : (username.isEmpty ? MoodTheme.brandAccent.opacity(0.4) : MoodTheme.brandAccent))
+                    .background(username.isEmpty ? MoodTheme.brandAccent.opacity(0.4) : MoodTheme.brandAccent)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .animation(.easeInOut(duration: 0.2), value: showSent)
                 }
                 .buttonStyle(.plain)
-                .disabled(username.isEmpty || showSent)
+                .disabled(username.isEmpty)
+            }
+
+            if let failure {
+                Text(failure)
+                    .font(.system(size: 12))
+                    .foregroundStyle(MoodTheme.mentionBadge)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(24)

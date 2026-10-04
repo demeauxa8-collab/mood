@@ -250,14 +250,64 @@ struct SidebarIcon: View {
 
 struct CreateServerModal: View {
     @Environment(\.layoutMode) private var layoutMode
+    @Environment(MatrixStore.self) private var matrixStore
     @Binding var isPresented: Bool
+    /// Called with the new or joined server's id so the caller can open it.
+    var onOpenServer: (UUID) -> Void = { _ in }
     @State private var step = 0 // 0 = choice, 1 = create, 2 = join
     @State private var serverName = ""
     @State private var inviteLink = ""
     @State private var selectedTemplate = ""
     @State private var isPublic = false
-    @State private var showCreated = false
-    @State private var showJoined = false
+    @State private var isWorking = false
+    @State private var failure: String?
+
+    private var defaultServerName: String {
+        "Serveur de \(matrixStore.currentUser?.displayName ?? "moi")"
+    }
+
+    private func createServer() {
+        guard !isWorking else { return }
+        isWorking = true
+        failure = nil
+        let name = serverName.trimmingCharacters(in: .whitespaces).isEmpty ? defaultServerName : serverName
+        Task {
+            let serverId = await matrixStore.createServer(name: name, isPublic: isPublic)
+            isWorking = false
+            if let serverId {
+                isPresented = false
+                onOpenServer(serverId)
+            } else {
+                failure = matrixStore.errorMessage ?? "La création du serveur a échoué."
+            }
+        }
+    }
+
+    private func joinServer() {
+        guard !isWorking else { return }
+        isWorking = true
+        failure = nil
+        Task {
+            let serverId = await matrixStore.joinServer(fromInvite: inviteLink)
+            isWorking = false
+            if let serverId {
+                isPresented = false
+                onOpenServer(serverId)
+            } else {
+                failure = matrixStore.errorMessage ?? "Impossible de rejoindre ce serveur."
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var failureText: some View {
+        if let failure {
+            Text(failure)
+                .font(.system(size: 12))
+                .foregroundStyle(MoodTheme.mentionBadge)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
 
     let templates = [
         ("gamecontroller", "Gaming", Color.purple),
@@ -371,7 +421,8 @@ struct CreateServerModal: View {
                             .tracking(0.4)
                             .foregroundStyle(MoodTheme.textSecondary)
 
-                        TextField("Mon super serveur", text: $serverName)
+                        TextField(defaultServerName, text: $serverName)
+                            .onAppear { if serverName.isEmpty { serverName = defaultServerName } }
                             .textFieldStyle(.plain)
                             .font(.system(size: 14))
                             .foregroundStyle(MoodTheme.textPrimary)
@@ -442,30 +493,24 @@ struct CreateServerModal: View {
                             .foregroundStyle(MoodTheme.textSecondary)
                     }
 
-                    Button {
-                        showCreated = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                            isPresented = false
-                        }
-                    } label: {
+                    failureText
+
+                    Button(action: createServer) {
                         HStack(spacing: 6) {
-                            if showCreated {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 12, weight: .bold))
+                            if isWorking {
+                                ProgressView().controlSize(.small).tint(.white)
                             }
-                            Text(showCreated ? "Serveur créé !" : "Créer")
+                            Text("Créer")
                                 .font(.system(size: 14, weight: .semibold))
                         }
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .background(showCreated ? MoodTheme.onlineGreen : MoodTheme.brandAccent)
+                        .background(MoodTheme.brandAccent)
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .animation(.easeInOut(duration: 0.2), value: showCreated)
                     }
                     .buttonStyle(.plain)
-                    .disabled(serverName.isEmpty)
-                    .opacity(serverName.isEmpty && !showCreated ? 0.5 : 1)
+                    .keyboardShortcut(.defaultAction)
                 }
                 .padding(20)
             } else {
@@ -486,7 +531,7 @@ struct CreateServerModal: View {
                             .tracking(0.4)
                             .foregroundStyle(MoodTheme.textSecondary)
 
-                        TextField("https://mood.app/invite/abc123", text: $inviteLink)
+                        TextField("https://matrix.to/#/#salon:matrix.org", text: $inviteLink)
                             .textFieldStyle(.plain)
                             .font(.system(size: 14))
                             .foregroundStyle(MoodTheme.textPrimary)
@@ -499,30 +544,25 @@ struct CreateServerModal: View {
                             )
                     }
 
-                    Button {
-                        showJoined = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                            isPresented = false
-                        }
-                    } label: {
+                    failureText
+
+                    Button(action: joinServer) {
                         HStack(spacing: 6) {
-                            if showJoined {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 12, weight: .bold))
+                            if isWorking {
+                                ProgressView().controlSize(.small).tint(.white)
                             }
-                            Text(showJoined ? "Rejoint !" : "Rejoindre le serveur")
+                            Text("Rejoindre le serveur")
                                 .font(.system(size: 14, weight: .semibold))
                         }
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .background(showJoined ? MoodTheme.onlineGreen : MoodTheme.brandAccent)
+                        .background(MoodTheme.brandAccent)
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .animation(.easeInOut(duration: 0.2), value: showJoined)
                     }
                     .buttonStyle(.plain)
-                    .disabled(inviteLink.isEmpty)
-                    .opacity(inviteLink.isEmpty && !showJoined ? 0.5 : 1)
+                    .disabled(inviteLink.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .opacity(inviteLink.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
                 }
                 .padding(20)
             }

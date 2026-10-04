@@ -1,5 +1,6 @@
 import SwiftUI
 import CryptoKit
+import UniformTypeIdentifiers
 
 // MARK: - Matrix Store
 
@@ -829,7 +830,7 @@ class MatrixStore {
                     categories: [
                         ChannelCategory(
                             id: stableUUID(from: "\(space.roomId)-cat"),
-                            name: "SALONS",
+                            name: "SALONS TEXTUELS",
                             channels: channels
                         )
                     ],
@@ -1247,6 +1248,85 @@ class MatrixStore {
             self.errorMessage = "Création de l'espace échouée : \(error.localizedDescription)"
             return nil
         }
+    }
+
+    /// Uploads a file picked from the composer's "+" menu; images are sent as m.image.
+    func sendAttachment(roomId: String, fileURL: URL) async {
+        let didAccess = fileURL.startAccessingSecurityScopedResource()
+        defer { if didAccess { fileURL.stopAccessingSecurityScopedResource() } }
+        let data: Data
+        do {
+            data = try Data(contentsOf: fileURL)
+        } catch {
+            errorMessage = "Impossible de lire \(fileURL.lastPathComponent) : \(error.localizedDescription)"
+            return
+        }
+        let type = UTType(filenameExtension: fileURL.pathExtension) ?? .data
+        if type.conforms(to: .image) {
+            await uploadAndSendImage(roomId: roomId, imageData: data, filename: fileURL.lastPathComponent)
+        } else {
+            await uploadAndSendFile(
+                roomId: roomId, fileData: data, filename: fileURL.lastPathComponent,
+                contentType: type.preferredMIMEType ?? "application/octet-stream"
+            )
+        }
+    }
+
+    /// Discord's "Créer mon serveur": a space plus a first #général channel inside it
+    /// (a space with no channel is not shown in the rail). Returns the server's UI id.
+    func createServer(name: String, isPublic: Bool) async -> UUID? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let spaceId = await createSpace(name: trimmed) else { return nil }
+        guard let channelId = await createRoom(name: "général", isPublic: isPublic) else { return nil }
+        do {
+            try await client.addSpaceChild(spaceRoomId: spaceId, childRoomId: channelId)
+        } catch {
+            errorMessage = "Le salon #général n'a pas pu être ajouté au serveur : \(error.localizedDescription)"
+            return nil
+        }
+        return stableUUID(from: spaceId)
+    }
+
+    /// Joins from whatever the user pasted: a matrix.to link, a #alias:server or a !roomId:server.
+    /// Returns the joined room's UI id (server id when it is a space).
+    func joinServer(fromInvite invite: String) async -> UUID? {
+        guard let reference = Self.roomReference(fromInvite: invite) else {
+            errorMessage = "Lien d'invitation invalide. Exemple : https://matrix.to/#/#salon:serveur.org"
+            return nil
+        }
+        do {
+            let response = try await client.joinRoom(reference)
+            return stableUUID(from: response.roomId)
+        } catch {
+            errorMessage = "Impossible de rejoindre : \(error.localizedDescription)"
+            return nil
+        }
+    }
+
+    /// "clara" → "@clara:<my homeserver>", "@clara:matrix.org" unchanged, nil if unusable.
+    func matrixUserId(from input: String) -> String? {
+        var text = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !text.contains(" ") else { return nil }
+        if !text.hasPrefix("@") { text = "@" + text }
+        if !text.contains(":") {
+            guard let domain = userId?.split(separator: ":", maxSplits: 1).last else { return nil }
+            text += ":\(domain)"
+        }
+        return text
+    }
+
+    static func roomReference(fromInvite invite: String) -> String? {
+        var text = invite.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let range = text.range(of: "matrix.to/#/") {
+            text = String(text[range.upperBound...])
+        }
+        if let query = text.firstIndex(of: "?") {
+            text = String(text[..<query])
+        }
+        text = text.removingPercentEncoding ?? text
+        guard let first = text.first, first == "#" || first == "!",
+              text.contains(":"), !text.contains(" ") else { return nil }
+        return text
     }
 
     func createDM(userId targetUserId: String) async -> String? {

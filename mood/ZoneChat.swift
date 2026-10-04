@@ -29,6 +29,11 @@ struct ChatArea: View {
         return storeMessages
     }
 
+    private func attach(_ url: URL) {
+        guard let roomId else { return }
+        Task { await matrixStore.sendAttachment(roomId: roomId, fileURL: url) }
+    }
+
     private var roomId: String? {
         matrixStore.roomId(for: channel)
     }
@@ -103,7 +108,8 @@ struct ChatArea: View {
                         typingUsers: roomId.flatMap { matrixStore.typingUsersByRoom[$0] } ?? [],
                         isDisabled: isEncrypted,
                         replyingTo: $replyingTo,
-                        onSend: sendCurrentMessage
+                        onSend: sendCurrentMessage,
+                        onAttachFile: attach
                     )
                 }
 

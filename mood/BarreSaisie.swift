@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct MessageInputBar: View {
     @Binding var text: String
@@ -9,12 +10,13 @@ struct MessageInputBar: View {
     var isDisabled: Bool = false
     @Binding var replyingTo: ChatMessage?
     var onSend: (() -> Void)?
+    var onAttachFile: ((URL) -> Void)?
     @State private var showEmojiPicker = false
     @State private var showGIFPicker = false
     @State private var showAttachMenu = false
-    @State private var showAttachAlert = false
+    @State private var importedTypes: [UTType]?
 
-    init(text: Binding<String>, channelName: String, isE2E: Bool, typingUsers: [String] = [], isDisabled: Bool = false, replyingTo: Binding<ChatMessage?> = .constant(nil), onSend: (() -> Void)? = nil) {
+    init(text: Binding<String>, channelName: String, isE2E: Bool, typingUsers: [String] = [], isDisabled: Bool = false, replyingTo: Binding<ChatMessage?> = .constant(nil), onSend: (() -> Void)? = nil, onAttachFile: ((URL) -> Void)? = nil) {
         self._text = text
         self.channelName = channelName
         self.isE2E = isE2E
@@ -22,6 +24,7 @@ struct MessageInputBar: View {
         self.isDisabled = isDisabled
         self._replyingTo = replyingTo
         self.onSend = onSend
+        self.onAttachFile = onAttachFile
     }
 
     var body: some View {
@@ -92,26 +95,24 @@ struct MessageInputBar: View {
                     VStack(spacing: 2) {
                         AttachMenuItem(icon: "doc", label: "Importer un fichier", color: MoodTheme.brandAccent) {
                             showAttachMenu = false
-                            showAttachAlert = true
+                            importedTypes = [.item]
                         }
                         AttachMenuItem(icon: "photo", label: "Importer une photo", color: MoodTheme.onlineGreen) {
                             showAttachMenu = false
-                            showAttachAlert = true
-                        }
-                        AttachMenuItem(icon: "text.bubble", label: "Créer un fil", color: MoodTheme.brandBlue) {
-                            showAttachMenu = false
-                            showAttachAlert = true
+                            importedTypes = [.image, .movie]
                         }
                     }
                     .padding(8)
                     .frame(width: 220)
                     .background(MoodTheme.channelList)
                 }
-                .alert("Bientôt disponible", isPresented: $showAttachAlert) {
-                    Button("OK", role: .cancel) {}
-                } message: {
-                    Text("L'envoi de fichiers sera disponible dans une prochaine version.")
+                .fileImporter(
+                    isPresented: Binding(get: { importedTypes != nil }, set: { if !$0 { importedTypes = nil } }),
+                    allowedContentTypes: importedTypes ?? [.item]
+                ) { result in
+                    if case .success(let url) = result { onAttachFile?(url) }
                 }
+                .disabled(isDisabled || onAttachFile == nil)
 
                 // Champ texte
                 HStack(spacing: 6 * LayoutMetrics.scale) {
