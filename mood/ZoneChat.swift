@@ -118,7 +118,6 @@ struct ChatArea: View {
                             showPanel: $showThreadPanel
                         )
                         .frame(width: LayoutMetrics.threadPanelWidth)
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
                     } else if showMemberList {
                         Rectangle().fill(MoodTheme.divider).frame(width: 1)
 
@@ -316,23 +315,17 @@ struct ChannelHeader: View {
                     }
 
                 HeaderButton(icon: "pin.fill") {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        showPinnedMessages.toggle()
-                    }
+                    showPinnedMessages.toggle()
                 }
                 .help("Messages épinglés")
 
                 HeaderButton(icon: "person.2.fill") {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        showMemberList.toggle()
-                    }
+                    showMemberList.toggle()
                 }
                 .help("Liste des membres")
 
                 Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        showSearch.toggle()
-                    }
+                    showSearch.toggle()
                 } label: {
                     HeaderSearchField(isActive: showSearch)
                 }
@@ -487,9 +480,7 @@ struct MessageList: View {
                                     replyingTo = message
                                 }, onThread: {
                                     activeThread = message
-                                    withAnimation(.easeInOut(duration: 0.2)) {
-                                        showThreadPanel = true
-                                    }
+                                    showThreadPanel = true
                                 }) {
                                     profileUser = message.sender
                                     showProfilePopup = true
@@ -505,9 +496,7 @@ struct MessageList: View {
                         proxy.scrollTo("bottom", anchor: .bottom)
                     }
                     .onChange(of: messages.count) { _, _ in
-                        withAnimation(.easeOut(duration: 0.25)) {
-                            proxy.scrollTo("bottom", anchor: .bottom)
-                        }
+                        proxy.scrollTo("bottom", anchor: .bottom)
                     }
                 }
             }
@@ -529,7 +518,7 @@ struct MessageList: View {
                 }
                 .buttonStyle(.plain)
                 .padding(16)
-                .transition(.scale.combined(with: .opacity))
+                .transition(.opacity)
                 .help("Aller en bas")
             }
         }
@@ -1168,9 +1157,7 @@ struct SearchPanel: View {
                     .foregroundStyle(MoodTheme.textPrimary)
 
                 Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        showSearch = false
-                    }
+                    showSearch = false
                 } label: {
                     Image(systemName: "xmark")
                         .font(.mood(11))
@@ -1213,7 +1200,7 @@ struct SearchFilterChip: View {
 
     var body: some View {
         Button {
-            withAnimation(.easeInOut(duration: 0.15)) { isActive.toggle() }
+            isActive.toggle()
         } label: {
             HStack(spacing: 4 * LayoutMetrics.scale) {
                 Image(systemName: icon)
@@ -1368,7 +1355,7 @@ struct PinnedMessagesPanel: View {
                     .foregroundStyle(MoodTheme.textPrimary)
                 Spacer()
                 Button {
-                    withAnimation(.easeInOut(duration: 0.15)) { showPanel = false }
+                    showPanel = false
                 } label: {
                     Image(systemName: "xmark")
                         .font(.mood(11))
@@ -1465,7 +1452,7 @@ struct ThreadPanel: View {
                 Spacer()
 
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { showPanel = false }
+                    showPanel = false
                 } label: {
                     Image(systemName: "xmark")
                         .font(.mood(12))

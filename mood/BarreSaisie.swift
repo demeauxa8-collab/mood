@@ -62,7 +62,7 @@ struct MessageInputBar: View {
                     Spacer()
 
                     Button {
-                        withAnimation(.easeInOut(duration: 0.12)) { replyingTo = nil }
+                        replyingTo = nil
                     } label: {
                         Image(systemName: "xmark")
                             .font(.mood(10))
@@ -73,7 +73,6 @@ struct MessageInputBar: View {
                 .padding(.horizontal, 16 * LayoutMetrics.scale)
                 .padding(.vertical, 8 * LayoutMetrics.scale)
                 .background(MoodTheme.glassBg)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
             HStack(spacing: 0) {
@@ -211,28 +210,34 @@ struct MessageInputBar: View {
 
 // MARK: - Typing Dots Animation
 
+/// Discord's typing indicator: three dots pulsing in sequence while someone types.
 struct TypingDots: View {
-    @State private var phase = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private let period = 1.2
+    private let stagger = 0.15
 
     var body: some View {
-        HStack(spacing: 3) {
-            ForEach(0..<3) { i in
-                Circle()
-                    .fill(MoodTheme.textSecondary)
-                    .frame(width: 5, height: 5)
-                    .offset(y: phase == i ? -3 : 0)
-            }
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 0.4).repeatForever(autoreverses: true)) {
-                phase = 1
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(.easeInOut(duration: 0.4).repeatForever(autoreverses: true)) {
-                    phase = 2
+        TimelineView(.animation(paused: reduceMotion)) { context in
+            let time = context.date.timeIntervalSinceReferenceDate
+            HStack(spacing: 3 * LayoutMetrics.scale) {
+                ForEach(0..<3, id: \.self) { index in
+                    let pulse = reduceMotion ? 1 : pulse(at: time - Double(index) * stagger)
+                    Circle()
+                        .fill(MoodTheme.textSecondary)
+                        .frame(width: 5 * LayoutMetrics.scale, height: 5 * LayoutMetrics.scale)
+                        .opacity(0.4 + 0.6 * pulse)
+                        .scaleEffect(0.85 + 0.15 * pulse)
                 }
             }
         }
+    }
+
+    /// 0 → 1 → 0 over the first half of each period, then rest.
+    private func pulse(at time: Double) -> Double {
+        let phase = (time.truncatingRemainder(dividingBy: period) + period).truncatingRemainder(dividingBy: period) / period
+        guard phase < 0.5 else { return 0 }
+        return sin(phase * 2 * .pi)
     }
 }
 
@@ -427,7 +432,7 @@ struct EmojiPicker: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(MoodTheme.glassBorder, lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
+        .popoverElevation()
     }
 }
 
@@ -518,7 +523,7 @@ struct GIFPicker: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(MoodTheme.glassBorder, lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
+        .popoverElevation()
     }
 }
 
@@ -617,7 +622,7 @@ struct QuickSwitcher: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(MoodTheme.glassBorder, lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.5), radius: 20, y: 8)
+        .popoverElevation()
     }
 }
 

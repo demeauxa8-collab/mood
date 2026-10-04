@@ -178,8 +178,8 @@ struct SidebarIcon: View {
                     MoodTheme.serverIconBg
                 )
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                .animation(.easeInOut(duration: 0.15), value: isSelected)
-                .animation(.easeInOut(duration: 0.15), value: isHovered)
+                .animation(MoodMotion.hover, value: isSelected)
+                .animation(MoodMotion.hover, value: isHovered)
 
                 // Badge mentions
                 if mentionCount > 0 {
@@ -200,7 +200,7 @@ struct SidebarIcon: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.12)) { isHovered = hovering }
+            withAnimation(MoodMotion.hover) { isHovered = hovering }
         }
         // Pill indicator gauche
         .overlay(alignment: .leading) {
@@ -394,7 +394,7 @@ struct CreateServerModal: View {
 
                         HStack(spacing: 8) {
                             Button {
-                                withAnimation(.easeInOut(duration: 0.15)) { isPublic = false }
+                                isPublic = false
                             } label: {
                                 HStack(spacing: 6) {
                                     Image(systemName: "lock.fill")
@@ -415,7 +415,7 @@ struct CreateServerModal: View {
                             .buttonStyle(.plain)
 
                             Button {
-                                withAnimation(.easeInOut(duration: 0.15)) { isPublic = true }
+                                isPublic = true
                             } label: {
                                 HStack(spacing: 6) {
                                     Image(systemName: "globe")
@@ -537,7 +537,7 @@ struct CreateServerModal: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(MoodTheme.glassBorder, lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.5), radius: 20, y: 8)
+        .popoverElevation()
     }
 }
 
@@ -595,9 +595,7 @@ struct InviteModal: View {
                             .foregroundStyle(MoodTheme.textPrimary)
                         Spacer()
                         Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                _ = invitedUsers.insert(user.id)
-                            }
+                            _ = invitedUsers.insert(user.id)
                         } label: {
                             Text(invitedUsers.contains(user.id) ? "Envoyé" : "Inviter")
                                 .font(.system(size: 12, weight: .semibold))
@@ -606,7 +604,6 @@ struct InviteModal: View {
                                 .padding(.vertical, 5)
                                 .background(invitedUsers.contains(user.id) ? MoodTheme.onlineGreen : MoodTheme.brandAccent)
                                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                .animation(.easeInOut(duration: 0.2), value: invitedUsers.contains(user.id))
                         }
                         .buttonStyle(.plain)
                         .disabled(invitedUsers.contains(user.id))
@@ -668,7 +665,7 @@ struct InviteModal: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(MoodTheme.glassBorder, lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.5), radius: 20, y: 8)
+        .popoverElevation()
     }
 }
 

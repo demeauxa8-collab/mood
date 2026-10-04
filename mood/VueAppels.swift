@@ -124,7 +124,7 @@ struct VoiceChannelLobby: View {
                                 .frame(height: 60)
                                 .onHover { hovering in
                                     if hovering {
-                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                        withAnimation(MoodMotion.popover) {
                                             isControlBarVisible = true
                                         }
                                     }
@@ -145,13 +145,13 @@ struct VoiceChannelLobby: View {
                                 )
                                 .onHover { hovering in
                                     if !hovering {
-                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                        withAnimation(MoodMotion.popover) {
                                             isControlBarVisible = false
                                         }
                                     }
                                 }
                             }
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                            .transition(.opacity)
                         }
                     }
                 }
@@ -185,18 +185,14 @@ struct VoiceChannelLobby: View {
     }
 
     private func joinChannel() {
-        withAnimation(.easeInOut(duration: 0.25)) {
-            connectedUsers = [MockData.currentUser] + (MockData.voiceUsers[channel.id] ?? [])
-            isConnected = true
-        }
+        connectedUsers = [MockData.currentUser] + (MockData.voiceUsers[channel.id] ?? [])
+        isConnected = true
         startSpeakingSimulation()
     }
 
     private func disconnectChannel() {
-        withAnimation(.easeInOut(duration: 0.2)) {
-            connectedUsers = []
-            isConnected = false
-        }
+        connectedUsers = []
+        isConnected = false
     }
 
     private func startSpeakingSimulation() {
@@ -390,7 +386,6 @@ struct DiscordControlButton: View {
     var action: () -> Void
 
     @State private var isHovered = false
-    @State private var isPressed = false
     @State private var showDeviceMenu = false
 
     private var iconColor: Color {
@@ -414,7 +409,6 @@ struct DiscordControlButton: View {
                     .font(.system(size: 15))
                     .foregroundStyle(iconColor)
                     .frame(width: hasDropdown ? 30 : 36, height: 36)
-                    .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(.plain)
 
@@ -454,8 +448,6 @@ struct DiscordControlButton: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(bgColor)
         )
-        .scaleEffect(isPressed ? 0.93 : 1.0)
-        .animation(.easeInOut(duration: 0.1), value: isPressed)
         .animation(.easeInOut(duration: 0.15), value: isDestructive)
         .animation(.easeInOut(duration: 0.15), value: isActive)
         .onHover { hovering in isHovered = hovering }
@@ -506,7 +498,6 @@ struct VoiceCallView: View {
     @State private var isDeafened = false
     @State private var callDuration: TimeInterval = 0
     @State private var timer: Timer?
-    @State private var pulseScale: CGFloat = 1.0
 
     var body: some View {
         ZStack {
@@ -529,7 +520,7 @@ struct VoiceCallView: View {
                 // Bandeau mode
                 if callState == .connected {
                     callTopBar
-                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .transition(.opacity)
                 }
 
                 Spacer()
@@ -538,16 +529,14 @@ struct VoiceCallView: View {
                 callControlBar
                     .padding(.horizontal, 20)
                     .padding(.vertical, 14)
-                    .background(.ultraThinMaterial)
+                    .background(MoodTheme.glassBg)
                     .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
                     .padding(.horizontal, 40)
                     .padding(.bottom, 30)
             }
         }
         .onAppear { startCall() }
         .onDisappear { timer?.invalidate() }
-        .animation(.easeInOut(duration: 0.25), value: callMode)
     }
 
     // MARK: - Mode Voix
@@ -557,13 +546,6 @@ struct VoiceCallView: View {
             Spacer()
 
             ZStack {
-                if callState == .ringing {
-                    Circle()
-                        .stroke(MoodTheme.textSecondary.opacity(0.15), lineWidth: 2)
-                        .frame(width: 120, height: 120)
-                        .scaleEffect(pulseScale)
-                        .opacity(2 - pulseScale)
-                }
                 if callState == .connected {
                     Circle()
                         .stroke(MoodTheme.onlineGreen, lineWidth: 3)
@@ -619,7 +601,6 @@ struct VoiceCallView: View {
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .stroke(MoodTheme.divider, lineWidth: 1)
                     )
-                    .shadow(color: .black.opacity(0.3), radius: 5, y: 2)
                     .padding(.top, 56)
                     .padding(.trailing, 12)
                 }
@@ -711,7 +692,7 @@ struct VoiceCallView: View {
                 icon: callMode == .camera ? "video.fill" : "video.slash.fill",
                 isHighlighted: callMode == .camera
             ) {
-                withAnimation { callMode = callMode == .camera ? .voice : .camera }
+                callMode = callMode == .camera ? .voice : .camera
             }
 
             // Partage d'écran
@@ -719,7 +700,7 @@ struct VoiceCallView: View {
                 icon: "rectangle.on.rectangle.angled",
                 isHighlighted: callMode == .screenShare
             ) {
-                withAnimation { callMode = callMode == .screenShare ? .voice : .screenShare }
+                callMode = callMode == .screenShare ? .voice : .screenShare
             }
 
             // Raccrocher
@@ -777,22 +758,16 @@ struct VoiceCallView: View {
 
     private func startCall() {
         callState = .ringing
-        withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: false)) {
-            pulseScale = 1.8
-        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                callState = .connected
-                pulseScale = 1.0
-            }
+            callState = .connected
             timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in callDuration += 1 }
         }
     }
 
     private func endCall() {
         timer?.invalidate()
-        withAnimation(.easeInOut(duration: 0.2)) { callState = .ended }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { onEnd() }
+        callState = .ended
+        onEnd()
     }
 }
 
@@ -829,7 +804,6 @@ struct CallControlCircle: View {
                 .frame(width: 52, height: 52)
                 .background(bgColor)
                 .clipShape(Circle())
-                .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(.plain)
         .animation(.easeInOut(duration: 0.15), value: isDestructive)
@@ -850,7 +824,6 @@ struct VideoCallView: View {
     @State private var callDuration: TimeInterval = 0
     @State private var timer: Timer?
     @State private var showControls = true
-    @State private var pulseScale: CGFloat = 1.0
 
     var body: some View {
         ZStack {
@@ -891,11 +864,6 @@ struct VideoCallView: View {
             if callState == .ringing || callState == .connecting {
                 VStack(spacing: 16) {
                     ZStack {
-                        Circle()
-                            .stroke(MoodTheme.textSecondary.opacity(0.15), lineWidth: 2)
-                            .frame(width: 120, height: 120)
-                            .scaleEffect(pulseScale)
-                            .opacity(2 - pulseScale)
 
                         Text(participant.avatarEmoji)
                             .font(.system(size: 48))
@@ -932,7 +900,6 @@ struct VideoCallView: View {
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .stroke(MoodTheme.divider, lineWidth: 1)
                         )
-                        .shadow(color: .black.opacity(0.3), radius: 5, y: 2)
                         .padding(12)
                     }
                     Spacer()
@@ -964,7 +931,7 @@ struct VideoCallView: View {
                         .clipShape(Capsule())
                     }
                     .padding(.horizontal, 14).padding(.top, 10)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .transition(.opacity)
                 }
 
                 Spacer()
@@ -987,11 +954,11 @@ struct VideoCallView: View {
                         }
                     }
                     .padding(.bottom, 40)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(.opacity)
                 }
             }
         }
-        .onTapGesture { withAnimation(.easeInOut(duration: 0.2)) { showControls.toggle() } }
+        .onTapGesture { withAnimation(MoodMotion.popover) { showControls.toggle() } }
         .onAppear { startCall() }
         .onDisappear { timer?.invalidate() }
     }
@@ -1003,22 +970,16 @@ struct VideoCallView: View {
 
     private func startCall() {
         callState = .ringing
-        withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: false)) {
-            pulseScale = 1.8
-        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                callState = .connected
-                pulseScale = 1.0
-            }
+            callState = .connected
             timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in callDuration += 1 }
         }
     }
 
     private func endCall() {
         timer?.invalidate()
-        withAnimation(.easeInOut(duration: 0.2)) { callState = .ended }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { onEnd() }
+        callState = .ended
+        onEnd()
     }
 }
 

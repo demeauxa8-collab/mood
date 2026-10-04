@@ -366,10 +366,8 @@ struct DMChatArea: View {
                         }
                         .help("Appel vidéo")
                         HeaderButton(icon: "pin") {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                showPinnedMessages.toggle()
-                                showSearch = false
-                            }
+                            showPinnedMessages.toggle()
+                            showSearch = false
                         }
                         .help("Messages épinglés")
 
@@ -382,10 +380,8 @@ struct DMChatArea: View {
                         }
 
                         HeaderButton(icon: "magnifyingglass") {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                showSearch.toggle()
-                                showPinnedMessages = false
-                            }
+                            showSearch.toggle()
+                            showPinnedMessages = false
                         }
                         .help("Rechercher")
                     }
@@ -465,9 +461,7 @@ struct DMChatArea: View {
                     }
                     .onChange(of: messages.count) { _, _ in
                         if let lastID = messages.last?.id {
-                            withAnimation(.easeOut(duration: 0.25)) {
-                                proxy.scrollTo(lastID, anchor: .bottom)
-                            }
+                            proxy.scrollTo(lastID, anchor: .bottom)
                         }
                     }
                 }
@@ -501,15 +495,15 @@ struct DMChatArea: View {
                     switch call {
                     case .voice:
                         VoiceCallView(participant: conversation.participant) {
-                            withAnimation(.easeInOut(duration: 0.2)) { activeCall = nil }
+                            activeCall = nil
                         }
                     case .video:
                         VideoCallView(participant: conversation.participant) {
-                            withAnimation(.easeInOut(duration: 0.2)) { activeCall = nil }
+                            activeCall = nil
                         }
                     }
                 }
-                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                .transition(.opacity)
             }
         }
     }

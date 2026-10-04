@@ -46,19 +46,6 @@ struct LoginView: View {
             // Background
             MoodTheme.serverBar.ignoresSafeArea()
 
-            // Subtle glow
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [MoodTheme.brandAccent.opacity(0.12), Color.clear],
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: 250
-                    )
-                )
-                .frame(width: 500, height: 500)
-                .blur(radius: 80)
-                .offset(y: -100)
 
             if layoutMode == .regular {
                 desktopLoginContent
@@ -246,9 +233,7 @@ struct LoginView: View {
                         homeserver: homeserver
                     )
                     isLoading = false
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        authState.isLoggedIn = true
-                    }
+                    authState.isLoggedIn = true
                 } catch {
                     isLoading = false
                     errorMessage = error.localizedDescription
@@ -326,9 +311,7 @@ struct LoginView: View {
                 .font(.system(size: layoutMode == .compact ? 12 : 13))
                 .foregroundStyle(MoodTheme.textSecondary)
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    authState.currentScreen = .signup
-                }
+                authState.currentScreen = .signup
             } label: {
                 Text("Créer un compte")
                     .font(.system(size: layoutMode == .compact ? 12 : 13, weight: .semibold))
@@ -342,9 +325,7 @@ struct LoginView: View {
     private var loginSkip: some View {
         Button {
             authState.isDemoMode = true
-            withAnimation(.easeOut(duration: 0.3)) {
-                authState.isLoggedIn = true
-            }
+            authState.isLoggedIn = true
         } label: {
             Text("Passer →")
                 .font(.system(size: layoutMode == .compact ? 12 : 13, weight: .medium))
@@ -410,9 +391,7 @@ struct LoginView: View {
             Task {
                 do {
                     try await matrixStore.loginWithSSOToken(loginToken, homeserver: homeserver)
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        authState.isLoggedIn = true
-                    }
+                    authState.isLoggedIn = true
                 } catch {
                     errorMessage = error.localizedDescription
                 }
@@ -470,18 +449,6 @@ struct SignupView: View {
         ZStack {
             MoodTheme.serverBar.ignoresSafeArea()
 
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [MoodTheme.brandBlue.opacity(0.12), Color.clear],
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: 250
-                    )
-                )
-                .frame(width: 500, height: 500)
-                .blur(radius: 80)
-                .offset(y: -100)
 
             if layoutMode == .regular {
                 desktopSignupContent
@@ -686,9 +653,7 @@ struct SignupView: View {
                         await matrixStore.updateDisplayName(name)
                     }
                     isLoading = false
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        authState.isLoggedIn = true
-                    }
+                    authState.isLoggedIn = true
                 } catch {
                     isLoading = false
                     errorMessage = error.localizedDescription
@@ -729,9 +694,7 @@ struct SignupView: View {
                 .font(.system(size: layoutMode == .compact ? 12 : 13))
                 .foregroundStyle(MoodTheme.textSecondary)
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    authState.currentScreen = .login
-                }
+                authState.currentScreen = .login
             } label: {
                 Text("Se connecter")
                     .font(.system(size: layoutMode == .compact ? 12 : 13, weight: .semibold))
@@ -745,9 +708,7 @@ struct SignupView: View {
     private var signupSkip: some View {
         Button {
             authState.isDemoMode = true
-            withAnimation(.easeOut(duration: 0.3)) {
-                authState.isLoggedIn = true
-            }
+            authState.isLoggedIn = true
         } label: {
             Text("Passer →")
                 .font(.system(size: layoutMode == .compact ? 12 : 13, weight: .medium))
@@ -781,13 +742,10 @@ struct AuthContainer: View {
             switch authState.currentScreen {
             case .login:
                 LoginView(authState: authState, matrixStore: matrixStore)
-                    .transition(.move(edge: .leading).combined(with: .opacity))
             case .signup:
                 SignupView(authState: authState, matrixStore: matrixStore)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: authState.currentScreen)
     }
 }
 

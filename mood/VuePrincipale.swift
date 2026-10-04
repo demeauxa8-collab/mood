@@ -44,9 +44,7 @@ struct ContentView: View {
                 if let conversation {
                     openDM(conversation)
                 } else {
-                    withAnimation(.snappy(duration: 0.2)) {
-                        selectedDM = nil
-                    }
+                    selectedDM = nil
                 }
             }
         )
@@ -91,10 +89,10 @@ struct ContentView: View {
                     matrixStore.errorMessage = nil
                 }
                 .id(error)
-                .transition(.move(edge: .top).combined(with: .opacity))
+                .transition(.opacity)
             }
         }
-        .animation(.easeOut(duration: 0.25), value: matrixStore.errorMessage)
+        .animation(MoodMotion.popover, value: matrixStore.errorMessage)
         .overlay {
             if showProfilePopup, let user = profileUser {
                 ZStack {
@@ -102,21 +100,19 @@ struct ContentView: View {
                     Color.black.opacity(0.4)
                         .ignoresSafeArea()
                         .onTapGesture {
-                            withAnimation(.easeOut(duration: 0.15)) {
-                                showProfilePopup = false
-                            }
+                            showProfilePopup = false
                         }
 
                     UserProfilePopup(user: user, server: selectedServer, onDismiss: {
-                            withAnimation(.easeOut(duration: 0.15)) { showProfilePopup = false }
+                            showProfilePopup = false
                         })
                         .frame(width: 320)
-                        .shadow(color: .black.opacity(0.5), radius: 20, y: 8)
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                        .popoverElevation()
                 }
-                .animation(.easeOut(duration: 0.15), value: showProfilePopup)
+                .transition(.opacity)
             }
         }
+        .animation(MoodMotion.popover, value: showProfilePopup)
         .sheet(isPresented: $showSettings) {
             AccountSettingsView(isPresented: $showSettings, authState: authState)
                 .environment(matrixStore)
@@ -138,17 +134,14 @@ struct ContentView: View {
                 VoiceCallView(
                     participant: user,
                     onEnd: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            callingUser = nil
-                        }
+                        callingUser = nil
                     }
                 )
-                .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
         }
         .background {
             if layoutMode == .regular {
-                Button { withAnimation(.easeOut(duration: 0.15)) { showQuickSwitcher.toggle() } } label: { EmptyView() }
+                Button { withAnimation(MoodMotion.popover) { showQuickSwitcher.toggle() } } label: { EmptyView() }
                     .keyboardShortcut("k", modifiers: .command)
             }
         }
@@ -243,11 +236,9 @@ struct ContentView: View {
                         .frame(width: LayoutMetrics.channelListWidth)
                         .frame(maxHeight: .infinity)
                         .background(MoodTheme.channelList)
-                        .transition(.move(edge: .leading).combined(with: .opacity))
                     }
 
                     desktopMainContent
-                        .transition(.opacity.combined(with: .scale(scale: 0.995)))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .clipShape(
@@ -281,10 +272,6 @@ struct ContentView: View {
                 .padding(.bottom, LayoutMetrics.composerBottomInset)
         }
         .ignoresSafeArea()
-        .animation(.snappy(duration: 0.24), value: showDMs)
-        .animation(.snappy(duration: 0.22), value: selectedServer?.id)
-        .animation(.snappy(duration: 0.20), value: selectedChannel?.id)
-        .animation(.snappy(duration: 0.20), value: selectedDM?.id)
         .overlay {
             if showCreateServer {
                 ZStack {
@@ -319,17 +306,15 @@ struct ContentView: View {
     }
 
     private func desktopBack() {
-        withAnimation(.snappy(duration: 0.2)) {
-            if showExplore {
-                showExplore = false
-                showDMs = true
-            } else if selectedDM != nil {
-                selectedDM = nil
-            } else if !showDMs {
-                showDMs = true
-                selectedServer = nil
-                selectedChannel = nil
-            }
+        if showExplore {
+            showExplore = false
+            showDMs = true
+        } else if selectedDM != nil {
+            selectedDM = nil
+        } else if !showDMs {
+            showDMs = true
+            selectedServer = nil
+            selectedChannel = nil
         }
     }
 
@@ -344,7 +329,7 @@ struct ContentView: View {
                     showProfilePopup: $showProfilePopup,
                     profileUser: $profileUser,
                     onBack: {
-                        withAnimation(.snappy(duration: 0.2)) { selectedDM = nil }
+                        selectedDM = nil
                     }
                 )
             } else {
@@ -365,7 +350,7 @@ struct ContentView: View {
                         showProfilePopup = true
                     },
                     onCall: { user in
-                        withAnimation(.snappy(duration: 0.25)) { callingUser = user }
+                        callingUser = user
                     }
                 )
             }
@@ -459,9 +444,7 @@ struct ContentView: View {
 
     private func openDM(_ conversation: DMConversation) {
         let readConversation = markConversationRead(conversation)
-        withAnimation(.snappy(duration: 0.2)) {
-            selectedDM = readConversation
-        }
+        selectedDM = readConversation
     }
 
     @discardableResult
@@ -483,9 +466,7 @@ struct ContentView: View {
 
     private func openChannel(_ channel: Channel) {
         let readChannel = markChannelRead(channel)
-        withAnimation(.snappy(duration: 0.2)) {
-            selectedChannel = readChannel
-        }
+        selectedChannel = readChannel
     }
 
     @discardableResult
@@ -547,7 +528,7 @@ struct ErrorBanner: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(MoodTheme.glassBorder, lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
+        .popoverElevation()
         .frame(maxWidth: 480)
         .padding(.horizontal, 16)
         .padding(.top, 12)
@@ -1273,7 +1254,7 @@ struct FriendsPlaceholderView: View {
         VStack(spacing: 0) {
             HStack(spacing: 13 * LayoutMetrics.scale) {
                 Button {
-                    withAnimation(.easeOut(duration: 0.14)) { selectedTab = .online }
+                    selectedTab = .online
                 } label: {
                     HStack(spacing: 8 * LayoutMetrics.scale) {
                         Image(systemName: "figure.wave")
@@ -1292,7 +1273,7 @@ struct FriendsPlaceholderView: View {
                 HStack(spacing: 19 * LayoutMetrics.scale) {
                     ForEach([FriendsTab.all, FriendsTab.pending], id: \.self) { tab in
                         FriendsTabButton(tab: tab, isSelected: selectedTab == tab) {
-                            withAnimation(.easeOut(duration: 0.14)) { selectedTab = tab }
+                            selectedTab = tab
                         }
                     }
 
@@ -1615,7 +1596,7 @@ struct AddFriendModal: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(MoodTheme.glassBorder, lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.5), radius: 20, y: 8)
+        .popoverElevation()
     }
 }
 

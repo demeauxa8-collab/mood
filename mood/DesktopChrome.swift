@@ -106,16 +106,9 @@ struct DesktopIconButton: View {
     var action: () -> Void = {}
 
     @State private var isHovered = false
-    @State private var isPressed = false
 
     var body: some View {
-        Button {
-            withAnimation(.easeOut(duration: 0.09)) { isPressed = true }
-            action()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.09) {
-                withAnimation(.easeOut(duration: 0.09)) { isPressed = false }
-            }
-        } label: {
+        Button(action: action) {
             ZStack(alignment: .topTrailing) {
                 Image(systemName: icon)
                     .font(.mood(15, weight: .semibold))
@@ -132,11 +125,10 @@ struct DesktopIconButton: View {
                         .offset(x: -2 * LayoutMetrics.scale, y: 2 * LayoutMetrics.scale)
                 }
             }
-            .scaleEffect(isPressed ? 0.92 : 1)
         }
         .buttonStyle(.plain)
         .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.12)) { isHovered = hovering }
+            withAnimation(MoodMotion.hover) { isHovered = hovering }
         }
         .help(help)
     }

@@ -421,3 +421,19 @@ extension Color {
         )
     }
 }
+
+// MARK: - Motion
+// Discord barely animates: hovers recolor in ~100 ms, popouts fade in ~150 ms,
+// navigation (server, channel, DM switches) is instant. Use these, never ad-hoc curves.
+
+enum MoodMotion {
+    static let hover = Animation.easeOut(duration: 0.1)
+    static let popover = Animation.easeOut(duration: 0.15)
+}
+
+extension View {
+    /// Flat Discord-style elevation for popouts, menus and modals.
+    func popoverElevation() -> some View {
+        shadow(color: .black.opacity(0.24), radius: 8, y: 8)
+    }
+}

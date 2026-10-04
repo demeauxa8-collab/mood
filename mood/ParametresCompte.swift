@@ -114,7 +114,7 @@ struct AccountSettingsView: View {
                     Button {
                         matrixStore.logout()
                         if let authState {
-                            withAnimation { authState.isLoggedIn = false }
+                            authState.isLoggedIn = false
                         }
                         isPresented = false
                     } label: {
@@ -215,7 +215,7 @@ struct AccountSettingsView: View {
                     Button {
                         matrixStore.logout()
                         if let authState {
-                            withAnimation { authState.isLoggedIn = false }
+                            authState.isLoggedIn = false
                         }
                         isPresented = false
                     } label: {

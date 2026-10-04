@@ -248,7 +248,7 @@ struct ServerSettingsMenu: View {
             RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous)
                 .strokeBorder(MoodTheme.serverMenuBorder, lineWidth: 1 * LayoutMetrics.scale)
         }
-        .shadow(color: .black.opacity(0.48), radius: 14 * LayoutMetrics.scale, y: 7 * LayoutMetrics.scale)
+        .popoverElevation()
         .alert("Bientôt disponible", isPresented: $showComingSoon) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -622,13 +622,13 @@ struct UserStatusPanel: View {
             // Status picker popup
             if showStatusPicker {
                 StatusPickerMenu(showPicker: $showStatusPicker)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(.opacity)
                     .padding(.leading, 2)
             }
 
             HStack(spacing: 6 * LayoutMetrics.scale) {
                 Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                    withAnimation(MoodMotion.popover) {
                         showStatusPicker.toggle()
                     }
                 } label: {
@@ -709,7 +709,6 @@ struct UserStatusPanel: View {
                 RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous)
                     .strokeBorder(MoodTheme.glassBorder, lineWidth: 1 * LayoutMetrics.scale)
             }
-            .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
         }
         .frame(width: LayoutMetrics.userPanelWidth, alignment: .bottomLeading)
         .zIndex(10)
@@ -794,7 +793,7 @@ struct StatusPickerMenu: View {
 
             ForEach(statuses, id: \.status) { item in
                 Button {
-                    withAnimation(.easeInOut(duration: 0.15)) { showPicker = false }
+                    showPicker = false
                 } label: {
                     HStack(spacing: 10) {
                         StatusIndicator(status: item.status, size: 10, borderColor: MoodTheme.serverBar)
