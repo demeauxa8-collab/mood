@@ -105,9 +105,12 @@ struct ContentView: View {
                             showProfilePopup = false
                         }
 
-                    UserProfilePopup(user: user, server: selectedServer, onDismiss: {
-                            showProfilePopup = false
-                        })
+                    UserProfilePopup(
+                        user: user,
+                        server: selectedServer,
+                        onDismiss: { showProfilePopup = false },
+                        onOpenConversation: openConversation(withID:)
+                    )
                         .frame(width: 320)
                         .popoverElevation()
                 }
@@ -457,6 +460,13 @@ struct ContentView: View {
         .tint(MoodTheme.textPrimary)
         .toolbarBackground(MoodTheme.serverBar, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
+    }
+
+    private func openConversation(withID id: UUID) {
+        showDMs = true
+        if let conversation = conversations.first(where: { $0.id == id }) {
+            openDM(conversation)
+        }
     }
 
     private func openServer(withID id: UUID) {
@@ -1266,9 +1276,15 @@ struct FriendsPlaceholderView: View {
         case online = "En ligne"
         case all = "Tous"
         case pending = "En attente"
+        case blocked = "Bloqués"
     }
 
-    let friends = MockData.users
+    @Environment(MatrixStore.self) private var matrixStore
+
+    /// Demo data only without a session; otherwise the people you have a DM with.
+    private var friends: [MoodUser] {
+        matrixStore.userId == nil ? MockData.users : matrixStore.friends
+    }
     var onOpenDM: ((MoodUser) -> Void)?
     var onOpenConversation: ((UUID) -> Void)?
     var onShowProfile: ((MoodUser) -> Void)?
@@ -1307,7 +1323,7 @@ struct FriendsPlaceholderView: View {
                     .frame(width: 4 * LayoutMetrics.scale, height: 4 * LayoutMetrics.scale)
 
                 HStack(spacing: 19 * LayoutMetrics.scale) {
-                    ForEach([FriendsTab.all, FriendsTab.pending], id: \.self) { tab in
+                    ForEach(FriendsTab.allCases, id: \.self) { tab in
                         FriendsTabButton(tab: tab, isSelected: selectedTab == tab) {
                             selectedTab = tab
                         }
@@ -1421,8 +1437,44 @@ struct FriendsPlaceholderView: View {
         case .all:
             allFriendsSection
         case .pending:
-            friendsEmptyState(icon: "person.crop.circle.badge.clock", title: "Aucune demande en attente", subtitle: "Les nouvelles demandes d'ami apparaîtront ici.")
+            pendingSection
+        case .blocked:
+            blockedSection
         }
+    }
+
+    @ViewBuilder
+    private var pendingSection: some View {
+        if matrixStore.pendingInvites.isEmpty {
+            friendsEmptyState(icon: "person.crop.circle.badge.clock", title: "Aucune invitation en attente", subtitle: "Les invitations à discuter ou à rejoindre un serveur apparaîtront ici.")
+        } else {
+            friendsListTitle("En attente — \(matrixStore.pendingInvites.count)")
+            ForEach(matrixStore.pendingInvites) { invite in
+                PendingInviteRow(invite: invite)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var blockedSection: some View {
+        if matrixStore.blockedUsers.isEmpty {
+            friendsEmptyState(icon: "nosign", title: "Personne n'est bloqué", subtitle: "Tu ne verras plus les messages des personnes que tu bloques.")
+        } else {
+            friendsListTitle("Bloqués — \(matrixStore.blockedUsers.count)")
+            ForEach(matrixStore.blockedUsers) { user in
+                BlockedUserRow(user: user)
+            }
+        }
+    }
+
+    private func friendsListTitle(_ title: String) -> some View {
+        Text(title)
+            .font(.mood(14, weight: .semibold))
+            .foregroundStyle(Color(hex: "efeff1"))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 38 * LayoutMetrics.scale)
+            .padding(.leading, 24 * LayoutMetrics.scale)
+            .padding(.top, 12 * LayoutMetrics.scale)
     }
 
     @ViewBuilder
@@ -1665,6 +1717,7 @@ struct AddFriendModal: View {
 // MARK: - Friend Row
 
 struct FriendRow: View {
+    @Environment(MatrixStore.self) private var matrixStore
     let user: MoodUser
     var onMessage: () -> Void = {}
     var onCall: () -> Void = {}
@@ -1735,13 +1788,17 @@ struct FriendRow: View {
         }
         .alert("Retirer l'ami", isPresented: $showRemoveConfirm) {
             Button("Annuler", role: .cancel) {}
-            Button("Retirer", role: .destructive) {}
+            Button("Retirer", role: .destructive) {
+                if let id = user.matrixId { Task { await matrixStore.removeFriend(id) } }
+            }
         } message: {
             Text("Es-tu sûr de vouloir retirer \(user.displayName) de ta liste d'amis ?")
         }
         .alert("Bloquer", isPresented: $showBlockConfirm) {
             Button("Annuler", role: .cancel) {}
-            Button("Bloquer", role: .destructive) {}
+            Button("Bloquer", role: .destructive) {
+                if let id = user.matrixId { Task { await matrixStore.setBlocked(id, blocked: true) } }
+            }
         } message: {
             Text("Es-tu sûr de vouloir bloquer \(user.displayName) ?")
         }
@@ -1752,6 +1809,7 @@ struct FriendRow: View {
 /// The online tab intentionally keeps `FriendRow`, whose call shortcut and
 /// denser layout were already calibrated separately.
 struct AllFriendRow: View {
+    @Environment(MatrixStore.self) private var matrixStore
     let user: MoodUser
     var onMessage: () -> Void = {}
     var onShowProfile: () -> Void = {}
@@ -1890,13 +1948,17 @@ struct AllFriendRow: View {
         }
         .alert("Retirer l'ami", isPresented: $showRemoveConfirm) {
             Button("Annuler", role: .cancel) {}
-            Button("Retirer", role: .destructive) {}
+            Button("Retirer", role: .destructive) {
+                if let id = user.matrixId { Task { await matrixStore.removeFriend(id) } }
+            }
         } message: {
             Text("Es-tu sûr de vouloir retirer \(user.displayName) de ta liste d'amis ?")
         }
         .alert("Bloquer", isPresented: $showBlockConfirm) {
             Button("Annuler", role: .cancel) {}
-            Button("Bloquer", role: .destructive) {}
+            Button("Bloquer", role: .destructive) {
+                if let id = user.matrixId { Task { await matrixStore.setBlocked(id, blocked: true) } }
+            }
         } message: {
             Text("Es-tu sûr de vouloir bloquer \(user.displayName) ?")
         }
@@ -1960,4 +2022,105 @@ struct FriendActionButton: View {
     ContentView()
         .environment(MatrixStore())
         .environment(AuthState())
+}
+
+// MARK: - Pending Invite Row
+
+struct PendingInviteRow: View {
+    @Environment(MatrixStore.self) private var matrixStore
+    let invite: MatrixStore.PendingInvite
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 12 * LayoutMetrics.scale) {
+            Image(systemName: "envelope.fill")
+                .font(.mood(16))
+                .foregroundStyle(MoodTheme.textSecondary)
+                .frame(width: 36 * LayoutMetrics.scale, height: 36 * LayoutMetrics.scale)
+                .background(MoodTheme.serverIconBg)
+                .clipShape(Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(invite.roomName)
+                    .font(.mood(15, weight: .semibold))
+                    .foregroundStyle(MoodTheme.textPrimary)
+                    .lineLimit(1)
+                Text("Invitation de \(invite.inviter)")
+                    .font(.mood(13))
+                    .foregroundStyle(MoodTheme.textSecondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            RoundIconButton(icon: "checkmark", tint: MoodTheme.onlineGreen, help: "Accepter") {
+                Task { await matrixStore.acceptInvite(roomId: invite.id) }
+            }
+            RoundIconButton(icon: "xmark", tint: MoodTheme.mentionBadge, help: "Refuser") {
+                Task { await matrixStore.rejectInvite(roomId: invite.id) }
+            }
+        }
+        .padding(.horizontal, 12 * LayoutMetrics.scale)
+        .frame(height: 62 * LayoutMetrics.scale)
+        .background(isHovered ? MoodTheme.hoverBg : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
+        .padding(.horizontal, 12 * LayoutMetrics.scale)
+        .onHover { isHovered = $0 }
+    }
+}
+
+// MARK: - Blocked User Row
+
+struct BlockedUserRow: View {
+    @Environment(MatrixStore.self) private var matrixStore
+    let user: MoodUser
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 12 * LayoutMetrics.scale) {
+            AvatarGlyph(user: user)
+                .font(.mood(18))
+                .frame(width: 36 * LayoutMetrics.scale, height: 36 * LayoutMetrics.scale)
+                .background(MoodTheme.serverIconBg)
+                .clipShape(Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(user.displayName)
+                    .font(.mood(15, weight: .semibold))
+                    .foregroundStyle(MoodTheme.textPrimary)
+                Text("Bloqué")
+                    .font(.mood(13))
+                    .foregroundStyle(MoodTheme.textSecondary)
+            }
+            Spacer()
+            RoundIconButton(icon: "person.fill.xmark", tint: MoodTheme.mentionBadge, help: "Débloquer") {
+                if let id = user.matrixId { Task { await matrixStore.setBlocked(id, blocked: false) } }
+            }
+        }
+        .padding(.horizontal, 12 * LayoutMetrics.scale)
+        .frame(height: 62 * LayoutMetrics.scale)
+        .background(isHovered ? MoodTheme.hoverBg : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
+        .padding(.horizontal, 12 * LayoutMetrics.scale)
+        .onHover { isHovered = $0 }
+    }
+}
+
+/// Discord's circular row action (accept, decline, message, unblock).
+struct RoundIconButton: View {
+    let icon: String
+    var tint: Color = MoodTheme.textSecondary
+    let help: String
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.mood(14, weight: .semibold))
+                .foregroundStyle(isHovered ? tint : MoodTheme.textSecondary)
+                .frame(width: 36 * LayoutMetrics.scale, height: 36 * LayoutMetrics.scale)
+                .background(MoodTheme.serverBar)
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in withAnimation(MoodMotion.hover) { isHovered = hovering } }
+        .help(help)
+    }
 }

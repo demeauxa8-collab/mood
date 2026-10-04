@@ -641,7 +641,7 @@ struct UserStatusPanel: View {
                         .font(.mood(14, weight: .semibold))
                         .foregroundStyle(MoodTheme.textPrimary)
                         .lineLimit(1)
-                    Text(user.status.rawValue)
+                    Text(user.bio.isEmpty ? user.status.rawValue : user.bio)
                         .font(.mood(12))
                         .foregroundStyle(MoodTheme.textSupporting)
                 }
@@ -749,6 +749,7 @@ struct UserPanelControl: View {
 // MARK: - Status Picker Menu
 
 struct StatusPickerMenu: View {
+    @Environment(MatrixStore.self) private var matrixStore
     @Binding var showPicker: Bool
     @State private var showCustomStatus = false
 
@@ -784,6 +785,7 @@ struct StatusPickerMenu: View {
             ForEach(statuses, id: \.status) { item in
                 Button {
                     showPicker = false
+                    Task { await matrixStore.setMyStatus(item.status, message: matrixStore.myStatusMessage) }
                 } label: {
                     HStack(spacing: 10) {
                         StatusIndicator(status: item.status, size: 10, borderColor: MoodTheme.serverBar)
@@ -817,6 +819,7 @@ struct StatusPickerMenu: View {
 // MARK: - Custom Status Editor
 
 struct CustomStatusEditor: View {
+    @Environment(MatrixStore.self) private var matrixStore
     @Binding var isPresented: Bool
     @State private var statusText = ""
     @State private var selectedEmoji = "😀"
@@ -824,6 +827,33 @@ struct CustomStatusEditor: View {
 
     private let quickEmojis = ["😀", "😴", "🤒", "🏠", "🎮", "📚", "💻", "🎵"]
     private let durations = ["Ne pas effacer", "30 minutes", "1 heure", "4 heures", "Aujourd'hui"]
+
+    private var clearAfter: TimeInterval? {
+        switch selectedDuration {
+        case "30 minutes": return 30 * 60
+        case "1 heure": return 3600
+        case "4 heures": return 4 * 3600
+        case "Aujourd'hui":
+            let midnight = Calendar.current.startOfDay(for: Date()).addingTimeInterval(86_400)
+            return midnight.timeIntervalSinceNow
+        default: return nil
+        }
+    }
+
+    private func saveStatus() {
+        let text = statusText.trimmingCharacters(in: .whitespaces)
+        let message = text.isEmpty ? nil : "\(selectedEmoji) \(text)"
+        let store = matrixStore
+        let delay = clearAfter
+        Task {
+            await store.setMyStatus(store.myStatus, message: message)
+            // Cleared while the app is running; Matrix has no server-side expiry for status_msg.
+            if let delay, let message {
+                try? await Task.sleep(for: .seconds(delay))
+                if store.myStatusMessage == message { await store.setMyStatus(store.myStatus, message: nil) }
+            }
+        }
+    }
 
     var body: some View {
         VStack(spacing: 12) {
@@ -888,6 +918,7 @@ struct CustomStatusEditor: View {
                 Button {
                     statusText = ""
                     isPresented = false
+                    Task { await matrixStore.setMyStatus(matrixStore.myStatus, message: nil) }
                 } label: {
                     Text("Effacer le statut")
                         .font(.system(size: 12, weight: .medium))
@@ -903,6 +934,7 @@ struct CustomStatusEditor: View {
 
                 Button {
                     isPresented = false
+                    saveStatus()
                 } label: {
                     Text("Enregistrer")
                         .font(.system(size: 12, weight: .semibold))

@@ -3,21 +3,39 @@ import SwiftUI
 // MARK: - User Profile Popup (Discord-style card)
 
 struct UserProfilePopup: View {
+    @Environment(MatrixStore.self) private var matrixStore
     let user: MoodUser
     var server: MoodServer? = nil
     var onDismiss: (() -> Void)? = nil
+    /// Opens the DM once a message was sent from the card.
+    var onOpenConversation: ((UUID) -> Void)? = nil
     @State private var messageText = ""
+
+    private var canMessage: Bool {
+        user.matrixId != nil && user.matrixId != matrixStore.userId
+    }
+
+    private func sendMessage() {
+        let text = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, let matrixId = user.matrixId else { return }
+        messageText = ""
+        Task {
+            if let conversationId = await matrixStore.sendDirectMessage(to: matrixId, text: text) {
+                onDismiss?()
+                onOpenConversation?(conversationId)
+            }
+        }
+    }
 
     private let bannerHeight: CGFloat = 60
     private let avatarSize: CGFloat = 76
     private let avatarBorder: CGFloat = 6
     private let avatarOverlap: CGFloat = 38
 
-    // Compute mutual servers from MockData
     private var mutualServers: [MoodServer] {
-        MockData.servers.filter { s in
-            s.members.contains(where: { $0.id == user.id })
-        }
+        matrixStore.userId == nil
+            ? MockData.servers.filter { s in s.members.contains(where: { $0.id == user.id }) }
+            : matrixStore.mutualServers(with: user)
     }
 
     var body: some View {
@@ -234,11 +252,11 @@ struct UserProfilePopup: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 13))
                         .foregroundStyle(MoodTheme.textPrimary)
+                        .onSubmit(sendMessage)
+                        .disabled(!canMessage)
 
                     if !messageText.isEmpty {
-                        Button {
-                            messageText = ""
-                        } label: {
+                        Button(action: sendMessage) {
                             Image(systemName: "paperplane.fill")
                                 .font(.system(size: 12))
                                 .foregroundStyle(MoodTheme.brandAccent)

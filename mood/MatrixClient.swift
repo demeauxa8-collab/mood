@@ -826,6 +826,12 @@ class MatrixClient {
         }
     }
 
+    func setIgnoredUsers(userId: String, ignored: [String]) async throws {
+        let path = "/_matrix/client/v3/user/\(pathEscape(userId))/account_data/m.ignored_user_list"
+        let users = Dictionary(uniqueKeysWithValues: ignored.map { ($0, [String: Any]()) })
+        try await putJSONNoResponse(path, body: ["ignored_users": users])
+    }
+
     func setDirectRooms(userId: String, directMap: [String: [String]]) async throws {
         let path = "/_matrix/client/v3/user/\(pathEscape(userId))/account_data/m.direct"
         try await putJSONNoResponse(path, body: directMap)

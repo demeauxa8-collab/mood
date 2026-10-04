@@ -26,6 +26,12 @@ class MatrixStore {
 
     // Pending invitations
     var pendingInvites: [PendingInvite] = []
+    /// My chosen status; Matrix presence cannot express "Ne pas déranger", so it is kept here.
+    private(set) var myStatus: MoodUser.UserStatus = .online
+    private(set) var myStatusMessage: String?
+    private var currentAvatarMxc: String?
+    /// m.ignored_user_list — Discord's "Bloqués".
+    private(set) var ignoredUserIds: Set<String> = []
 
     // Pagination: true si on peut encore charger de l'historique pour la room
     var hasMoreHistory: [String: Bool] = [:]
@@ -97,6 +103,8 @@ class MatrixStore {
         var avatarUrl: String? // room avatar mxc URL
         var heroes: [String] // m.heroes du sync, fallback DM quand les membres ne sont pas résolus
         var pinnedEventIds: [String] = [] // m.room.pinned_events
+        var powerLevels: [String: Int] = [:] // m.room.power_levels users
+        var creator: String? // sender of m.room.create
     }
 
     private var rooms: [MatrixRoom] = []
@@ -272,7 +280,7 @@ class MatrixStore {
                     if isFirstSync {
                         isFirstSync = false
                         if let userId = self.userId {
-                            try? await self.client.setPresence(userId: userId, presence: "online")
+                            try? await self.client.setPresence(userId: userId, presence: Self.matrixPresence(for: self.myStatus), statusMsg: self.myStatusMessage)
                         }
                         guard !Task.isCancelled, generation == self.syncGeneration else { return }
                         self.flushOutbox()
@@ -302,6 +310,9 @@ class MatrixStore {
     private func processSyncResponse(_ response: MatrixSyncResponse) {
         // Account data (m.direct)
         if let accountEvents = response.accountData?.events {
+            for event in accountEvents where event.type == "m.ignored_user_list" {
+                ignoredUserIds = Set(event.content?["ignored_users"]?.dictValue?.keys.map { $0 } ?? [])
+            }
             for event in accountEvents where event.type == "m.direct" {
                 if let content = event.content {
                     var dmIds = Set<String>()
@@ -499,6 +510,13 @@ class MatrixStore {
             if let roomType = event.content?["type"]?.stringValue {
                 room.roomType = roomType
             }
+            room.creator = event.content?["creator"]?.stringValue ?? event.sender
+        case "m.room.power_levels":
+            var levels: [String: Int] = [:]
+            for (user, level) in event.content?["users"]?.dictValue ?? [:] {
+                levels[user] = level.intValue ?? 0
+            }
+            room.powerLevels = levels
         case "m.space.child":
             if let childRoomId = event.stateKey {
                 let via = event.content?["via"]?.arrayValue
@@ -791,12 +809,39 @@ class MatrixStore {
         return message
     }
 
+    /// Everyone in the space or one of its channels, with Discord-style roles from power levels.
+    private func members(of space: MatrixRoom, channels: [MatrixRoom]) -> (users: [MoodUser], roles: [UUID: ServerRole]) {
+        var names: [String: String] = [:]
+        var avatars: [String: String] = [:]
+        for room in [space] + channels {
+            names.merge(room.members) { current, _ in current }
+            avatars.merge(room.memberAvatars) { current, _ in current }
+        }
+        var roles: [UUID: ServerRole] = [:]
+        let users = names.map { matrixUserId, displayName -> MoodUser in
+            let user = makeUser(matrixUserId, displayName: displayName, avatarMxc: avatars[matrixUserId],
+                                fallbackStatus: matrixUserId == userId ? .online : .offline)
+            let level = space.powerLevels[matrixUserId] ?? 0
+            if matrixUserId == space.creator {
+                roles[user.id] = .owner
+            } else if level >= 100 {
+                roles[user.id] = .admin
+            } else if level >= 50 {
+                roles[user.id] = .moderator
+            }
+            return user
+        }.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+        return (users, roles)
+    }
+
     /// Single place that turns a Matrix user into a UI user (real avatar, presence, Matrix id).
     func makeUser(_ matrixUserId: String, displayName: String? = nil, avatarMxc: String? = nil,
                   fallbackStatus: MoodUser.UserStatus = .offline) -> MoodUser {
         let presenceInfo = presenceByUser[matrixUserId]
         let status: MoodUser.UserStatus
-        switch presenceInfo?.presence {
+        let isMe = matrixUserId == userId
+        switch isMe ? nil : presenceInfo?.presence {
+        case nil where isMe: status = myStatus
         case "online": status = .online
         case "unavailable": status = .idle
         case "offline": status = .offline
@@ -809,7 +854,7 @@ class MatrixStore {
             avatarEmoji: emojiForUser(matrixUserId),
             roleColor: colorForUser(matrixUserId),
             status: status,
-            bio: presenceInfo?.statusMsg ?? "",
+            bio: (isMe ? myStatusMessage : presenceInfo?.statusMsg) ?? "",
             joinedDate: Date(),
             badges: [],
             activity: nil,
@@ -846,6 +891,7 @@ class MatrixStore {
             }
 
             if !channels.isEmpty {
+                let serverMembers = members(of: space, channels: childRooms)
                 let server = MoodServer(
                     id: stableUUID(from: space.roomId),
                     name: space.name,
@@ -857,8 +903,8 @@ class MatrixStore {
                             channels: channels
                         )
                     ],
-                    members: [],
-                    memberRoles: [:],
+                    members: serverMembers.users,
+                    memberRoles: serverMembers.roles,
                     hasUnread: childRooms.contains(where: { $0.unreadCount > 0 }),
                     mentionCount: childRooms.reduce(0) { $0 + $1.mentionCount }
                 )
@@ -942,6 +988,52 @@ class MatrixStore {
     // MARK: - Public Actions
 
     // Écho local immédiat + envoi via la file hors-ligne : jamais bloquant pour l'UI
+    // MARK: - Friends (Matrix has no friend graph: friends are the people you have a DM with)
+
+    var friends: [MoodUser] {
+        var seen = Set<UUID>()
+        return dmConversations.map(\.participant).filter { user in
+            guard let matrixId = user.matrixId, !ignoredUserIds.contains(matrixId) else { return false }
+            return seen.insert(user.id).inserted
+        }
+    }
+
+    var blockedUsers: [MoodUser] {
+        ignoredUserIds.sorted().map { makeUser($0) }
+    }
+
+    func setBlocked(_ matrixUserId: String, blocked: Bool) async {
+        guard let userId else { return }
+        var ignored = ignoredUserIds
+        if blocked { ignored.insert(matrixUserId) } else { ignored.remove(matrixUserId) }
+        do {
+            try await client.setIgnoredUsers(userId: userId, ignored: Array(ignored))
+            ignoredUserIds = ignored
+            rebuildUIModels()
+        } catch {
+            errorMessage = "Impossible de modifier la liste des bloqués : \(error.localizedDescription)"
+        }
+    }
+
+    /// Servers (spaces) where this user is also a member — the profile card's "serveurs en commun".
+    func mutualServers(with user: MoodUser) -> [MoodServer] {
+        servers.filter { server in server.members.contains { $0.id == user.id } }
+    }
+
+    /// The profile card's "Envoyer un message à @x": opens (or creates) the DM and sends there.
+    func sendDirectMessage(to matrixUserId: String, text: String) async -> UUID? {
+        guard let conversationId = await openOrCreateDM(with: matrixUserId),
+              let roomId = stableIdReverse[conversationId] else { return nil }
+        await sendMessage(roomId: roomId, text: text)
+        return conversationId
+    }
+
+    /// Discord's "Retirer l'ami": leave the DM room with them.
+    func removeFriend(_ matrixUserId: String) async {
+        guard let roomId = existingDirectRoomId(with: matrixUserId) else { return }
+        await leaveRoom(roomId)
+    }
+
     func clearNewMessagesDivider(roomId: String) {
         newMessagesDivider.removeValue(forKey: roomId)
     }
@@ -1251,6 +1343,23 @@ class MatrixStore {
 
     func isRoomEncrypted(_ roomId: String) -> Bool {
         rooms.first(where: { $0.roomId == roomId })?.isEncrypted ?? false
+    }
+
+    static func matrixPresence(for status: MoodUser.UserStatus) -> String {
+        switch status {
+        case .idle: return "unavailable"
+        case .invisible, .offline: return "offline"
+        default: return "online"
+        }
+    }
+
+    func setMyStatus(_ status: MoodUser.UserStatus, message: String? = nil) async {
+        myStatus = status
+        myStatusMessage = message.flatMap { $0.isEmpty ? nil : $0 }
+        if let currentUser, let matrixId = currentUser.matrixId {
+            self.currentUser = makeUser(matrixId, displayName: currentUser.displayName, avatarMxc: currentAvatarMxc)
+        }
+        await setPresenceStatus(presence: Self.matrixPresence(for: status), statusMsg: myStatusMessage)
     }
 
     func setPresenceStatus(presence: String, statusMsg: String? = nil) async {
@@ -1732,6 +1841,7 @@ class MatrixStore {
         var displayName = extractLocalpart(userId)
         var avatarMxc: String?
 
+        defer { currentAvatarMxc = avatarMxc }
         // Try to fetch real profile
         if let profile = try? await client.getProfile(userId: userId) {
             if let name = profile.displayname, !name.isEmpty {
