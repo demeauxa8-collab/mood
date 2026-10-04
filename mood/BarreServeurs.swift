@@ -4,6 +4,7 @@ import UIKit
 // MARK: - Server Sidebar
 
 struct ServerSidebarView: View {
+    @Environment(MatrixStore.self) private var matrixStore
     let servers: [MoodServer]
     @Binding var selectedServer: MoodServer?
     @Binding var showDMs: Bool
@@ -77,7 +78,16 @@ struct ServerSidebarView: View {
                             emoji: server.iconEmoji,
                             isSelected: !showDMs && selectedServer?.id == server.id,
                             hasUnread: server.hasUnread,
-                            mentionCount: server.mentionCount
+                            mentionCount: server.mentionCount,
+                            onMarkRead: { matrixStore.markServerAsRead(server) },
+                            onLeave: {
+                                if selectedServer?.id == server.id {
+                                    selectedServer = nil
+                                    selectedChannel = nil
+                                    showDMs = true
+                                }
+                                Task { await matrixStore.leaveServer(server) }
+                            }
                         ) {
                             selectedServer = server
                             showDMs = false
@@ -145,13 +155,15 @@ struct SidebarIcon: View {
     let hasUnread: Bool
     let mentionCount: Int
     var iconColor: Color = MoodTheme.textPrimary
+    /// Server-only actions; the context menu is hidden for rail buttons (add, explore…).
+    var onMarkRead: (() -> Void)?
+    var onLeave: (() -> Void)?
     let action: () -> Void
 
     @State private var isHovered = false
     @State private var isMuted = false
     @State private var showComingSoon = false
     @State private var showLeaveConfirm = false
-    @State private var markedAsRead = false
     @State private var hideMutedChannels = false
 
     // Discord's 2025 rail keeps every icon a rounded square; only the pill changes.
@@ -213,22 +225,20 @@ struct SidebarIcon: View {
             }
         }
         .contextMenu {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) { markedAsRead = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    withAnimation { markedAsRead = false }
-                }
-            } label: { Label(markedAsRead ? "Marqué !" : "Marquer comme lu", systemImage: markedAsRead ? "checkmark.circle.fill" : "checkmark.circle") }
-            Divider()
-            Button { showComingSoon = true } label: { Label("Inviter des gens", systemImage: "person.badge.plus") }
-            Button { isMuted.toggle() } label: { Label(isMuted ? "Rétablir le son" : "Rendre muet", systemImage: isMuted ? "bell" : "bell.slash") }
-            Button { showComingSoon = true } label: { Label("Paramètres de notification", systemImage: "bell") }
-            Button { showComingSoon = true } label: { Label("Confidentialité", systemImage: "shield") }
-            Divider()
-            Button { showComingSoon = true } label: { Label("Modifier le profil serveur", systemImage: "pencil") }
-            Button { hideMutedChannels.toggle() } label: { Label(hideMutedChannels ? "Afficher les channels muets" : "Masquer les channels muets", systemImage: hideMutedChannels ? "eye" : "eye.slash") }
-            Divider()
-            Button(role: .destructive) { showLeaveConfirm = true } label: { Label("Quitter le serveur", systemImage: "rectangle.portrait.and.arrow.right") }
+            if onLeave != nil {
+                Button { onMarkRead?() } label: { Label("Marquer comme lu", systemImage: "checkmark.circle") }
+                    .disabled(!hasUnread && mentionCount == 0)
+                Divider()
+                Button { showComingSoon = true } label: { Label("Inviter des gens", systemImage: "person.badge.plus") }
+                Button { isMuted.toggle() } label: { Label(isMuted ? "Rétablir le son" : "Rendre muet", systemImage: isMuted ? "bell" : "bell.slash") }
+                Button { showComingSoon = true } label: { Label("Paramètres de notification", systemImage: "bell") }
+                Button { showComingSoon = true } label: { Label("Confidentialité", systemImage: "shield") }
+                Divider()
+                Button { showComingSoon = true } label: { Label("Modifier le profil serveur", systemImage: "pencil") }
+                Button { hideMutedChannels.toggle() } label: { Label(hideMutedChannels ? "Afficher les channels muets" : "Masquer les channels muets", systemImage: hideMutedChannels ? "eye" : "eye.slash") }
+                Divider()
+                Button(role: .destructive) { showLeaveConfirm = true } label: { Label("Quitter le serveur", systemImage: "rectangle.portrait.and.arrow.right") }
+            }
         }
         .alert("Bientôt disponible", isPresented: $showComingSoon) {
             Button("OK", role: .cancel) {}
@@ -237,7 +247,7 @@ struct SidebarIcon: View {
         }
         .alert("Quitter le serveur", isPresented: $showLeaveConfirm) {
             Button("Annuler", role: .cancel) {}
-            Button("Quitter", role: .destructive) {}
+            Button("Quitter", role: .destructive) { onLeave?() }
         } message: {
             Text("Es-tu sûr de vouloir quitter ce serveur ?")
         }

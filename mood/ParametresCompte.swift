@@ -442,38 +442,25 @@ struct MyAccountContent: View {
 
 struct ProfileContent: View {
     @Environment(MatrixStore.self) private var matrixStore
-    @State private var bio = ""
     @State private var displayName = ""
-    @State private var showSaved = false
-    @State private var showAvatarInfo = false
+    @State private var savedDisplayName = ""
+    @State private var isPickingAvatar = false
+    @State private var isSaving = false
     private var user: MoodUser { matrixStore.currentUser ?? MockData.currentUser }
+
+    private var hasChanges: Bool {
+        displayName.trimmingCharacters(in: .whitespaces) != savedDisplayName
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             SettingsSection(title: "NOM D'AFFICHAGE") {
-                HStack {
-                    TextField("Nom d'affichage", text: $displayName)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 14))
-                        .foregroundStyle(MoodTheme.textPrimary)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(MoodTheme.glassBg)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .stroke(MoodTheme.glassBorder, lineWidth: 0.5)
-                        )
-                }
-            }
-
-            SettingsSection(title: "BIO") {
-                TextEditor(text: $bio)
+                TextField("Nom d'affichage", text: $displayName)
+                    .textFieldStyle(.plain)
                     .font(.system(size: 14))
                     .foregroundStyle(MoodTheme.textPrimary)
-                    .scrollContentBackground(.hidden)
-                    .frame(height: 80)
-                    .padding(10)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
                     .background(MoodTheme.glassBg)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .overlay(
@@ -491,7 +478,7 @@ struct ProfileContent: View {
                         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                     Button {
-                        showAvatarInfo = true
+                        isPickingAvatar = true
                     } label: {
                         Text("Changer l'avatar")
                             .font(.system(size: 13, weight: .semibold))
@@ -506,10 +493,9 @@ struct ProfileContent: View {
                             )
                     }
                     .buttonStyle(.plain)
-                    .alert("Changer l'avatar", isPresented: $showAvatarInfo) {
-                        Button("OK", role: .cancel) {}
-                    } message: {
-                        Text("L'import d'images sera disponible dans une prochaine version.")
+                    .fileImporter(isPresented: $isPickingAvatar, allowedContentTypes: [.image]) { result in
+                        guard case .success(let url) = result else { return }
+                        Task { await uploadAvatar(from: url) }
                     }
                 }
             }
@@ -529,35 +515,43 @@ struct ProfileContent: View {
             }
 
             Spacer()
-
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) { showSaved = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                    withAnimation { showSaved = false }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    if showSaved {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 12, weight: .bold))
-                    }
-                    Text(showSaved ? "Sauvegardé !" : "Sauvegarder")
-                        .font(.system(size: 14, weight: .semibold))
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(showSaved ? MoodTheme.onlineGreen : MoodTheme.brandAccent)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .animation(.easeInOut(duration: 0.2), value: showSaved)
-            }
-            .buttonStyle(.plain)
         }
         .padding(24)
-        .onAppear {
-            bio = user.bio
-            displayName = user.displayName
+        .safeAreaInset(edge: .bottom) {
+            if hasChanges {
+                UnsavedChangesBar(isSaving: isSaving, onReset: { displayName = savedDisplayName }, onSave: save)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 16)
+                    .transition(.opacity)
+            }
         }
+        .animation(MoodMotion.popover, value: hasChanges)
+        .onAppear {
+            displayName = user.displayName
+            savedDisplayName = user.displayName
+        }
+    }
+
+    private func save() {
+        let name = displayName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty, !isSaving else { return }
+        isSaving = true
+        Task {
+            await matrixStore.updateDisplayName(name)
+            isSaving = false
+            savedDisplayName = name
+            displayName = name
+        }
+    }
+
+    private func uploadAvatar(from url: URL) async {
+        let didAccess = url.startAccessingSecurityScopedResource()
+        defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: url) else {
+            matrixStore.errorMessage = "Impossible de lire l'image \(url.lastPathComponent)."
+            return
+        }
+        await matrixStore.updateAvatar(imageData: data, filename: url.lastPathComponent)
     }
 }
 
@@ -1230,4 +1224,45 @@ struct AccentDot: View {
         .environment(MatrixStore())
         .frame(width: 700, height: 500)
         .preferredColorScheme(.dark)
+}
+
+// MARK: - Unsaved Changes Bar
+// Discord's bottom bar: appears only when a settings page has unsaved edits.
+
+struct UnsavedChangesBar: View {
+    let isSaving: Bool
+    let onReset: () -> Void
+    let onSave: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text("Attention, tu as des modifications non enregistrées !")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(MoodTheme.textPrimary)
+            Spacer()
+            Button("Réinitialiser", action: onReset)
+                .buttonStyle(.plain)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(MoodTheme.textPrimary)
+            Button(action: onSave) {
+                HStack(spacing: 6) {
+                    if isSaving { ProgressView().controlSize(.small).tint(.white) }
+                    Text("Enregistrer les modifications")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(MoodTheme.onlineGreen)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.defaultAction)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(MoodTheme.serverBar)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .popoverElevation()
+    }
 }

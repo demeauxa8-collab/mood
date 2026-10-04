@@ -506,11 +506,11 @@ struct CategorySection: View {
 // MARK: - Channel Row
 
 struct ChannelRow: View {
+    @Environment(MatrixStore.self) private var matrixStore
     let channel: Channel
     let isSelected: Bool
     @State private var isHovered = false
     @State private var isMuted = false
-    @State private var markedAsRead = false
     @State private var showComingSoon = false
     @State private var showDeleteConfirm = false
 
@@ -566,12 +566,8 @@ struct ChannelRow: View {
         .contentShape(Rectangle())
         .onHover { hovering in isHovered = hovering }
         .contextMenu {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) { markedAsRead = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    withAnimation { markedAsRead = false }
-                }
-            } label: { Label(markedAsRead ? "Marqué !" : "Marquer comme lu", systemImage: markedAsRead ? "checkmark.circle.fill" : "checkmark.circle") }
+            Button { matrixStore.markChannelAsRead(channel) } label: { Label("Marquer comme lu", systemImage: "checkmark.circle") }
+                .disabled(channel.unreadCount == 0 && channel.mentionCount == 0)
             Divider()
             Button { showComingSoon = true } label: { Label("Modifier le channel", systemImage: "pencil") }
             Button { showComingSoon = true } label: { Label("Paramètres de notification", systemImage: "bell") }

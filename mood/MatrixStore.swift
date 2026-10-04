@@ -1588,6 +1588,24 @@ class MatrixStore {
 
     // MARK: - Mapping Helpers
 
+    func roomId(for server: MoodServer) -> String? {
+        stableIdReverse[server.id]
+    }
+
+    func markServerAsRead(_ server: MoodServer) {
+        for channel in server.categories.flatMap(\.channels) where channel.unreadCount > 0 || channel.mentionCount > 0 {
+            markChannelAsRead(channel)
+        }
+    }
+
+    /// Discord's "Quitter le serveur": leave every channel of the space, then the space.
+    func leaveServer(_ server: MoodServer) async {
+        for channel in server.categories.flatMap(\.channels) {
+            if let roomId = roomId(for: channel) { await leaveRoom(roomId) }
+        }
+        if let spaceId = roomId(for: server) { await leaveRoom(spaceId) }
+    }
+
     func roomId(for channel: Channel) -> String? {
         stableIdReverse[channel.id]
     }
