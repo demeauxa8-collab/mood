@@ -339,20 +339,7 @@ struct DMChatArea: View {
                     Text(conversation.participant.displayName)
                         .font(.mood(15, weight: .bold))
                         .foregroundStyle(MoodTheme.textPrimary)
-
-                    if isEncrypted {
-                        HStack(spacing: 3) {
-                            Image(systemName: "lock.fill")
-                                .font(.mood(8))
-                            Text("E2E")
-                                .font(.mood(10, weight: .semibold))
-                        }
-                        .foregroundStyle(MoodTheme.onlineGreen)
-                        .padding(.horizontal, 8 * LayoutMetrics.scale)
-                        .padding(.vertical, 3 * LayoutMetrics.scale)
-                        .background(MoodTheme.onlineGreen.opacity(0.10))
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    }
+                        .lineLimit(1)
 
                     Spacer()
 

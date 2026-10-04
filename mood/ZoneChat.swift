@@ -276,20 +276,8 @@ struct ChannelHeader: View {
             Text(channel.name)
                 .font(.mood(15, weight: .bold))
                 .foregroundStyle(MoodTheme.textPrimary)
-
-            if channel.isE2E {
-                HStack(spacing: 3) {
-                    Image(systemName: "lock.fill")
-                        .font(.mood(8))
-                    Text("E2E")
-                        .font(.mood(10, weight: .semibold))
-                }
-                .foregroundStyle(MoodTheme.onlineGreen)
-                .padding(.horizontal, 8 * LayoutMetrics.scale)
-                .padding(.vertical, 3 * LayoutMetrics.scale)
-                .background(MoodTheme.onlineGreen.opacity(0.10))
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            }
+                .lineLimit(1)
+                .fixedSize()
 
             if !channel.topic.isEmpty {
                 Rectangle().fill(MoodTheme.divider).frame(width: 1, height: 16 * LayoutMetrics.scale)
@@ -298,6 +286,7 @@ struct ChannelHeader: View {
                     .font(.mood(13))
                     .foregroundStyle(MoodTheme.textMuted)
                     .lineLimit(1)
+                    .layoutPriority(-1)
             }
 
             Spacer()
@@ -379,7 +368,9 @@ struct HeaderSearchField: View {
                 .foregroundStyle(isActive ? MoodTheme.textSecondary : MoodTheme.textMuted)
         }
         .padding(.horizontal, 10 * LayoutMetrics.scale)
-        .frame(width: 244 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
+        // Discord shrinks the search box before it lets the channel title wrap.
+        .frame(minWidth: 120 * LayoutMetrics.scale, maxWidth: 244 * LayoutMetrics.scale)
+        .frame(height: 32 * LayoutMetrics.scale)
         .background(isHovered || isActive ? MoodTheme.inputBg : MoodTheme.headerSearchBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
         .overlay(

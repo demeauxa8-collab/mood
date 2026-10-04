@@ -30,7 +30,7 @@ struct moodApp: App {
                     showSplash = false
                 }
         }
-        .defaultSize(width: 1280, height: 780)
+        .defaultSize(width: 1600, height: 1000)
     }
 }
 

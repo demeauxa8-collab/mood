@@ -115,11 +115,6 @@ struct MessageInputBar: View {
 
                 // Champ texte
                 HStack(spacing: 6 * LayoutMetrics.scale) {
-                    if isE2E {
-                        Image(systemName: "lock.fill")
-                            .font(.mood(9))
-                            .foregroundStyle(MoodTheme.brandAccent.opacity(0.4))
-                    }
 
                     TextField(
                         "",

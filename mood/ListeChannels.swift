@@ -530,12 +530,6 @@ struct ChannelRow: View {
                 .foregroundStyle(isUnread ? MoodTheme.textPrimary : MoodTheme.textSecondary)
                 .lineLimit(1)
 
-            if channel.isE2E {
-                Image(systemName: "lock.fill")
-                    .font(.mood(7))
-                    .foregroundStyle(MoodTheme.textMuted.opacity(0.4))
-            }
-
             Spacer()
 
             if isSelected || isHovered {

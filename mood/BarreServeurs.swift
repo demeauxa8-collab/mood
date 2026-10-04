@@ -1,8 +1,6 @@
 import SwiftUI
 import UIKit
 
-private let serverIconCornerRadius: CGFloat = LayoutMetrics.serverIconCornerRadius
-
 // MARK: - Server Sidebar
 
 struct ServerSidebarView: View {
@@ -156,7 +154,8 @@ struct SidebarIcon: View {
     @State private var markedAsRead = false
     @State private var hideMutedChannels = false
 
-    private let cornerRadius: CGFloat = serverIconCornerRadius
+    // Discord's 2025 rail keeps every icon a rounded square; only the pill changes.
+    private let cornerRadius: CGFloat = LayoutMetrics.serverIconCornerRadius
 
     var body: some View {
         Button(action: action) {
@@ -204,7 +203,7 @@ struct SidebarIcon: View {
         }
         // Pill indicator gauche
         .overlay(alignment: .leading) {
-            if hasUnread || isSelected {
+            if hasUnread || isSelected || isHovered {
                 RoundedRectangle(cornerRadius: 3, style: .continuous)
                     .fill(MoodTheme.textPrimary)
                     .frame(width: 4 * LayoutMetrics.scale, height: (isSelected ? 40 : (isHovered ? 20 : 8)) * LayoutMetrics.scale)
