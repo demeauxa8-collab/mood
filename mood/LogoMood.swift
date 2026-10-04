@@ -4,62 +4,6 @@ import SwiftUI
 // Concept : deux points ":" qui sont les deux "o" de "mood"
 // Animation : les deux points s'écartent et les lettres m et d apparaissent
 
-struct MoodLogo: View {
-    var size: CGFloat = 28
-    var animated: Bool = true
-    @State private var expanded = false
-
-    private var dotSize: CGFloat { size * 0.32 }
-
-    var body: some View {
-        HStack(spacing: 0) {
-            // "m" — apparaît en expanded
-            Text("m")
-                .font(.system(size: size, weight: .bold, design: .rounded))
-                .foregroundStyle(MoodTheme.textPrimary)
-                .opacity(expanded ? 1 : 0)
-                .scaleEffect(expanded ? 1 : 0.3)
-                .offset(x: expanded ? 0 : size * 0.35)
-
-            // ∞ central (deux points compacts → symbole infini)
-            ZStack {
-                // Points compacts (visibles quand replié)
-                VStack(spacing: size * 0.15) {
-                    Circle()
-                        .fill(MoodTheme.brandAccent)
-                        .frame(width: dotSize, height: dotSize)
-
-                    Circle()
-                        .fill(MoodTheme.brandBlue)
-                        .frame(width: dotSize, height: dotSize)
-                }
-                .opacity(expanded ? 0 : 1)
-                .scaleEffect(expanded ? 1.8 : 1)
-
-                // Symbole ∞ (visible quand expanded)
-                MoodInfinitySymbol(size: size)
-                    .opacity(expanded ? 1 : 0)
-                    .scaleEffect(expanded ? 1 : 0.3)
-                    .offset(y: size * 0.04)
-            }
-
-            // "d" — apparaît en expanded
-            Text("d")
-                .font(.system(size: size, weight: .bold, design: .rounded))
-                .foregroundStyle(MoodTheme.textPrimary)
-                .opacity(expanded ? 1 : 0)
-                .scaleEffect(expanded ? 1 : 0.3)
-                .offset(x: expanded ? 0 : -size * 0.35)
-        }
-        .animation(.spring(response: 0.6, dampingFraction: 0.75), value: expanded)
-        .onHover { hovering in
-            if animated {
-                expanded = hovering
-            }
-        }
-    }
-}
-
 // MARK: - Compact Logo (juste les deux points, vertical)
 
 struct MoodLogoDots: View {
@@ -80,93 +24,6 @@ struct MoodLogoDots: View {
 }
 
 // MARK: - Splash Screen Logo Animation
-
-struct MoodSplashLogo: View {
-    @State private var phase: SplashPhase = .dots
-    @State private var dotScale: CGFloat = 0
-    @State private var dotOpacity: Double = 0
-    @State private var dotsSpacing: CGFloat = 6
-    @State private var showText = false
-    @State private var glowOpacity: Double = 0
-
-    enum SplashPhase {
-        case dots, expand, text
-    }
-
-    var body: some View {
-        ZStack {
-            // Glow derrière le logo
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [MoodTheme.brandAccent.opacity(0.3), Color.clear],
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: 80
-                    )
-                )
-                .frame(width: 160, height: 160)
-                .opacity(glowOpacity)
-                .blur(radius: 20)
-
-            VStack(spacing: 0) {
-                if !showText {
-                    // Phase 1 & 2 : les deux points
-                    VStack(spacing: dotsSpacing) {
-                        Circle()
-                            .fill(MoodTheme.brandAccent)
-                            .frame(width: 14, height: 14)
-
-                        Circle()
-                            .fill(MoodTheme.brandBlue)
-                            .frame(width: 14, height: 14)
-                    }
-                    .scaleEffect(dotScale)
-                    .opacity(dotOpacity)
-                } else {
-                    // Phase 3 : "m∞d" complet
-                    HStack(spacing: 0) {
-                        Text("m")
-                            .foregroundStyle(MoodTheme.textPrimary)
-                        MoodInfinitySymbol(size: 42)
-                            .offset(y: 2)
-                        Text("d")
-                            .foregroundStyle(MoodTheme.textPrimary)
-                    }
-                    .font(.system(size: 42, weight: .bold, design: .rounded))
-                    .transition(.scale(scale: 0.5).combined(with: .opacity))
-                }
-            }
-        }
-        .onAppear {
-            // Phase 1 : les points apparaissent
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
-                dotScale = 1
-                dotOpacity = 1
-            }
-
-            // Phase 1.5 : glow
-            withAnimation(.easeInOut(duration: 0.8).delay(0.3)) {
-                glowOpacity = 1
-            }
-
-            // Phase 2 : les points s'écartent
-            withAnimation(.easeInOut(duration: 0.4).delay(0.8)) {
-                dotsSpacing = 20
-            }
-
-            // Phase 3 : transformation en "mood"
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(1.3)) {
-                showText = true
-            }
-
-            // Glow pulse
-            withAnimation(.easeInOut(duration: 1.2).delay(1.3)) {
-                glowOpacity = 0.5
-            }
-        }
-    }
-}
 
 // MARK: - Infinity Symbol (deux "o" qui se chevauchent pour former ∞)
 
@@ -255,21 +112,4 @@ struct MoodInfinityLogo: View {
     .padding(60)
     .background(MoodTheme.serverBar)
     .preferredColorScheme(.dark)
-}
-
-#Preview("Logo Hover") {
-    VStack(spacing: 40) {
-        MoodLogo(size: 36)
-        MoodLogoDots(dotSize: 10, spacing: 5)
-    }
-    .padding(60)
-    .background(MoodTheme.serverBar)
-    .preferredColorScheme(.dark)
-}
-
-#Preview("Splash") {
-    MoodSplashLogo()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(MoodTheme.serverBar)
-        .preferredColorScheme(.dark)
 }

@@ -507,10 +507,6 @@ struct DMChatArea: View {
                         VideoCallView(participant: conversation.participant) {
                             withAnimation(.easeInOut(duration: 0.2)) { activeCall = nil }
                         }
-                    case .screenShare:
-                        ScreenShareView(participant: conversation.participant) {
-                            withAnimation(.easeInOut(duration: 0.2)) { activeCall = nil }
-                        }
                     }
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.95)))

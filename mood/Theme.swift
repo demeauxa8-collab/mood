@@ -403,22 +403,6 @@ enum MoodTheme {
 
     // — Gradients —
 
-    static var brandGradient: LinearGradient {
-        LinearGradient(
-            colors: [shared.accent.color, Color(hex: "5865f2")],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    static var subtleGlow: RadialGradient {
-        RadialGradient(
-            colors: [shared.accent.color.opacity(0.10), Color.clear],
-            center: .top,
-            startRadius: 0,
-            endRadius: 300
-        )
-    }
 }
 
 // MARK: - Hex Color

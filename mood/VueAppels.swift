@@ -5,7 +5,6 @@ import SwiftUI
 enum CallType {
     case voice
     case video
-    case screenShare
 }
 
 enum CallState {
@@ -1024,106 +1023,6 @@ struct VideoCallView: View {
 }
 
 // MARK: - Screen Share View
-
-struct ScreenShareView: View {
-    let participant: MoodUser
-    let onEnd: () -> Void
-    @State private var isMuted = false
-    @State private var callDuration: TimeInterval = 0
-    @State private var timer: Timer?
-    @State private var showControls = true
-
-    var body: some View {
-        ZStack {
-            MoodTheme.chatBackground.ignoresSafeArea()
-
-            // Contenu partagé
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(MoodTheme.glassBg)
-
-                VStack(spacing: 12) {
-                    Image(systemName: "rectangle.on.rectangle.angled")
-                        .font(.system(size: 34))
-                        .foregroundStyle(MoodTheme.brandAccent)
-                    Text("\(participant.displayName) partage son écran")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(MoodTheme.textPrimary)
-                    Text("Le contenu apparaîtra ici")
-                        .font(.system(size: 12))
-                        .foregroundStyle(MoodTheme.textSecondary)
-                }
-            }
-            .padding(12)
-
-            // Overlay contrôles
-            VStack {
-                if showControls {
-                    HStack {
-                        HStack(spacing: 6) {
-                            Circle().fill(Color(hex: "f23f43")).frame(width: 7, height: 7)
-                            Text("Partage d'écran").font(.system(size: 12, weight: .medium)).foregroundStyle(MoodTheme.textPrimary)
-                            Text("·").foregroundStyle(MoodTheme.textSecondary)
-                            Text(formattedDuration).font(.system(size: 12, design: .monospaced)).foregroundStyle(MoodTheme.textSecondary)
-                        }
-                        .padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(MoodTheme.glassBg.opacity(0.9))
-                        .clipShape(Capsule())
-
-                        Spacer()
-
-                        HStack(spacing: 4) {
-                            Image(systemName: "lock.fill").font(.system(size: 8))
-                            Text("E2E").font(.system(size: 10, weight: .semibold))
-                        }
-                        .foregroundStyle(MoodTheme.onlineGreen)
-                        .padding(.horizontal, 8).padding(.vertical, 4)
-                        .background(MoodTheme.onlineGreen.opacity(0.08))
-                        .clipShape(Capsule())
-                    }
-                    .padding(.horizontal, 14).padding(.top, 10)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
-
-                Spacer()
-
-                if showControls {
-                    HStack(spacing: 12) {
-                        CallControlCircle(icon: isMuted ? "mic.slash.fill" : "mic.fill", isDestructive: isMuted) {
-                            isMuted.toggle()
-                        }
-
-                        Spacer()
-
-                        Button { onEnd() } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "rectangle.on.rectangle.slash").font(.system(size: 14))
-                                Text("Arrêter le partage").font(.system(size: 13, weight: .medium))
-                            }
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 16).padding(.vertical, 10)
-                            .background(Color(hex: "f23f43"))
-                            .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.horizontal, 20).padding(.bottom, 20)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-            }
-        }
-        .onTapGesture { withAnimation(.easeInOut(duration: 0.2)) { showControls.toggle() } }
-        .onAppear {
-            timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in callDuration += 1 }
-        }
-        .onDisappear { timer?.invalidate() }
-    }
-
-    private var formattedDuration: String {
-        let m = Int(callDuration) / 60; let s = Int(callDuration) % 60
-        return String(format: "%02d:%02d", m, s)
-    }
-}
 
 // MARK: - Previews
 

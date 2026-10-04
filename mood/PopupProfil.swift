@@ -297,25 +297,6 @@ struct ProfileCardSection<Content: View>: View {
 
 // MARK: - Legacy ProfileSection (used elsewhere)
 
-struct ProfileSection<Content: View>: View {
-    let title: String
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.system(size: 11, weight: .bold))
-                .tracking(0.4)
-                .foregroundStyle(MoodTheme.textSecondary)
-            content
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(MoodTheme.glassBg)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-}
-
 #Preview {
     ZStack {
         MoodTheme.chatBackground.ignoresSafeArea()
