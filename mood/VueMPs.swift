@@ -3,11 +3,13 @@ import SwiftUI
 // MARK: - DM List Column
 
 struct DMListView: View {
+    @Environment(MatrixStore.self) private var matrixStore
     let conversations: [DMConversation]
     @Binding var selectedDM: DMConversation?
     @Binding var showSettings: Bool
     @State private var showComingSoon = false
     @State private var showQuickSwitcher = false
+    @State private var showNewMessage = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -67,7 +69,7 @@ struct DMListView: View {
 
                         Spacer()
 
-                        Button { showComingSoon = true } label: {
+                        Button { showNewMessage = true } label: {
                             Image(systemName: "plus")
                                 .font(.mood(12))
                                 .foregroundStyle(MoodTheme.textPrimary)
@@ -78,6 +80,22 @@ struct DMListView: View {
                     .padding(.horizontal, 16 * LayoutMetrics.scale)
                     .padding(.top, 7 * LayoutMetrics.scale)
                     .padding(.bottom, 4 * LayoutMetrics.scale)
+
+                    if conversations.isEmpty {
+                        VStack(spacing: 8 * LayoutMetrics.scale) {
+                            Image(systemName: "bubble.left.and.bubble.right")
+                                .font(.mood(24))
+                                .foregroundStyle(MoodTheme.textMuted)
+                            Text("Aucune conversation")
+                                .font(.mood(13, weight: .medium))
+                                .foregroundStyle(MoodTheme.textSecondary)
+                            Text("Appuie sur + pour lancer un message")
+                                .font(.mood(11))
+                                .foregroundStyle(MoodTheme.textMuted)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24 * LayoutMetrics.scale)
+                    }
 
                     ForEach(conversations) { convo in
                         DMRow(
@@ -103,6 +121,15 @@ struct DMListView: View {
         .sheet(isPresented: $showQuickSwitcher) {
             QuickSwitcher(isPresented: $showQuickSwitcher)
                 .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showNewMessage) {
+            NewDMSheet { conversationId in
+                if let convo = matrixStore.dmConversations.first(where: { $0.id == conversationId }) {
+                    selectedDM = convo
+                }
+            }
+            .environment(matrixStore)
+            .presentationDetents([.medium, .large])
         }
     }
 }
@@ -262,6 +289,7 @@ struct DMRow: View {
 
 struct DMChatArea: View {
     @Environment(MatrixStore.self) private var matrixStore
+    @Environment(AuthState.self) private var authState
     @Environment(\.layoutMode) private var layoutMode
     let conversation: DMConversation
     @Binding var showProfilePopup: Bool
@@ -272,10 +300,29 @@ struct DMChatArea: View {
     @State private var showPinnedMessages = false
     @State private var showSearch = false
     @State private var showInlineProfile = false
+    @State private var typingTask: Task<Void, Never>?
+    @State private var isTyping = false
 
     private var messages: [ChatMessage] {
         let storeMessages = matrixStore.messages(forDM: conversation)
-        return storeMessages.isEmpty ? MockData.dmMessages(for: conversation) : storeMessages
+        if storeMessages.isEmpty && authState.isDemoMode {
+            return MockData.dmMessages(for: conversation)
+        }
+        return storeMessages
+    }
+
+    private var roomId: String? {
+        matrixStore.roomId(for: conversation)
+    }
+
+    private var isEncrypted: Bool {
+        guard let roomId else { return false }
+        return matrixStore.isRoomEncrypted(roomId)
+    }
+
+    private var hasMoreHistory: Bool {
+        guard let roomId else { return false }
+        return matrixStore.hasMoreHistory[roomId] == true
     }
 
     var body: some View {
@@ -293,17 +340,19 @@ struct DMChatArea: View {
                         .font(.mood(15, weight: .bold))
                         .foregroundStyle(MoodTheme.textPrimary)
 
-                    HStack(spacing: 3) {
-                        Image(systemName: "lock.fill")
-                            .font(.mood(8))
-                        Text("E2E")
-                            .font(.mood(10, weight: .semibold))
+                    if isEncrypted {
+                        HStack(spacing: 3) {
+                            Image(systemName: "lock.fill")
+                                .font(.mood(8))
+                            Text("E2E")
+                                .font(.mood(10, weight: .semibold))
+                        }
+                        .foregroundStyle(MoodTheme.onlineGreen)
+                        .padding(.horizontal, 8 * LayoutMetrics.scale)
+                        .padding(.vertical, 3 * LayoutMetrics.scale)
+                        .background(MoodTheme.onlineGreen.opacity(0.10))
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     }
-                    .foregroundStyle(MoodTheme.onlineGreen)
-                    .padding(.horizontal, 8 * LayoutMetrics.scale)
-                    .padding(.vertical, 3 * LayoutMetrics.scale)
-                    .background(MoodTheme.onlineGreen.opacity(0.10))
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
                     Spacer()
 
@@ -379,14 +428,6 @@ struct DMChatArea: View {
                             Text("@\(conversation.participant.username)")
                                 .font(.mood(13))
                                 .foregroundStyle(MoodTheme.textSecondary)
-
-                            HStack(spacing: 4) {
-                                Image(systemName: "lock.fill")
-                                    .font(.mood(9))
-                                Text("Conversation chiffrée de bout en bout")
-                                    .font(.mood(12))
-                            }
-                            .foregroundStyle(MoodTheme.onlineGreen)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 28 * LayoutMetrics.scale)
@@ -397,8 +438,20 @@ struct DMChatArea: View {
                             .padding(.horizontal, 16)
                             .padding(.bottom, 6)
 
+                        if hasMoreHistory, let roomId {
+                            LoadMoreHistoryButton(roomId: roomId)
+                        }
+
+                        if messages.isEmpty {
+                            Text("Aucun message pour l'instant. Dis bonjour 👋")
+                                .font(.mood(13))
+                                .foregroundStyle(MoodTheme.textSecondary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 24 * LayoutMetrics.scale)
+                        }
+
                         ForEach(messages) { message in
-                            MessageRow(message: message, server: nil) {
+                            MessageRow(message: message, server: nil, roomId: roomId) {
                                 profileUser = message.sender
                                 showProfilePopup = true
                             }
@@ -410,28 +463,38 @@ struct DMChatArea: View {
                             proxy.scrollTo(lastID, anchor: .bottom)
                         }
                     }
+                    .onChange(of: messages.count) { _, _ in
+                        if let lastID = messages.last?.id {
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                proxy.scrollTo(lastID, anchor: .bottom)
+                            }
+                        }
+                    }
                 }
             }
             .scrollDismissesKeyboard(.interactively)
 
+            if isEncrypted {
+                EncryptedRoomNotice()
+            }
+
             MessageInputBar(
                 text: $messageText,
                 channelName: conversation.participant.displayName,
-                isE2E: true,
-                onSend: {
-                    let trimmed = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !trimmed.isEmpty else { return }
-                    let text = trimmed
-                    messageText = ""
-                    Task {
-                        if let roomId = matrixStore.roomId(for: conversation) {
-                            await matrixStore.sendMessage(roomId: roomId, text: text)
-                        }
-                    }
-                }
+                isE2E: isEncrypted,
+                typingUsers: roomId.flatMap { matrixStore.typingUsersByRoom[$0] } ?? [],
+                isDisabled: isEncrypted,
+                onSend: sendCurrentMessage
             )
         }
         .background(MoodTheme.chatBackground)
+        .onAppear { markConversationAsRead() }
+        .onChange(of: conversation.id) { _, _ in markConversationAsRead() }
+        .onChange(of: messageText) { _, newValue in
+            guard !newValue.isEmpty else { return }
+            scheduleTypingNotification()
+        }
+        .onDisappear { stopTyping() }
         .overlay {
             if let call = activeCall {
                 Group {
@@ -453,6 +516,56 @@ struct DMChatArea: View {
                 .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
         }
+    }
+
+    private func sendCurrentMessage() {
+        let trimmed = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard let roomId else {
+            if authState.isDemoMode {
+                messageText = ""
+            } else {
+                matrixStore.errorMessage = "Impossible d'envoyer : cette conversation n'est pas reliée à une room Matrix."
+            }
+            return
+        }
+        stopTyping()
+        let text = trimmed
+        Task {
+            await matrixStore.sendMessage(roomId: roomId, text: text)
+        }
+        messageText = ""
+    }
+
+    private func markConversationAsRead() {
+        guard let roomId else { return }
+        matrixStore.markAsRead(roomId: roomId)
+    }
+
+    private func scheduleTypingNotification() {
+        guard let roomId else { return }
+        if !isTyping {
+            isTyping = true
+            Task { await matrixStore.setTyping(roomId: roomId, typing: true) }
+        }
+        typingTask?.cancel()
+        typingTask = Task {
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            isTyping = false
+            await matrixStore.setTyping(roomId: roomId, typing: false)
+        }
+    }
+
+    private func stopTyping() {
+        typingTask?.cancel()
+        typingTask = nil
+        guard isTyping, let roomId else {
+            isTyping = false
+            return
+        }
+        isTyping = false
+        Task { await matrixStore.setTyping(roomId: roomId, typing: false) }
     }
 }
 

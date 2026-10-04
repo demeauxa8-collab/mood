@@ -823,8 +823,7 @@ struct UserStatusPanel: View {
                     .padding(.leading, 2)
             }
 
-            HStack(spacing: 8 * LayoutMetrics.scale) {
-                // Avatar circle (clickable for status)
+            HStack(spacing: 6 * LayoutMetrics.scale) {
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) {
                         showStatusPicker.toggle()
@@ -844,7 +843,7 @@ struct UserStatusPanel: View {
                 .buttonStyle(.plain)
                 .help("Changer le statut")
 
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 0) {
                     Text(user.displayName)
                         .font(.mood(14, weight: .semibold))
                         .foregroundStyle(MoodTheme.textPrimary)

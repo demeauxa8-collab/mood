@@ -250,6 +250,12 @@ struct MessageAttachment: Identifiable {
     }
 }
 
+// MARK: - Message Send State
+
+enum MessageSendState: String, Codable {
+    case sending, sent, failed
+}
+
 // MARK: - Message
 
 struct ChatMessage: Identifiable {
@@ -267,13 +273,17 @@ struct ChatMessage: Identifiable {
     var linkEmbed: LinkEmbed?
     var isSystemMessage: Bool
     var systemType: SystemMessageType?
+    var sendState: MessageSendState
+    let eventId: String? // event_id Matrix, nil pour un écho local pas encore confirmé
+    let txnId: String?
 
     init(id: UUID, sender: MoodUser, content: String, timestamp: Date, isGrouped: Bool,
          reactions: [MessageReaction] = [], replyTo: ReplyRef? = nil,
          attachments: [MessageAttachment] = [], isPinned: Bool = false,
          threadInfo: ThreadInfo? = nil, isEdited: Bool = false,
          linkEmbed: LinkEmbed? = nil, isSystemMessage: Bool = false,
-         systemType: SystemMessageType? = nil) {
+         systemType: SystemMessageType? = nil,
+         sendState: MessageSendState = .sent, eventId: String? = nil, txnId: String? = nil) {
         self.id = id
         self.sender = sender
         self.content = content
@@ -288,6 +298,9 @@ struct ChatMessage: Identifiable {
         self.linkEmbed = linkEmbed
         self.isSystemMessage = isSystemMessage
         self.systemType = systemType
+        self.sendState = sendState
+        self.eventId = eventId
+        self.txnId = txnId
     }
 }
 

@@ -5,22 +5,37 @@ import UIKit
 
 struct ChatArea: View {
     @Environment(MatrixStore.self) private var matrixStore
+    @Environment(AuthState.self) private var authState
     @Environment(\.layoutMode) private var layoutMode
     let channel: Channel
     let server: MoodServer
     @Binding var showProfilePopup: Bool
     @Binding var profileUser: MoodUser?
     @State private var messageText = ""
-    @State private var showMemberList = false
+    @State private var showMemberList = true
     @State private var showSearch = false
     @State private var showPinnedMessages = false
     @State private var showThreadPanel = false
     @State private var activeThread: ChatMessage?
     @State private var replyingTo: ChatMessage?
+    @State private var typingTask: Task<Void, Never>?
+    @State private var isTyping = false
 
     private var messages: [ChatMessage] {
         let storeMessages = matrixStore.messages(for: channel)
-        return storeMessages.isEmpty ? MockData.messages(for: channel) : storeMessages
+        if storeMessages.isEmpty && authState.isDemoMode {
+            return MockData.messages(for: channel)
+        }
+        return storeMessages
+    }
+
+    private var roomId: String? {
+        matrixStore.roomId(for: channel)
+    }
+
+    private var isEncrypted: Bool {
+        guard let roomId else { return false }
+        return matrixStore.isRoomEncrypted(roomId)
     }
 
     var body: some View {
@@ -69,6 +84,7 @@ struct ChatArea: View {
                         messages: messages,
                         channel: channel,
                         server: server,
+                        roomId: roomId,
                         showProfilePopup: $showProfilePopup,
                         profileUser: $profileUser,
                         replyingTo: $replyingTo,
@@ -76,22 +92,18 @@ struct ChatArea: View {
                         showThreadPanel: $showThreadPanel
                     )
 
+                    if isEncrypted {
+                        EncryptedRoomNotice()
+                    }
+
                     MessageInputBar(
                         text: $messageText,
                         channelName: channel.name,
-                        isE2E: channel.isE2E,
+                        isE2E: isEncrypted,
+                        typingUsers: roomId.flatMap { matrixStore.typingUsersByRoom[$0] } ?? [],
+                        isDisabled: isEncrypted,
                         replyingTo: $replyingTo,
-                        onSend: {
-                            let trimmed = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard !trimmed.isEmpty else { return }
-                            let text = trimmed
-                            messageText = ""
-                            Task {
-                                if let roomId = matrixStore.roomId(for: channel) {
-                                    await matrixStore.sendMessage(roomId: roomId, text: text)
-                                }
-                            }
-                        }
+                        onSend: sendCurrentMessage
                     )
                 }
 
@@ -122,6 +134,13 @@ struct ChatArea: View {
             }
         }
         .background(MoodTheme.chatBackground)
+        .onAppear { markChannelAsRead() }
+        .onChange(of: channel.id) { _, _ in markChannelAsRead() }
+        .onChange(of: messageText) { _, newValue in
+            guard !newValue.isEmpty else { return }
+            scheduleTypingNotification()
+        }
+        .onDisappear { stopTyping() }
         // Sheets pour les panels sur compact
         .sheet(isPresented: Binding(
             get: { layoutMode == .compact && showThreadPanel && activeThread != nil },
@@ -166,6 +185,77 @@ struct ChatArea: View {
             }
             .presentationDetents([.medium, .large])
         }
+    }
+
+    private func sendCurrentMessage() {
+        let trimmed = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard let roomId else {
+            if authState.isDemoMode {
+                messageText = ""
+            } else {
+                matrixStore.errorMessage = "Impossible d'envoyer : ce channel n'est pas relié à une room Matrix."
+            }
+            return
+        }
+        stopTyping()
+        let text = trimmed
+        Task {
+            await matrixStore.sendMessage(roomId: roomId, text: text)
+        }
+        messageText = ""
+    }
+
+    private func markChannelAsRead() {
+        guard let roomId else { return }
+        matrixStore.markAsRead(roomId: roomId)
+    }
+
+    private func scheduleTypingNotification() {
+        guard let roomId else { return }
+        if !isTyping {
+            isTyping = true
+            Task { await matrixStore.setTyping(roomId: roomId, typing: true) }
+        }
+        typingTask?.cancel()
+        typingTask = Task {
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            isTyping = false
+            await matrixStore.setTyping(roomId: roomId, typing: false)
+        }
+    }
+
+    private func stopTyping() {
+        typingTask?.cancel()
+        typingTask = nil
+        guard isTyping, let roomId else {
+            isTyping = false
+            return
+        }
+        isTyping = false
+        Task { await matrixStore.setTyping(roomId: roomId, typing: false) }
+    }
+}
+
+// MARK: - Encrypted Room Notice
+
+struct EncryptedRoomNotice: View {
+    var body: some View {
+        HStack(spacing: 8 * LayoutMetrics.scale) {
+            Image(systemName: "lock.fill")
+                .font(.mood(11))
+            Text("Cette conversation est chiffrée — Mood ne prend pas encore en charge le chiffrement.")
+                .font(.mood(12))
+            Spacer()
+        }
+        .foregroundStyle(MoodTheme.mentionBadge)
+        .padding(.horizontal, 12 * LayoutMetrics.scale)
+        .padding(.vertical, 8 * LayoutMetrics.scale)
+        .background(MoodTheme.mentionBadge.opacity(0.10))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .padding(.horizontal, 16 * LayoutMetrics.scale)
+        .padding(.top, 6)
     }
 }
 
@@ -314,9 +404,11 @@ struct HeaderSearchField: View {
 // MARK: - Message List
 
 struct MessageList: View {
+    @Environment(MatrixStore.self) private var matrixStore
     let messages: [ChatMessage]
     let channel: Channel
     let server: MoodServer
+    var roomId: String? = nil
     @Binding var showProfilePopup: Bool
     @Binding var profileUser: MoodUser?
     @Binding var replyingTo: ChatMessage?
@@ -324,50 +416,57 @@ struct MessageList: View {
     @Binding var showThreadPanel: Bool
     @State private var isAtBottom = true
 
+    private var hasMoreHistory: Bool {
+        guard let roomId else { return false }
+        return matrixStore.hasMoreHistory[roomId] == true
+    }
+
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             ScrollView {
                 ScrollViewReader { proxy in
                     LazyVStack(spacing: 0) {
-                        // Welcome
-                        VStack(alignment: .leading, spacing: 10 * LayoutMetrics.scale) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .fill(MoodTheme.brandAccent.opacity(0.12))
-                                    .frame(width: 56 * LayoutMetrics.scale, height: 56 * LayoutMetrics.scale)
-                                Image(systemName: channel.icon)
-                                    .font(.mood(26))
-                                    .foregroundStyle(MoodTheme.brandAccent)
-                            }
+                        if hasMoreHistory, let roomId {
+                            LoadMoreHistoryButton(roomId: roomId)
+                        } else {
+                            // Welcome — uniquement au vrai début du channel
+                            VStack(alignment: .leading, spacing: 10 * LayoutMetrics.scale) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .fill(MoodTheme.brandAccent.opacity(0.12))
+                                        .frame(width: 56 * LayoutMetrics.scale, height: 56 * LayoutMetrics.scale)
+                                    Image(systemName: channel.icon)
+                                        .font(.mood(26))
+                                        .foregroundStyle(MoodTheme.brandAccent)
+                                }
 
-                            Text("Bienvenue dans #\(channel.name)")
-                                .font(.mood(22, weight: .bold))
-                                .foregroundStyle(MoodTheme.textPrimary)
+                                Text("Bienvenue dans #\(channel.name)")
+                                    .font(.mood(22, weight: .bold))
+                                    .foregroundStyle(MoodTheme.textPrimary)
 
-                            HStack(spacing: 6) {
                                 Text("C'est le début du channel.")
                                     .foregroundStyle(MoodTheme.textSecondary)
-                                if channel.isE2E {
-                                    HStack(spacing: 3) {
-                                        Image(systemName: "lock.fill")
-                                            .font(.mood(9))
-                                        Text("Chiffrement E2E")
-                                    }
-                                    .foregroundStyle(MoodTheme.onlineGreen)
-                                }
+                                    .font(.mood(13))
                             }
-                            .font(.mood(13))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16 * LayoutMetrics.scale)
+                            .padding(.top, 24 * LayoutMetrics.scale)
+                            .padding(.bottom, 16 * LayoutMetrics.scale)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16 * LayoutMetrics.scale)
-                        .padding(.top, 24 * LayoutMetrics.scale)
-                        .padding(.bottom, 16 * LayoutMetrics.scale)
 
                         Rectangle()
                             .fill(MoodTheme.divider)
                             .frame(height: 1)
                             .padding(.horizontal, 16)
                             .padding(.bottom, 6)
+
+                        if messages.isEmpty {
+                            Text("Aucun message pour l'instant. Dis bonjour 👋")
+                                .font(.mood(13))
+                                .foregroundStyle(MoodTheme.textSecondary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 24 * LayoutMetrics.scale)
+                        }
 
                         ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
                             // Date separator
@@ -384,7 +483,7 @@ struct MessageList: View {
                                 SystemMessageRow(message: message)
                                     .id(message.id)
                             } else {
-                                MessageRow(message: message, server: server, onReply: {
+                                MessageRow(message: message, server: server, roomId: roomId, onReply: {
                                     replyingTo = message
                                 }, onThread: {
                                     activeThread = message
@@ -404,6 +503,11 @@ struct MessageList: View {
                     }
                     .onAppear {
                         proxy.scrollTo("bottom", anchor: .bottom)
+                    }
+                    .onChange(of: messages.count) { _, _ in
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            proxy.scrollTo("bottom", anchor: .bottom)
+                        }
                     }
                 }
             }
@@ -435,8 +539,10 @@ struct MessageList: View {
 // MARK: - Message Row
 
 struct MessageRow: View {
+    @Environment(MatrixStore.self) private var matrixStore
     let message: ChatMessage
     let server: MoodServer?
+    var roomId: String? = nil
     var onReply: (() -> Void)?
     var onThread: (() -> Void)?
     let onAvatarTap: () -> Void
@@ -530,6 +636,38 @@ struct MessageRow: View {
                                 .font(.mood(11))
                                 .foregroundStyle(MoodTheme.textMuted)
                         }
+
+                        if message.sendState == .sending {
+                            ProgressView()
+                                .scaleEffect(0.5)
+                                .frame(width: 16 * LayoutMetrics.scale, height: 16 * LayoutMetrics.scale)
+                                .padding(.leading, 6)
+                        }
+                    }
+                    .opacity(message.sendState == .sending ? 0.55 : 1)
+
+                    if message.sendState == .failed {
+                        HStack(spacing: 6 * LayoutMetrics.scale) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .font(.mood(11))
+                                .foregroundStyle(MoodTheme.mentionBadge)
+
+                            Text("Échec de l'envoi")
+                                .font(.mood(11))
+                                .foregroundStyle(MoodTheme.mentionBadge)
+
+                            if let roomId {
+                                Button {
+                                    matrixStore.retryMessage(message.id, roomId: roomId)
+                                } label: {
+                                    Text("Réessayer")
+                                        .font(.mood(11, weight: .semibold))
+                                        .foregroundStyle(MoodTheme.brandBlue)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.top, 2)
                     }
 
                     // Attachments
@@ -805,6 +943,47 @@ struct MessageRow: View {
         } message: {
             Text("Es-tu sûr de vouloir supprimer ce message ? Cette action est irréversible.")
         }
+    }
+}
+
+// MARK: - Load More History Button
+
+struct LoadMoreHistoryButton: View {
+    @Environment(MatrixStore.self) private var matrixStore
+    let roomId: String
+    @State private var isLoading = false
+
+    var body: some View {
+        Button {
+            guard !isLoading else { return }
+            isLoading = true
+            Task {
+                await matrixStore.loadMoreMessages(roomId: roomId)
+                isLoading = false
+            }
+        } label: {
+            HStack(spacing: 6 * LayoutMetrics.scale) {
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.5)
+                        .frame(width: 14 * LayoutMetrics.scale, height: 14 * LayoutMetrics.scale)
+                } else {
+                    Image(systemName: "arrow.up.circle")
+                        .font(.mood(12))
+                }
+                Text(isLoading ? "Chargement…" : "Charger les messages précédents")
+                    .font(.mood(12, weight: .medium))
+            }
+            .foregroundStyle(MoodTheme.textSecondary)
+            .padding(.horizontal, 12 * LayoutMetrics.scale)
+            .padding(.vertical, 6 * LayoutMetrics.scale)
+            .background(MoodTheme.glassBg)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(isLoading)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12 * LayoutMetrics.scale)
     }
 }
 
@@ -1578,5 +1757,6 @@ struct SystemMessageRow: View {
         profileUser: .constant(nil)
     )
     .environment(MatrixStore())
+    .environment(AuthState())
     .preferredColorScheme(.dark)
 }

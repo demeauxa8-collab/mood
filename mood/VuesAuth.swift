@@ -7,6 +7,8 @@ import UIKit
 @Observable
 class AuthState {
     var isLoggedIn = false
+    // true uniquement via les boutons "Passer" — autorise les fallbacks MockData
+    var isDemoMode: Bool = false
     var currentScreen: AuthScreen = .login
 
     enum AuthScreen {
@@ -339,6 +341,7 @@ struct LoginView: View {
 
     private var loginSkip: some View {
         Button {
+            authState.isDemoMode = true
             withAnimation(.easeOut(duration: 0.3)) {
                 authState.isLoggedIn = true
             }
@@ -673,11 +676,15 @@ struct SignupView: View {
             errorMessage = nil
             Task {
                 do {
-                    try await matrixStore.login(
+                    try await matrixStore.register(
                         username: username,
                         password: password,
                         homeserver: homeserver
                     )
+                    let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !name.isEmpty {
+                        await matrixStore.updateDisplayName(name)
+                    }
                     isLoading = false
                     withAnimation(.easeOut(duration: 0.3)) {
                         authState.isLoggedIn = true
@@ -737,6 +744,7 @@ struct SignupView: View {
 
     private var signupSkip: some View {
         Button {
+            authState.isDemoMode = true
             withAnimation(.easeOut(duration: 0.3)) {
                 authState.isLoggedIn = true
             }

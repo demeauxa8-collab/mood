@@ -24,11 +24,12 @@ struct moodApp: App {
                     if ProcessInfo.processInfo.arguments.contains("-uiPreview") {
                         showSplash = false
                         authState.isLoggedIn = true
-                    } else if matrixStore.restoreSession() {
+                    } else if await matrixStore.restoreSession() {
                         authState.isLoggedIn = true
                     }
                 }
         }
+        .defaultSize(width: 1280, height: 780)
     }
 }
 

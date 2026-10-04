@@ -85,6 +85,16 @@ struct ContentView: View {
         }
         .background(MoodTheme.chatBackground)
         .preferredColorScheme(.dark)
+        .overlay(alignment: .top) {
+            if let error = matrixStore.errorMessage {
+                ErrorBanner(message: error) {
+                    matrixStore.errorMessage = nil
+                }
+                .id(error)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeOut(duration: 0.25), value: matrixStore.errorMessage)
         .overlay {
             if showProfilePopup, let user = profileUser {
                 ZStack {
@@ -201,6 +211,7 @@ struct ContentView: View {
             )
 
             HStack(spacing: 0) {
+                // Layer 0 — Server bar (darkest, base)
                 ServerSidebarView(
                     servers: servers,
                     selectedServer: $selectedServer,
@@ -499,6 +510,55 @@ struct ContentView: View {
     }
 }
 
+// MARK: - Error Banner (toast global, lit matrixStore.errorMessage)
+
+struct ErrorBanner: View {
+    let message: String
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.mood(13))
+                .foregroundStyle(MoodTheme.mentionBadge)
+
+            Text(message)
+                .font(.mood(13))
+                .foregroundStyle(MoodTheme.textPrimary)
+                .lineLimit(3)
+                .multilineTextAlignment(.leading)
+
+            Spacer(minLength: 8)
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.mood(11, weight: .semibold))
+                    .foregroundStyle(MoodTheme.textSecondary)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(MoodTheme.popupBg)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(MoodTheme.glassBorder, lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
+        .frame(maxWidth: 480)
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .task {
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+            onDismiss()
+        }
+    }
+}
+
 // MARK: - Compact Server List (iPhone)
 
 struct CompactServerListView: View {
@@ -781,6 +841,7 @@ struct CompactChatWrapper: View {
 // MARK: - Compact DM List (iPhone)
 
 struct CompactDMListView: View {
+    @Environment(AuthState.self) private var authState
     let conversations: [DMConversation]
     @Binding var showProfilePopup: Bool
     @Binding var profileUser: MoodUser?
@@ -813,10 +874,12 @@ struct CompactDMListView: View {
                 .padding(.top, 6)
                 .padding(.bottom, 6)
 
-                onlineFriendsCarousel
+                if authState.isDemoMode {
+                    onlineFriendsCarousel
 
-                Rectangle().fill(MoodTheme.divider).frame(height: 0.5)
-                    .padding(.horizontal, 14)
+                    Rectangle().fill(MoodTheme.divider).frame(height: 0.5)
+                        .padding(.horizontal, 14)
+                }
 
                 // Header section
                 Text("MESSAGES DIRECTS")
@@ -885,12 +948,26 @@ struct CompactDMListView: View {
         }
     }
 
+    @ViewBuilder
     private var conversationList: some View {
-        ForEach(filteredConversations) { convo in
-            NavigationLink(value: convo) {
-                CompactDMRow(conversation: convo)
+        if conversations.isEmpty {
+            VStack(spacing: 8) {
+                Image(systemName: "bubble.left.and.bubble.right")
+                    .font(.system(size: 24))
+                    .foregroundStyle(MoodTheme.textMuted)
+                Text("Aucune conversation")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(MoodTheme.textSecondary)
             }
-            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 24)
+        } else {
+            ForEach(filteredConversations) { convo in
+                NavigationLink(value: convo) {
+                    CompactDMRow(conversation: convo)
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 }

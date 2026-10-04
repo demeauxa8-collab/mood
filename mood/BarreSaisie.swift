@@ -5,6 +5,8 @@ struct MessageInputBar: View {
     let channelName: String
     let isE2E: Bool
     var typingUsers: [String] = []
+    // Bloque la saisie (ex. room E2EE non supportée — ne pas envoyer du clair)
+    var isDisabled: Bool = false
     @Binding var replyingTo: ChatMessage?
     var onSend: (() -> Void)?
     @State private var showEmojiPicker = false
@@ -12,11 +14,12 @@ struct MessageInputBar: View {
     @State private var showAttachMenu = false
     @State private var showAttachAlert = false
 
-    init(text: Binding<String>, channelName: String, isE2E: Bool, typingUsers: [String] = [], replyingTo: Binding<ChatMessage?> = .constant(nil), onSend: (() -> Void)? = nil) {
+    init(text: Binding<String>, channelName: String, isE2E: Bool, typingUsers: [String] = [], isDisabled: Bool = false, replyingTo: Binding<ChatMessage?> = .constant(nil), onSend: (() -> Void)? = nil) {
         self._text = text
         self.channelName = channelName
         self.isE2E = isE2E
         self.typingUsers = typingUsers
+        self.isDisabled = isDisabled
         self._replyingTo = replyingTo
         self.onSend = onSend
     }
@@ -122,13 +125,17 @@ struct MessageInputBar: View {
                     TextField(
                         "",
                         text: $text,
-                        prompt: Text("Envoyer un message dans #\(channelName)")
+                        prompt: Text(isDisabled ? "Saisie désactivée (conversation chiffrée)" : "Envoyer un message dans #\(channelName)")
                             .foregroundStyle(MoodTheme.textMuted)
                     )
                         .textFieldStyle(.plain)
                         .font(.mood(15))
                         .foregroundStyle(MoodTheme.textPrimary)
-                        .onSubmit { onSend?() }
+                        .disabled(isDisabled)
+                        .onSubmit {
+                            guard !isDisabled else { return }
+                            onSend?()
+                        }
                 }
 
                 // Boutons droite
@@ -186,6 +193,7 @@ struct MessageInputBar: View {
                 RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous)
                     .strokeBorder(MoodTheme.composerBorder, lineWidth: 1 * LayoutMetrics.scale)
             }
+            .opacity(isDisabled ? 0.5 : 1)
             .padding(.horizontal, LayoutMetrics.composerHorizontalInset)
             .padding(.bottom, LayoutMetrics.composerBottomInset)
         }

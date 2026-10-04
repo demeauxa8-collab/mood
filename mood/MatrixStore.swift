@@ -1,4 +1,5 @@
 import SwiftUI
+import CryptoKit
 
 // MARK: - Matrix Store
 
@@ -25,6 +26,9 @@ class MatrixStore {
     // Pending invitations
     var pendingInvites: [PendingInvite] = []
 
+    // Pagination: true si on peut encore charger de l'historique pour la room
+    var hasMoreHistory: [String: Bool] = [:]
+
     struct UserPresenceInfo {
         let presence: String // "online", "offline", "unavailable"
         let statusMsg: String?
@@ -43,8 +47,27 @@ class MatrixStore {
     let client: MatrixClient
     private var syncToken: String?
     private var syncTask: Task<Void, Never>?
+    private var syncGeneration = 0
     private(set) var userId: String?
     private var directRoomIds: Set<String> = []
+
+    private static let syncTokenKey = "mood.syncToken"
+    private static let encryptedPlaceholderBody = "🔒 Message chiffré — pas encore pris en charge"
+    private static let maxSendAttempts = 3
+
+    // Outbox (file hors-ligne)
+    private let outbox: MessageOutbox
+    private let reachability: NetworkReachability
+    private var flushTask: Task<Void, Never>?
+    private var failedOutgoing: [String: OutgoingMessage] = [:] // txnId -> message pour retry manuel
+
+    // Pagination
+    private var backPaginationTokens: [String: String] = [:] // roomId -> token /messages
+    private var paginatingRooms: Set<String> = []
+
+    // Stable IDs: cache SHA256 + map inverse pour roomId(for:) en O(1)
+    private var stableIdCache: [String: UUID] = [:]
+    private var stableIdReverse: [UUID: String] = [:]
 
     // Raw event tracking for reactions/edits/redactions
     private var reactionEvents: [String: [(emoji: String, sender: String, eventId: String)]] = [:] // targetEventId -> reactions
@@ -69,6 +92,7 @@ class MatrixStore {
         var roomType: String? // nil for normal, "m.space" for spaces
         var spaceChildren: [String] // roomIds of children (for spaces)
         var avatarUrl: String? // room avatar mxc URL
+        var heroes: [String] // m.heroes du sync, fallback DM quand les membres ne sont pas résolus
     }
 
     private var rooms: [MatrixRoom] = []
@@ -77,6 +101,11 @@ class MatrixStore {
 
     init(homeserver: String = "matrix.org") {
         self.client = MatrixClient(homeserver: homeserver)
+        self.outbox = MessageOutbox()
+        self.reachability = NetworkReachability()
+        self.reachability.onReconnect = { [weak self] in
+            self?.flushOutbox()
+        }
     }
 
     // MARK: - Auth
@@ -92,6 +121,8 @@ class MatrixStore {
         self.userId = response.userId
 
         saveCredentials(token: response.accessToken, userId: response.userId, homeserver: homeserver)
+        syncToken = nil
+        UserDefaults.standard.removeObject(forKey: Self.syncTokenKey)
         await buildCurrentUser(userId: response.userId)
         startSyncLoop()
     }
@@ -107,6 +138,8 @@ class MatrixStore {
         self.userId = response.userId
 
         saveCredentials(token: response.accessToken, userId: response.userId, homeserver: homeserver)
+        syncToken = nil
+        UserDefaults.standard.removeObject(forKey: Self.syncTokenKey)
         await buildCurrentUser(userId: response.userId)
         startSyncLoop()
     }
@@ -122,6 +155,8 @@ class MatrixStore {
         self.userId = response.userId
 
         saveCredentials(token: response.accessToken, userId: response.userId, homeserver: homeserver)
+        syncToken = nil
+        UserDefaults.standard.removeObject(forKey: Self.syncTokenKey)
         await buildCurrentUser(userId: response.userId)
         startSyncLoop()
     }
@@ -132,8 +167,13 @@ class MatrixStore {
     }
 
     func logout() {
+        let clientRef = client
+        Task { try? await clientRef.logout() } // best effort
         syncTask?.cancel()
         syncTask = nil
+        syncGeneration += 1
+        flushTask?.cancel()
+        flushTask = nil
         syncToken = nil
         userId = nil
         currentUser = nil
@@ -152,12 +192,18 @@ class MatrixStore {
         readThroughUnreadEventIdByRoom = [:]
         pendingReadReceipts = [:]
         isSendingReadReceipts = false
+        backPaginationTokens = [:]
+        hasMoreHistory = [:]
+        paginatingRooms = []
+        failedOutgoing = [:]
+        outbox.removeAll()
+        UserDefaults.standard.removeObject(forKey: Self.syncTokenKey)
         clearCredentials()
     }
 
-    func restoreSession() -> Bool {
+    func restoreSession() async -> Bool {
         guard let token = KeychainHelper.load(key: "access_token"),
-              let userId = KeychainHelper.load(key: "user_id"),
+              let storedUserId = KeychainHelper.load(key: "user_id"),
               let homeserver = KeychainHelper.load(key: "homeserver")
         else {
             // Migration from UserDefaults
@@ -168,17 +214,30 @@ class MatrixStore {
                 UserDefaults.standard.removeObject(forKey: "matrix_access_token")
                 UserDefaults.standard.removeObject(forKey: "matrix_user_id")
                 UserDefaults.standard.removeObject(forKey: "matrix_homeserver")
-                return restoreSession()
+                return await restoreSession()
             }
             return false
         }
 
-        self.userId = userId
         client.setHomeserver(homeserver)
         client.setAccessToken(token)
 
-        Task { await buildCurrentUser(userId: userId) }
+        do {
+            self.userId = try await client.whoami()
+        } catch let error as MatrixClient.MatrixError where error.isUnknownToken {
+            clearCredentials()
+            UserDefaults.standard.removeObject(forKey: Self.syncTokenKey)
+            return false
+        } catch {
+            // Erreur réseau : hors ligne ≠ déconnecté, on garde la session
+            self.userId = storedUserId
+        }
+
+        syncToken = UserDefaults.standard.string(forKey: Self.syncTokenKey)
+        restoreOutboxEchoes()
+        Task { await buildCurrentUser(userId: self.userId ?? storedUserId) }
         startSyncLoop()
+        flushOutbox()
         return true
     }
 
@@ -186,40 +245,52 @@ class MatrixStore {
 
     private func startSyncLoop() {
         syncTask?.cancel()
+        syncGeneration += 1
+        let generation = syncGeneration
+
         syncTask = Task { [weak self] in
             guard let self else { return }
 
-            // Initial sync
-            do {
-                let response = try await client.sync(since: nil, timeout: 0)
-                self.processSyncResponse(response)
-                self.syncToken = response.nextBatch
-                await self.retryPendingReadReceipts()
-            } catch {
-                if !Task.isCancelled {
-                    self.errorMessage = "Sync initiale échouée : \(error.localizedDescription)"
-                }
-            }
+            var backoff: Double = 1
+            var isFirstSync = true
 
-            // Set online presence
-            if let userId = self.userId {
-                try? await client.setPresence(userId: userId, presence: "online")
-            }
-
-            // Long-poll loop
-            while !Task.isCancelled {
+            while !Task.isCancelled && generation == self.syncGeneration {
                 do {
-                    let response = try await client.sync(since: self.syncToken, timeout: 30000)
+                    let response = try await self.client.sync(since: self.syncToken, timeout: isFirstSync ? 0 : 30000)
+                    guard !Task.isCancelled, generation == self.syncGeneration else { return }
+
                     self.processSyncResponse(response)
                     self.syncToken = response.nextBatch
+                    UserDefaults.standard.set(response.nextBatch, forKey: Self.syncTokenKey)
+                    backoff = 1
                     await self.retryPendingReadReceipts()
-                } catch {
-                    if !Task.isCancelled {
-                        try? await Task.sleep(for: .seconds(5))
+
+                    if isFirstSync {
+                        isFirstSync = false
+                        if let userId = self.userId {
+                            try? await self.client.setPresence(userId: userId, presence: "online")
+                        }
+                        guard !Task.isCancelled, generation == self.syncGeneration else { return }
+                        self.flushOutbox()
                     }
+                } catch {
+                    guard !Task.isCancelled, generation == self.syncGeneration else { return }
+                    if (error as? MatrixClient.MatrixError)?.isUnknownToken == true {
+                        self.handleSessionExpired()
+                        return
+                    }
+                    let jitter = Double.random(in: 0...(backoff * 0.25))
+                    try? await Task.sleep(for: .seconds(backoff + jitter))
+                    guard !Task.isCancelled, generation == self.syncGeneration else { return }
+                    backoff = min(backoff * 2, 60)
                 }
             }
         }
+    }
+
+    private func handleSessionExpired() {
+        logout()
+        errorMessage = "Session expirée, reconnecte-toi"
     }
 
     // MARK: - Process Sync Response
@@ -301,10 +372,14 @@ class MatrixStore {
             var room = rooms.first(where: { $0.roomId == roomId }) ?? MatrixRoom(
                 roomId: roomId, name: roomId, topic: "", isDirect: directRoomIds.contains(roomId),
                 members: [:], memberAvatars: [:], unreadCount: 0, mentionCount: 0,
-                isEncrypted: false, roomType: nil, spaceChildren: [], avatarUrl: nil
+                isEncrypted: false, roomType: nil, spaceChildren: [], avatarUrl: nil, heroes: []
             )
 
             room.isDirect = directRoomIds.contains(roomId)
+
+            if let heroes = roomData.summary?.mHeroes, !heroes.isEmpty {
+                room.heroes = heroes
+            }
 
             // Remove from pending invites once joined
             pendingInvites.removeAll { $0.id == roomId }
@@ -313,6 +388,20 @@ class MatrixStore {
             if let stateEvents = roomData.state?.events {
                 for event in stateEvents {
                     processStateEvent(event, room: &room)
+                }
+            }
+
+            // Pagination : prev_batch du sync = point de départ, limited = trou à combler
+            if let timeline = roomData.timeline {
+                let hadMessages = !(messagesByRoom[roomId]?.isEmpty ?? true)
+                if let prevBatch = timeline.prevBatch, backPaginationTokens[roomId] == nil {
+                    backPaginationTokens[roomId] = prevBatch
+                    hasMoreHistory[roomId] = true
+                } else if timeline.limited == true, hadMessages, let prevBatch = timeline.prevBatch {
+                    let generation = syncGeneration
+                    Task { [weak self] in
+                        await self?.fillGap(roomId: roomId, from: prevBatch, generation: generation)
+                    }
                 }
             }
 
@@ -431,11 +520,9 @@ class MatrixStore {
         if event.type == "m.room.redaction" {
             guard let redactedId = event.redacts else { return }
             redactedEventIds.insert(redactedId)
-            // Remove the message from the store
-            if let idx = messagesByRoom[roomId]?.firstIndex(where: { stableUUID(from: redactedId) == $0.id }) {
+            if let idx = messageIndex(roomId: roomId, eventId: redactedId) {
                 messagesByRoom[roomId]?.remove(at: idx)
             }
-            // Remove associated reactions
             reactionEvents.removeValue(forKey: redactedId)
             return
         }
@@ -458,41 +545,82 @@ class MatrixStore {
             return
         }
 
-        // Regular message or edit
-        if event.type == "m.room.message" {
-            // Check for edit (m.replace)
-            if let relatesTo = event.content?["m.relates_to"]?.dictValue,
-               let relType = relatesTo["rel_type"]?.stringValue,
-               relType == "m.replace",
-               let targetEventId = relatesTo["event_id"]?.stringValue {
-                // Update the original message content
-                let newContent = event.content?["m.new_content"]?.dictValue
-                let newBody = newContent?["body"]?.stringValue ?? event.content?["body"]?.stringValue ?? ""
+        guard event.type == "m.room.message" || event.type == "m.room.encrypted" else { return }
 
-                if let idx = messagesByRoom[roomId]?.firstIndex(where: { stableUUID(from: targetEventId) == $0.id }) {
-                    let original = messagesByRoom[roomId]![idx]
-                    messagesByRoom[roomId]![idx] = ChatMessage(
-                        id: original.id, sender: original.sender, content: newBody,
-                        timestamp: original.timestamp, isGrouped: original.isGrouped,
-                        reactions: original.reactions, replyTo: original.replyTo,
-                        attachments: original.attachments, isPinned: original.isPinned,
-                        threadInfo: original.threadInfo, isEdited: true,
-                        linkEmbed: original.linkEmbed,
-                        isSystemMessage: original.isSystemMessage, systemType: original.systemType
-                    )
-                }
-                return
+        // Edit (m.replace)
+        if event.type == "m.room.message",
+           let relatesTo = event.content?["m.relates_to"]?.dictValue,
+           relatesTo["rel_type"]?.stringValue == "m.replace",
+           let targetEventId = relatesTo["event_id"]?.stringValue {
+            let newContent = event.content?["m.new_content"]?.dictValue
+            let newBody = newContent?["body"]?.stringValue ?? event.content?["body"]?.stringValue ?? ""
+
+            if let idx = messageIndex(roomId: roomId, eventId: targetEventId) {
+                let original = messagesByRoom[roomId]![idx]
+                messagesByRoom[roomId]![idx] = ChatMessage(
+                    id: original.id, sender: original.sender, content: newBody,
+                    timestamp: original.timestamp, isGrouped: original.isGrouped,
+                    reactions: original.reactions, replyTo: original.replyTo,
+                    attachments: original.attachments, isPinned: original.isPinned,
+                    threadInfo: original.threadInfo, isEdited: true,
+                    linkEmbed: original.linkEmbed,
+                    isSystemMessage: original.isSystemMessage, systemType: original.systemType,
+                    sendState: original.sendState, eventId: original.eventId, txnId: original.txnId
+                )
             }
-
-            // Check if already added
-            if messagesByRoom[roomId]?.contains(where: { stableUUID(from: eventId) == $0.id }) == true {
-                return
-            }
-
-            let chatMessage = convertToChatMessage(event, roomId: roomId)
-            if messagesByRoom[roomId] == nil { messagesByRoom[roomId] = [] }
-            messagesByRoom[roomId]!.append(chatMessage)
+            return
         }
+
+        // Écho serveur d'un envoi local : remplace le message local au lieu de dupliquer
+        if let txn = event.transactionId,
+           let idx = messagesByRoom[roomId]?.firstIndex(where: { $0.txnId == txn }) {
+            let localId = messagesByRoom[roomId]![idx].id
+            messagesByRoom[roomId]?.remove(at: idx)
+            failedOutgoing.removeValue(forKey: txn)
+            outbox.remove(txnId: txn)
+            if let message = makeMessage(from: event, roomId: roomId, overrideId: localId) {
+                insertSorted(message, roomId: roomId)
+            }
+            return
+        }
+
+        // Déjà connu (eventId)
+        if messageIndex(roomId: roomId, eventId: eventId) != nil { return }
+
+        guard let message = makeMessage(from: event, roomId: roomId) else { return }
+        insertSorted(message, roomId: roomId)
+    }
+
+    // Construit un ChatMessage depuis un event timeline (placeholder pour le chiffré, nil pour les edits)
+    private func makeMessage(from event: MatrixEvent, roomId: String, overrideId: UUID? = nil) -> ChatMessage? {
+        switch event.type {
+        case "m.room.message":
+            if let relatesTo = event.content?["m.relates_to"]?.dictValue,
+               relatesTo["rel_type"]?.stringValue == "m.replace" {
+                return nil
+            }
+            return convertToChatMessage(event, roomId: roomId, overrideId: overrideId)
+        case "m.room.encrypted":
+            return convertToChatMessage(event, roomId: roomId, overrideId: overrideId, overrideBody: Self.encryptedPlaceholderBody)
+        default:
+            return nil
+        }
+    }
+
+    private func messageIndex(roomId: String, eventId: String) -> Int? {
+        guard let list = messagesByRoom[roomId] else { return nil }
+        let stableId = stableUUID(from: eventId)
+        return list.firstIndex(where: { $0.id == stableId || $0.eventId == eventId })
+    }
+
+    private func insertSorted(_ message: ChatMessage, roomId: String) {
+        var list = messagesByRoom[roomId] ?? []
+        var idx = list.endIndex
+        while idx > list.startIndex && list[idx - 1].timestamp > message.timestamp {
+            idx -= 1
+        }
+        list.insert(message, at: idx)
+        messagesByRoom[roomId] = list
     }
 
     private func isUnreadRelevant(_ event: MatrixEvent) -> Bool {
@@ -533,7 +661,7 @@ class MatrixStore {
 
     private func updateMessageReactions(roomId: String, targetEventId: String) {
         guard let reactions = reactionEvents[targetEventId],
-              let idx = messagesByRoom[roomId]?.firstIndex(where: { stableUUID(from: targetEventId) == $0.id })
+              let idx = messageIndex(roomId: roomId, eventId: targetEventId)
         else { return }
 
         // Group reactions by emoji
@@ -563,18 +691,19 @@ class MatrixStore {
             attachments: original.attachments, isPinned: original.isPinned,
             threadInfo: original.threadInfo, isEdited: original.isEdited,
             linkEmbed: original.linkEmbed,
-            isSystemMessage: original.isSystemMessage, systemType: original.systemType
+            isSystemMessage: original.isSystemMessage, systemType: original.systemType,
+            sendState: original.sendState, eventId: original.eventId, txnId: original.txnId
         )
     }
 
     // MARK: - Convert to UI Models
 
-    private func convertToChatMessage(_ event: MatrixEvent, roomId: String) -> ChatMessage {
+    private func convertToChatMessage(_ event: MatrixEvent, roomId: String, overrideId: UUID? = nil, overrideBody: String? = nil) -> ChatMessage {
         let senderUserId = event.sender ?? "unknown"
         let room = rooms.first(where: { $0.roomId == roomId })
         let displayName = room?.members[senderUserId] ?? extractLocalpart(senderUserId)
-        let body = event.content?["body"]?.stringValue ?? ""
-        let msgtype = event.content?["msgtype"]?.stringValue ?? "m.text"
+        let body = overrideBody ?? event.content?["body"]?.stringValue ?? ""
+        let msgtype = overrideBody != nil ? "m.text" : (event.content?["msgtype"]?.stringValue ?? "m.text")
         let timestamp = Date(timeIntervalSince1970: TimeInterval(event.originServerTs ?? 0) / 1000)
         let eventId = event.eventId ?? UUID().uuidString
 
@@ -605,7 +734,8 @@ class MatrixStore {
            let inReplyTo = relatesTo["m.in_reply_to"]?.dictValue,
            let replyEventId = inReplyTo["event_id"]?.stringValue {
             // Find the original message
-            if let original = messagesByRoom[roomId]?.first(where: { stableUUID(from: replyEventId) == $0.id }) {
+            if let idx = messageIndex(roomId: roomId, eventId: replyEventId) {
+                let original = messagesByRoom[roomId]![idx]
                 replyTo = ReplyRef(sender: original.sender, content: original.content)
             }
         }
@@ -648,7 +778,7 @@ class MatrixStore {
         }
 
         return ChatMessage(
-            id: stableUUID(from: eventId),
+            id: overrideId ?? stableUUID(from: eventId),
             sender: sender,
             content: body,
             timestamp: timestamp,
@@ -657,7 +787,10 @@ class MatrixStore {
             replyTo: replyTo,
             attachments: attachments,
             isSystemMessage: isSystem,
-            systemType: systemType
+            systemType: systemType,
+            sendState: .sent,
+            eventId: event.eventId,
+            txnId: event.transactionId
         )
     }
 
@@ -749,25 +882,36 @@ class MatrixStore {
 
         self.servers = builtServers
 
-        // DMs
-        self.dmConversations = dmRooms.compactMap { room in
-            guard let otherUserId = room.members.keys.first(where: { $0 != self.userId }) else { return nil }
-            let displayName = room.members[otherUserId] ?? extractLocalpart(otherUserId)
+        // DMs — pas de suppression silencieuse : fallback heroes puis nom de room
+        self.dmConversations = dmRooms.map { room in
+            let otherUserId = room.members.keys.first(where: { $0 != self.userId })
+                ?? room.heroes.first(where: { $0 != self.userId })
+
+            let displayName: String
+            if let otherUserId {
+                displayName = room.members[otherUserId] ?? extractLocalpart(otherUserId)
+            } else if !room.name.isEmpty && room.name != room.roomId {
+                displayName = room.name
+            } else {
+                displayName = "Conversation"
+            }
+
             let lastMsg = messagesByRoom[room.roomId]?.last
             let lastMessage = lastMsg?.content ?? ""
             let lastDate = lastMsg?.timestamp ?? Date()
 
-            let presence = presenceByUser[otherUserId]
+            let presence = otherUserId.flatMap { presenceByUser[$0] }
             let status: MoodUser.UserStatus = (presence?.presence == "online" || presence?.currentlyActive == true) ? .online : .offline
 
-            let avatarMxc = room.memberAvatars[otherUserId]
+            let avatarMxc = otherUserId.flatMap { room.memberAvatars[$0] }
+            let participantKey = otherUserId ?? room.roomId
 
             let participant = MoodUser(
-                id: stableUUID(from: otherUserId),
-                username: extractLocalpart(otherUserId),
+                id: stableUUID(from: participantKey),
+                username: otherUserId.map(extractLocalpart) ?? displayName,
                 displayName: displayName,
-                avatarEmoji: avatarMxc != nil ? "👤" : emojiForUser(otherUserId),
-                roleColor: colorForUser(otherUserId),
+                avatarEmoji: avatarMxc != nil ? "👤" : emojiForUser(participantKey),
+                roleColor: colorForUser(participantKey),
                 status: status,
                 bio: "",
                 joinedDate: Date(),
@@ -789,11 +933,168 @@ class MatrixStore {
 
     // MARK: - Public Actions
 
+    // Écho local immédiat + envoi via la file hors-ligne : jamais bloquant pour l'UI
     func sendMessage(roomId: String, text: String, replyToEventId: String? = nil, threadRootEventId: String? = nil) async {
-        do {
-            try await client.sendMessage(roomId: roomId, body: text, replyToEventId: replyToEventId, threadRootEventId: threadRootEventId)
-        } catch {
-            self.errorMessage = "Envoi échoué : \(error.localizedDescription)"
+        let txnId = UUID().uuidString
+        let echo = makeLocalEcho(roomId: roomId, body: text, txnId: txnId, replyToEventId: replyToEventId)
+        insertSorted(echo, roomId: roomId)
+        rebuildUIModels()
+
+        outbox.enqueue(OutgoingMessage(
+            txnId: txnId, roomId: roomId, body: text,
+            replyToEventId: replyToEventId, threadRootEventId: threadRootEventId,
+            createdAt: Date()
+        ))
+        flushOutbox()
+    }
+
+    func retryMessage(_ localId: UUID, roomId: String) {
+        guard var list = messagesByRoom[roomId],
+              let idx = list.firstIndex(where: { $0.id == localId }),
+              list[idx].sendState == .failed,
+              let txnId = list[idx].txnId
+        else { return }
+
+        list[idx].sendState = .sending
+        messagesByRoom[roomId] = list
+
+        let item = failedOutgoing.removeValue(forKey: txnId) ?? OutgoingMessage(
+            txnId: txnId, roomId: roomId, body: list[idx].content,
+            replyToEventId: nil, threadRootEventId: nil, createdAt: list[idx].timestamp
+        )
+        outbox.enqueue(item)
+        flushOutbox()
+    }
+
+    // MARK: - Outbox
+
+    private enum DeliveryResult {
+        case sent, failed, offline, sessionExpired
+    }
+
+    private func flushOutbox() {
+        guard flushTask == nil, userId != nil, !outbox.pending.isEmpty else { return }
+        flushTask = Task { [weak self] in
+            guard let self else { return }
+            await self.processOutbox()
+            self.flushTask = nil
+            // Un message enfilé pendant la fin du flush ne doit pas rester bloqué
+            if self.userId != nil, !self.outbox.pending.isEmpty, self.reachability.isConnected {
+                self.flushOutbox()
+            }
+        }
+    }
+
+    private func processOutbox() async {
+        while let item = outbox.pending.first {
+            guard !Task.isCancelled, reachability.isConnected, userId != nil else { return }
+            let result = await deliver(item)
+            guard !Task.isCancelled else { return }
+
+            switch result {
+            case .sent:
+                outbox.remove(txnId: item.txnId)
+                rebuildUIModels()
+            case .failed:
+                outbox.remove(txnId: item.txnId)
+                failedOutgoing[item.txnId] = item
+                setSendState(.failed, txnId: item.txnId, roomId: item.roomId)
+            case .offline:
+                return
+            case .sessionExpired:
+                handleSessionExpired()
+                return
+            }
+        }
+    }
+
+    private func deliver(_ item: OutgoingMessage) async -> DeliveryResult {
+        var attempt = 0
+        while attempt < Self.maxSendAttempts {
+            do {
+                let response = try await client.sendMessage(
+                    roomId: item.roomId, body: item.body,
+                    replyToEventId: item.replyToEventId,
+                    threadRootEventId: item.threadRootEventId,
+                    txnId: item.txnId
+                )
+                confirmEcho(txnId: item.txnId, roomId: item.roomId, eventId: response.eventId)
+                return .sent
+            } catch {
+                if (error as? MatrixClient.MatrixError)?.isUnknownToken == true { return .sessionExpired }
+                if !reachability.isConnected { return .offline }
+                attempt += 1
+                guard let delay = retryDelay(for: error, attempt: attempt) else { return .failed }
+                try? await Task.sleep(for: .seconds(delay))
+                if Task.isCancelled { return .offline }
+            }
+        }
+        return .failed
+    }
+
+    private func retryDelay(for error: Error, attempt: Int) -> TimeInterval? {
+        guard attempt < Self.maxSendAttempts else { return nil }
+        if case .httpError(let statusCode, _, _, let retryAfterMs)? = error as? MatrixClient.MatrixError {
+            if statusCode == 429 {
+                return retryAfterMs.map { TimeInterval($0) / 1000 } ?? pow(2, Double(attempt))
+            }
+            if (400..<500).contains(statusCode) { return nil } // erreur définitive, inutile de réessayer
+        }
+        return pow(2, Double(attempt))
+    }
+
+    private func confirmEcho(txnId: String, roomId: String, eventId: String) {
+        guard var list = messagesByRoom[roomId],
+              let idx = list.firstIndex(where: { $0.txnId == txnId }),
+              list[idx].eventId == nil
+        else { return }
+        let msg = list[idx]
+        list[idx] = ChatMessage(
+            id: msg.id, sender: msg.sender, content: msg.content, timestamp: msg.timestamp,
+            isGrouped: msg.isGrouped, reactions: msg.reactions, replyTo: msg.replyTo,
+            attachments: msg.attachments, isPinned: msg.isPinned, threadInfo: msg.threadInfo,
+            isEdited: msg.isEdited, linkEmbed: msg.linkEmbed,
+            isSystemMessage: msg.isSystemMessage, systemType: msg.systemType,
+            sendState: .sent, eventId: eventId, txnId: msg.txnId
+        )
+        messagesByRoom[roomId] = list
+    }
+
+    private func setSendState(_ state: MessageSendState, txnId: String, roomId: String) {
+        guard var list = messagesByRoom[roomId],
+              let idx = list.firstIndex(where: { $0.txnId == txnId }) else { return }
+        list[idx].sendState = state
+        messagesByRoom[roomId] = list
+    }
+
+    private func makeLocalEcho(roomId: String, body: String, txnId: String, replyToEventId: String?, createdAt: Date = Date()) -> ChatMessage {
+        let sender = currentUser ?? MoodUser(
+            id: stableUUID(from: userId ?? "me"),
+            username: userId.map(extractLocalpart) ?? "moi",
+            displayName: userId.map(extractLocalpart) ?? "Moi",
+            avatarEmoji: "👤", roleColor: .blue, status: .online,
+            bio: "", joinedDate: Date(), badges: [], activity: nil
+        )
+        var replyTo: ReplyRef?
+        if let replyToEventId, let idx = messageIndex(roomId: roomId, eventId: replyToEventId) {
+            let original = messagesByRoom[roomId]![idx]
+            replyTo = ReplyRef(sender: original.sender, content: original.content)
+        }
+        return ChatMessage(
+            id: stableUUID(from: txnId), sender: sender, content: body,
+            timestamp: createdAt, isGrouped: false, replyTo: replyTo,
+            sendState: .sending, eventId: nil, txnId: txnId
+        )
+    }
+
+    // Recrée les échos locaux des messages encore en file au démarrage
+    private func restoreOutboxEchoes() {
+        for item in outbox.pending {
+            let exists = messagesByRoom[item.roomId]?.contains(where: { $0.txnId == item.txnId }) ?? false
+            guard !exists else { continue }
+            let echo = makeLocalEcho(roomId: item.roomId, body: item.body, txnId: item.txnId,
+                                     replyToEventId: item.replyToEventId, createdAt: item.createdAt)
+            insertSorted(echo, roomId: item.roomId)
         }
     }
 
@@ -880,6 +1181,18 @@ class MatrixStore {
         }
     }
 
+    /// Marks a room read up to `eventId` (or the latest known event) and queues the receipt.
+    func markAsRead(roomId: String, eventId: String? = nil) {
+        let target = eventId
+            ?? latestEventIdByRoom[roomId]
+            ?? messagesByRoom[roomId]?.last(where: { $0.eventId != nil })?.eventId
+        markRoomAsRead(roomId: roomId, eventId: target, unreadEventId: latestUnreadEventIdByRoom[roomId])
+    }
+
+    func isRoomEncrypted(_ roomId: String) -> Bool {
+        rooms.first(where: { $0.roomId == roomId })?.isEncrypted ?? false
+    }
+
     func setPresenceStatus(presence: String, statusMsg: String? = nil) async {
         guard let userId else { return }
         try? await client.setPresence(userId: userId, presence: presence, statusMsg: statusMsg)
@@ -937,16 +1250,64 @@ class MatrixStore {
     }
 
     func createDM(userId targetUserId: String) async -> String? {
+        // Dédup : room direct existante avec exactement ce user
+        if let existing = existingDirectRoomId(with: targetUserId) {
+            return existing
+        }
+        if let userId,
+           let map = try? await client.getDirectRooms(userId: userId),
+           let candidates = map[targetUserId],
+           let existing = candidates.first(where: { candidate in rooms.contains { $0.roomId == candidate } }) {
+            directRoomIds.insert(existing)
+            return existing
+        }
+
         do {
             let response = try await client.createRoom(isDirect: true, inviteUserIds: [targetUserId], preset: "trusted_private_chat")
-
-            // Mark as direct in account data
-            // The sync loop will pick this up
+            directRoomIds.insert(response.roomId)
+            await registerDirectRoom(response.roomId, with: targetUserId)
             return response.roomId
         } catch {
             self.errorMessage = "Création du DM échouée : \(error.localizedDescription)"
             return nil
         }
+    }
+
+    // Retourne l'id de la DMConversation (existante ou créée), nil si échec
+    func openOrCreateDM(with userId: String) async -> UUID? {
+        guard let roomId = await createDM(userId: userId) else { return nil }
+        if !rooms.contains(where: { $0.roomId == roomId }) {
+            var members = [userId: extractLocalpart(userId)]
+            if let me = self.userId {
+                members[me] = currentUser?.displayName ?? extractLocalpart(me)
+            }
+            rooms.append(MatrixRoom(
+                roomId: roomId, name: extractLocalpart(userId), topic: "", isDirect: true,
+                members: members, memberAvatars: [:], unreadCount: 0, mentionCount: 0,
+                isEncrypted: false, roomType: nil, spaceChildren: [], avatarUrl: nil, heroes: []
+            ))
+        }
+        rebuildUIModels()
+        return stableUUID(from: roomId)
+    }
+
+    private func existingDirectRoomId(with targetUserId: String) -> String? {
+        rooms.first(where: { room in
+            guard room.isDirect, room.roomType != "m.space" else { return false }
+            let others = Set(room.members.keys.filter { $0 != userId })
+            return others == [targetUserId]
+        })?.roomId
+    }
+
+    // Merge dans m.direct (account data) pour que les autres clients voient le DM
+    private func registerDirectRoom(_ roomId: String, with targetUserId: String) async {
+        guard let userId else { return }
+        var map = (try? await client.getDirectRooms(userId: userId)) ?? [:]
+        var list = map[targetUserId] ?? []
+        guard !list.contains(roomId) else { return }
+        list.append(roomId)
+        map[targetUserId] = list
+        try? await client.setDirectRooms(userId: userId, directMap: map)
     }
 
     func joinRoom(_ roomIdOrAlias: String) async -> Bool {
@@ -963,6 +1324,9 @@ class MatrixStore {
         do {
             try await client.leaveRoom(roomId)
             rooms.removeAll { $0.roomId == roomId }
+            messagesByRoom.removeValue(forKey: roomId)
+            backPaginationTokens.removeValue(forKey: roomId)
+            hasMoreHistory.removeValue(forKey: roomId)
             rebuildUIModels()
         } catch {
             self.errorMessage = "Impossible de quitter : \(error.localizedDescription)"
@@ -1029,9 +1393,11 @@ class MatrixStore {
         }
     }
 
-    func searchUsers(term: String) async -> [MatrixUserResult] {
+    func searchUsers(query: String) async -> [MatrixUserResult] {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return [] }
         do {
-            let response = try await client.searchUsers(term: term)
+            let response = try await client.searchUsers(term: trimmed)
             return response.results ?? []
         } catch {
             return []
@@ -1080,22 +1446,57 @@ class MatrixStore {
     }
 
     func loadMoreMessages(roomId: String) async {
+        guard hasMoreHistory[roomId] ?? true, !paginatingRooms.contains(roomId) else { return }
+        guard let token = backPaginationTokens[roomId] else {
+            hasMoreHistory[roomId] = false
+            return
+        }
+        paginatingRooms.insert(roomId)
+        defer { paginatingRooms.remove(roomId) }
+
         do {
-            let existing = messagesByRoom[roomId] ?? []
-            let firstEventId = existing.first.map { "\($0.id)" }
-            let response = try await client.roomMessages(roomId: roomId, from: firstEventId, limit: 50)
-            if let events = response.chunk {
-                for event in events.reversed() where event.type == "m.room.message" {
-                    let msg = convertToChatMessage(event, roomId: roomId)
-                    if !(messagesByRoom[roomId]?.contains(where: { $0.id == msg.id }) ?? false) {
-                        if messagesByRoom[roomId] == nil { messagesByRoom[roomId] = [] }
-                        messagesByRoom[roomId]!.insert(msg, at: 0)
-                    }
-                }
+            let response = try await client.roomMessages(roomId: roomId, from: token, limit: 50)
+            let events = response.chunk ?? []
+            for event in events {
+                insertHistoricalEvent(event, roomId: roomId)
             }
+            if let end = response.end, !events.isEmpty {
+                backPaginationTokens[roomId] = end
+                hasMoreHistory[roomId] = true
+            } else {
+                hasMoreHistory[roomId] = false
+            }
+            rebuildUIModels()
         } catch {
             self.errorMessage = "Chargement de l'historique échoué : \(error.localizedDescription)"
         }
+    }
+
+    // Comble un trou de timeline (sync limited) en remontant depuis prev_batch
+    private func fillGap(roomId: String, from token: String, generation: Int) async {
+        guard let response = try? await client.roomMessages(roomId: roomId, from: token, limit: 100) else { return }
+        guard generation == syncGeneration else { return }
+        var insertedAny = false
+        for event in response.chunk ?? [] {
+            if let eventId = event.eventId, messageIndex(roomId: roomId, eventId: eventId) != nil {
+                break // trou comblé, on a rejoint l'historique connu
+            }
+            if insertHistoricalEvent(event, roomId: roomId) {
+                insertedAny = true
+            }
+        }
+        if insertedAny { rebuildUIModels() }
+    }
+
+    @discardableResult
+    private func insertHistoricalEvent(_ event: MatrixEvent, roomId: String) -> Bool {
+        guard let eventId = event.eventId,
+              !redactedEventIds.contains(eventId),
+              messageIndex(roomId: roomId, eventId: eventId) == nil,
+              let message = makeMessage(from: event, roomId: roomId)
+        else { return false }
+        insertSorted(message, roomId: roomId)
+        return true
     }
 
     // MARK: - Media URL Resolution
@@ -1108,11 +1509,11 @@ class MatrixStore {
     // MARK: - Mapping Helpers
 
     func roomId(for channel: Channel) -> String? {
-        rooms.first(where: { stableUUID(from: $0.roomId) == channel.id })?.roomId
+        stableIdReverse[channel.id]
     }
 
     func roomId(for dm: DMConversation) -> String? {
-        rooms.first(where: { stableUUID(from: $0.roomId) == dm.id })?.roomId
+        stableIdReverse[dm.id]
     }
 
     func messages(for channel: Channel) -> [ChatMessage] {
@@ -1148,7 +1549,8 @@ class MatrixStore {
                     replyTo: result[i].replyTo, attachments: result[i].attachments,
                     isPinned: result[i].isPinned, threadInfo: result[i].threadInfo,
                     isEdited: result[i].isEdited, linkEmbed: result[i].linkEmbed,
-                    isSystemMessage: result[i].isSystemMessage, systemType: result[i].systemType
+                    isSystemMessage: result[i].isSystemMessage, systemType: result[i].systemType,
+                    sendState: result[i].sendState, eventId: result[i].eventId, txnId: result[i].txnId
                 )
             }
         }
@@ -1207,17 +1609,17 @@ class MatrixStore {
     }
 
     func stableUUID(from string: String) -> UUID {
-        var hash = [UInt8](repeating: 0, count: 16)
-        let bytes = Array(string.utf8)
-        for (i, byte) in bytes.enumerated() {
-            hash[i % 16] ^= byte &+ UInt8(truncatingIfNeeded: i)
-        }
-        hash[6] = (hash[6] & 0x0F) | 0x40
-        hash[8] = (hash[8] & 0x3F) | 0x80
-        return UUID(uuid: (hash[0], hash[1], hash[2], hash[3],
-                           hash[4], hash[5], hash[6], hash[7],
-                           hash[8], hash[9], hash[10], hash[11],
-                           hash[12], hash[13], hash[14], hash[15]))
+        if let cached = stableIdCache[string] { return cached }
+        var bytes = [UInt8](SHA256.hash(data: Data(string.utf8)).prefix(16))
+        bytes[6] = (bytes[6] & 0x0F) | 0x40
+        bytes[8] = (bytes[8] & 0x3F) | 0x80
+        let uuid = UUID(uuid: (bytes[0], bytes[1], bytes[2], bytes[3],
+                               bytes[4], bytes[5], bytes[6], bytes[7],
+                               bytes[8], bytes[9], bytes[10], bytes[11],
+                               bytes[12], bytes[13], bytes[14], bytes[15]))
+        stableIdCache[string] = uuid
+        stableIdReverse[uuid] = string
+        return uuid
     }
 
     private func emojiForUser(_ userId: String) -> String {
