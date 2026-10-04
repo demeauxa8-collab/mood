@@ -107,6 +107,8 @@ struct MatrixEvent: Codable, Sendable {
     let unsigned: MatrixUnsigned?
     let redacts: String?
 
+    var transactionId: String? { unsigned?.transactionId }
+
     enum CodingKeys: String, CodingKey {
         case type
         case eventId = "event_id"
@@ -167,8 +169,14 @@ struct MatrixMessagesResponse: Codable, Sendable {
 }
 
 struct MatrixErrorResponse: Codable, Sendable {
-    let errcode: String
-    let error: String
+    let errcode: String?
+    let error: String?
+    let retryAfterMs: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case errcode, error
+        case retryAfterMs = "retry_after_ms"
+    }
 }
 
 struct MatrixProfileResponse: Codable, Sendable {
@@ -263,6 +271,16 @@ struct MatrixSendResponse: Codable, Sendable {
     enum CodingKeys: String, CodingKey { case eventId = "event_id" }
 }
 
+struct MatrixWhoamiResponse: Codable, Sendable {
+    let userId: String
+    let deviceId: String?
+
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case deviceId = "device_id"
+    }
+}
+
 // MARK: - AnyCodable
 
 struct AnyCodable: Codable, @unchecked Sendable {
@@ -309,16 +327,23 @@ class MatrixClient {
 
     enum MatrixError: LocalizedError {
         case invalidURL
-        case httpError(Int, String)
+        case httpError(statusCode: Int, errcode: String?, message: String, retryAfterMs: Int?)
         case decodingError(Error)
         case notAuthenticated
         case networkError(Error)
         case registrationIncomplete(session: String, flows: [MatrixAuthFlow])
 
+        var errcode: String? {
+            if case .httpError(_, let errcode, _, _) = self { return errcode }
+            return nil
+        }
+
+        var isUnknownToken: Bool { errcode == "M_UNKNOWN_TOKEN" }
+
         var errorDescription: String? {
             switch self {
             case .invalidURL: return "URL invalide"
-            case .httpError(let code, let msg): return "Erreur \(code) : \(msg)"
+            case .httpError(let code, _, let msg, _): return "Erreur \(code) : \(msg)"
             case .decodingError(let err): return "Erreur de décodage : \(err.localizedDescription)"
             case .notAuthenticated: return "Non authentifié"
             case .networkError(let err): return "Erreur réseau : \(err.localizedDescription)"
@@ -331,11 +356,11 @@ class MatrixClient {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 60
         self.session = URLSession(configuration: config)
-        self.homeserverURL = URL(string: "https://\(homeserver)")!
+        self.homeserverURL = Self.normalizedHomeserverURL(from: homeserver)
     }
 
     func setHomeserver(_ homeserver: String) {
-        self.homeserverURL = URL(string: "https://\(homeserver)")!
+        self.homeserverURL = Self.normalizedHomeserverURL(from: homeserver)
     }
 
     func setAccessToken(_ token: String) {
@@ -343,6 +368,23 @@ class MatrixClient {
     }
 
     var currentHomeserverURL: URL { homeserverURL }
+
+    private static let fallbackHomeserverURL = URL(string: "https://matrix.org")!
+
+    private static func normalizedHomeserverURL(from input: String) -> URL {
+        var host = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        for scheme in ["https://", "http://"] where host.lowercased().hasPrefix(scheme) {
+            host = String(host.dropFirst(scheme.count))
+        }
+        if let slash = host.firstIndex(of: "/") {
+            host = String(host[..<slash])
+        }
+        host = host.lowercased()
+        guard !host.isEmpty, let url = URL(string: "https://\(host)"), url.host != nil else {
+            return Self.fallbackHomeserverURL
+        }
+        return url
+    }
 
     // MARK: - Login
 
@@ -368,11 +410,8 @@ class MatrixClient {
     // MARK: - SSO Redirect URL
 
     func ssoRedirectURL(idpId: String, redirectURL: String) -> URL? {
-        let encodedIdp = idpId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? idpId
-        let path = "/_matrix/client/v3/login/sso/redirect/\(encodedIdp)"
-        var components = URLComponents(url: homeserverURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)
-        components?.queryItems = [URLQueryItem(name: "redirectUrl", value: redirectURL)]
-        return components?.url
+        let path = "/_matrix/client/v3/login/sso/redirect/\(pathEscape(idpId))"
+        return try? buildURL(encodedPath: path, query: [URLQueryItem(name: "redirectUrl", value: redirectURL)])
     }
 
     // MARK: - Get SSO Providers
@@ -383,11 +422,11 @@ class MatrixClient {
     }
 
     func getSSOProviders() async throws -> [SSOProvider] {
-        let url = homeserverURL.appendingPathComponent("/_matrix/client/v3/login")
-        let (data, response) = try await session.data(for: URLRequest(url: url))
+        let url = try buildURL(encodedPath: "/_matrix/client/v3/login")
+        let (data, response) = try await performRequest(URLRequest(url: url))
         try validateResponse(response, data: data)
 
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let flows = json["flows"] as? [[String: Any]] else { return [] }
 
         for flow in flows {
@@ -419,28 +458,34 @@ class MatrixClient {
             ] as [String: Any]
         }
 
-        let url = homeserverURL.appendingPathComponent("/_matrix/client/v3/register")
+        let url = try buildURL(encodedPath: "/_matrix/client/v3/register")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await self.session.data(for: request)
+        let (data, response) = try await performRequest(request)
 
-        // 401 means UIAA flow — need to complete auth stages
+        // 401 = UIAA flow. Un seul retry m.login.dummy ; tout autre stage (recaptcha, terms…) est impossible in-app.
         if let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 401 {
-            let regResp = try JSONDecoder().decode(MatrixRegisterResponse.self, from: data)
-            if let sess = regResp.session {
+            let regResp: MatrixRegisterResponse = try decodeResponse(data)
+            let hasDummyOnlyFlow = (regResp.flows ?? []).contains { $0.stages == ["m.login.dummy"] }
+            if uiaaSession == nil, hasDummyOnlyFlow, let sess = regResp.session {
                 return try await register(username: username, password: password, uiaaSession: sess)
             }
-            throw MatrixError.registrationIncomplete(session: "", flows: regResp.flows ?? [])
+            throw MatrixError.httpError(
+                statusCode: 401,
+                errcode: nil,
+                message: "Ce serveur exige une inscription via son site web (captcha ou conditions d'utilisation).",
+                retryAfterMs: nil
+            )
         }
 
         try validateResponse(response, data: data)
-        let regResp = try JSONDecoder().decode(MatrixRegisterResponse.self, from: data)
+        let regResp: MatrixRegisterResponse = try decodeResponse(data)
 
         guard let token = regResp.accessToken, let userId = regResp.userId, let deviceId = regResp.deviceId else {
-            throw MatrixError.httpError(400, "Réponse d'inscription incomplète")
+            throw MatrixError.httpError(statusCode: 400, errcode: nil, message: "Réponse d'inscription incomplète", retryAfterMs: nil)
         }
 
         self.accessToken = token
@@ -452,47 +497,48 @@ class MatrixClient {
         )
     }
 
+    // MARK: - Whoami
+
+    func whoami() async throws -> String {
+        let response: MatrixWhoamiResponse = try await get("/_matrix/client/v3/account/whoami")
+        return response.userId
+    }
+
+    // MARK: - Logout
+
+    func logout() async throws {
+        try await postNoResponse("/_matrix/client/v3/logout", body: [:])
+        accessToken = nil
+    }
+
     // MARK: - Sync
 
     func sync(since: String? = nil, timeout: Int = 30000) async throws -> MatrixSyncResponse {
         guard let token = accessToken else { throw MatrixError.notAuthenticated }
 
-        guard var components = URLComponents(url: homeserverURL.appendingPathComponent("/_matrix/client/v3/sync"), resolvingAgainstBaseURL: false) else {
-            throw MatrixError.invalidURL
-        }
         var queryItems = [URLQueryItem(name: "timeout", value: String(timeout))]
         if let since {
             queryItems.append(URLQueryItem(name: "since", value: since))
         }
-        if since == nil {
-            let filterJSON = #"{"room":{"timeline":{"limit":50},"state":{"lazy_load_members":true}},"presence":{"types":["m.presence"]}}"#
-            queryItems.append(URLQueryItem(name: "filter", value: filterJSON))
-        }
-        components.queryItems = queryItems
+        let filterJSON = #"{"room":{"timeline":{"limit":50},"state":{"lazy_load_members":true}},"presence":{"types":["m.presence"]}}"#
+        queryItems.append(URLQueryItem(name: "filter", value: filterJSON))
 
-        guard let url = components.url else { throw MatrixError.invalidURL }
+        let url = try buildURL(encodedPath: "/_matrix/client/v3/sync", query: queryItems)
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = TimeInterval(timeout / 1000 + 30)
 
-        do {
-            let (data, response) = try await session.data(for: request)
-            try validateResponse(response, data: data)
-            return try JSONDecoder().decode(MatrixSyncResponse.self, from: data)
-        } catch let error as MatrixError { throw error }
-        catch let error as DecodingError { throw MatrixError.decodingError(error) }
-        catch { throw MatrixError.networkError(error) }
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+        return try decodeResponse(data)
     }
 
     // MARK: - Send Message
 
     @discardableResult
-    func sendMessage(roomId: String, body: String, replyToEventId: String? = nil, threadRootEventId: String? = nil) async throws -> MatrixSendResponse {
-        guard let token = accessToken else { throw MatrixError.notAuthenticated }
-
-        let txnId = UUID().uuidString
-        let encodedRoomId = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
-        let path = "/_matrix/client/v3/rooms/\(encodedRoomId)/send/m.room.message/\(txnId)"
+    func sendMessage(roomId: String, body: String, replyToEventId: String? = nil, threadRootEventId: String? = nil, txnId: String? = nil) async throws -> MatrixSendResponse {
+        let transactionId = txnId ?? UUID().uuidString
+        let path = "/_matrix/client/v3/rooms/\(pathEscape(roomId))/send/m.room.message/\(pathEscape(transactionId))"
 
         var content: [String: Any] = ["msgtype": "m.text", "body": body]
 
@@ -512,16 +558,7 @@ class MatrixClient {
             content["m.relates_to"] = relatesTo
         }
 
-        let url = homeserverURL.appendingPathComponent(path)
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONSerialization.data(withJSONObject: content)
-
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data)
-        return try JSONDecoder().decode(MatrixSendResponse.self, from: data)
+        return try await putJSON(path, body: content)
     }
 
     // MARK: - Edit Message
@@ -529,8 +566,7 @@ class MatrixClient {
     @discardableResult
     func editMessage(roomId: String, eventId: String, newBody: String) async throws -> MatrixSendResponse {
         let txnId = UUID().uuidString
-        let encodedRoomId = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
-        let path = "/_matrix/client/v3/rooms/\(encodedRoomId)/send/m.room.message/\(txnId)"
+        let path = "/_matrix/client/v3/rooms/\(pathEscape(roomId))/send/m.room.message/\(pathEscape(txnId))"
 
         let content: [String: Any] = [
             "msgtype": "m.text",
@@ -553,9 +589,7 @@ class MatrixClient {
     @discardableResult
     func redactEvent(roomId: String, eventId: String, reason: String? = nil) async throws -> MatrixSendResponse {
         let txnId = UUID().uuidString
-        let encodedRoomId = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
-        let encodedEventId = eventId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? eventId
-        let path = "/_matrix/client/v3/rooms/\(encodedRoomId)/redact/\(encodedEventId)/\(txnId)"
+        let path = "/_matrix/client/v3/rooms/\(pathEscape(roomId))/redact/\(pathEscape(eventId))/\(pathEscape(txnId))"
 
         var body: [String: Any] = [:]
         if let reason { body["reason"] = reason }
@@ -568,8 +602,7 @@ class MatrixClient {
     @discardableResult
     func sendReaction(roomId: String, eventId: String, emoji: String) async throws -> MatrixSendResponse {
         let txnId = UUID().uuidString
-        let encodedRoomId = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
-        let path = "/_matrix/client/v3/rooms/\(encodedRoomId)/send/m.reaction/\(txnId)"
+        let path = "/_matrix/client/v3/rooms/\(pathEscape(roomId))/send/m.reaction/\(pathEscape(txnId))"
 
         let content: [String: Any] = [
             "m.relates_to": [
@@ -585,9 +618,7 @@ class MatrixClient {
     // MARK: - Typing Indicator
 
     func sendTyping(roomId: String, userId: String, typing: Bool, timeout: Int = 30000) async throws {
-        let encodedRoomId = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
-        let encodedUserId = userId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? userId
-        let path = "/_matrix/client/v3/rooms/\(encodedRoomId)/typing/\(encodedUserId)"
+        let path = "/_matrix/client/v3/rooms/\(pathEscape(roomId))/typing/\(pathEscape(userId))"
 
         var body: [String: Any] = ["typing": typing]
         if typing { body["timeout"] = timeout }
@@ -598,18 +629,14 @@ class MatrixClient {
     // MARK: - Read Receipt
 
     func sendReadReceipt(roomId: String, eventId: String) async throws {
-        let encodedRoomId = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
-        let encodedEventId = eventId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? eventId
-        let path = "/_matrix/client/v3/rooms/\(encodedRoomId)/receipt/m.read/\(encodedEventId)"
-
+        let path = "/_matrix/client/v3/rooms/\(pathEscape(roomId))/receipt/m.read/\(pathEscape(eventId))"
         try await postNoResponse(path, body: [:])
     }
 
     // MARK: - Read Markers (fully read)
 
     func setReadMarker(roomId: String, fullyRead: String, read: String? = nil) async throws {
-        let encodedRoomId = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
-        let path = "/_matrix/client/v3/rooms/\(encodedRoomId)/read_markers"
+        let path = "/_matrix/client/v3/rooms/\(pathEscape(roomId))/read_markers"
 
         var body: [String: Any] = ["m.fully_read": fullyRead]
         if let read { body["m.read"] = read }
@@ -620,8 +647,7 @@ class MatrixClient {
     // MARK: - Presence
 
     func setPresence(userId: String, presence: String, statusMsg: String? = nil) async throws {
-        let encodedUserId = userId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? userId
-        let path = "/_matrix/client/v3/presence/\(encodedUserId)/status"
+        let path = "/_matrix/client/v3/presence/\(pathEscape(userId))/status"
 
         var body: [String: Any] = ["presence": presence]
         if let statusMsg { body["status_msg"] = statusMsg }
@@ -630,9 +656,7 @@ class MatrixClient {
     }
 
     func getPresence(userId: String) async throws -> MatrixPresenceResponse {
-        let encodedUserId = userId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? userId
-        let path = "/_matrix/client/v3/presence/\(encodedUserId)/status"
-        return try await get(path)
+        return try await get("/_matrix/client/v3/presence/\(pathEscape(userId))/status")
     }
 
     // MARK: - Media Upload
@@ -640,18 +664,19 @@ class MatrixClient {
     func uploadMedia(data: Data, filename: String, contentType: String) async throws -> MatrixUploadResponse {
         guard let token = accessToken else { throw MatrixError.notAuthenticated }
 
-        var components = URLComponents(url: homeserverURL.appendingPathComponent("/_matrix/media/v3/upload"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "filename", value: filename)]
-
-        var request = URLRequest(url: components.url!)
+        let url = try buildURL(
+            encodedPath: "/_matrix/media/v3/upload",
+            query: [URLQueryItem(name: "filename", value: filename)]
+        )
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = data
 
-        let (responseData, response) = try await session.data(for: request)
+        let (responseData, response) = try await performRequest(request)
         try validateResponse(response, data: responseData)
-        return try JSONDecoder().decode(MatrixUploadResponse.self, from: responseData)
+        return try decodeResponse(responseData)
     }
 
     // MARK: - Send Image
@@ -659,8 +684,7 @@ class MatrixClient {
     @discardableResult
     func sendImage(roomId: String, mxcUrl: String, body: String, info: [String: Any]? = nil) async throws -> MatrixSendResponse {
         let txnId = UUID().uuidString
-        let encodedRoomId = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
-        let path = "/_matrix/client/v3/rooms/\(encodedRoomId)/send/m.room.message/\(txnId)"
+        let path = "/_matrix/client/v3/rooms/\(pathEscape(roomId))/send/m.room.message/\(pathEscape(txnId))"
 
         var content: [String: Any] = [
             "msgtype": "m.image",
@@ -677,8 +701,7 @@ class MatrixClient {
     @discardableResult
     func sendFile(roomId: String, mxcUrl: String, body: String, info: [String: Any]? = nil) async throws -> MatrixSendResponse {
         let txnId = UUID().uuidString
-        let encodedRoomId = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
-        let path = "/_matrix/client/v3/rooms/\(encodedRoomId)/send/m.room.message/\(txnId)"
+        let path = "/_matrix/client/v3/rooms/\(pathEscape(roomId))/send/m.room.message/\(pathEscape(txnId))"
 
         var content: [String: Any] = [
             "msgtype": "m.file",
@@ -741,64 +764,71 @@ class MatrixClient {
     // MARK: - Join Room
 
     func joinRoom(_ roomIdOrAlias: String) async throws -> MatrixJoinResponse {
-        let encoded = roomIdOrAlias.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomIdOrAlias
-        return try await post("/_matrix/client/v3/join/\(encoded)", body: [:])
+        return try await post("/_matrix/client/v3/join/\(pathEscape(roomIdOrAlias))", body: [:])
     }
 
     // MARK: - Invite User
 
     func inviteUser(roomId: String, userId: String) async throws {
-        let encodedRoomId = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
-        try await postNoResponse("/_matrix/client/v3/rooms/\(encodedRoomId)/invite", body: ["user_id": userId])
+        try await postNoResponse("/_matrix/client/v3/rooms/\(pathEscape(roomId))/invite", body: ["user_id": userId])
     }
 
     // MARK: - Leave Room
 
     func leaveRoom(_ roomId: String) async throws {
-        let encoded = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
-        try await postNoResponse("/_matrix/client/v3/rooms/\(encoded)/leave", body: [:])
+        try await postNoResponse("/_matrix/client/v3/rooms/\(pathEscape(roomId))/leave", body: [:])
     }
 
     // MARK: - Kick User
 
     func kickUser(roomId: String, userId: String, reason: String? = nil) async throws {
-        let encoded = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
         var body: [String: Any] = ["user_id": userId]
         if let reason { body["reason"] = reason }
-        try await postNoResponse("/_matrix/client/v3/rooms/\(encoded)/kick", body: body)
+        try await postNoResponse("/_matrix/client/v3/rooms/\(pathEscape(roomId))/kick", body: body)
     }
 
     // MARK: - Ban User
 
     func banUser(roomId: String, userId: String, reason: String? = nil) async throws {
-        let encoded = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
         var body: [String: Any] = ["user_id": userId]
         if let reason { body["reason"] = reason }
-        try await postNoResponse("/_matrix/client/v3/rooms/\(encoded)/ban", body: body)
+        try await postNoResponse("/_matrix/client/v3/rooms/\(pathEscape(roomId))/ban", body: body)
     }
 
     // MARK: - Unban User
 
     func unbanUser(roomId: String, userId: String) async throws {
-        let encoded = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
-        try await postNoResponse("/_matrix/client/v3/rooms/\(encoded)/unban", body: ["user_id": userId])
+        try await postNoResponse("/_matrix/client/v3/rooms/\(pathEscape(roomId))/unban", body: ["user_id": userId])
     }
 
     // MARK: - Profile
 
     func getProfile(userId: String) async throws -> MatrixProfileResponse {
-        let encoded = userId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? userId
-        return try await get("/_matrix/client/v3/profile/\(encoded)")
+        return try await get("/_matrix/client/v3/profile/\(pathEscape(userId))")
     }
 
     func setDisplayName(userId: String, displayName: String) async throws {
-        let encoded = userId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? userId
-        try await putJSONNoResponse("/_matrix/client/v3/profile/\(encoded)/displayname", body: ["displayname": displayName])
+        try await putJSONNoResponse("/_matrix/client/v3/profile/\(pathEscape(userId))/displayname", body: ["displayname": displayName])
     }
 
     func setAvatarUrl(userId: String, avatarUrl: String) async throws {
-        let encoded = userId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? userId
-        try await putJSONNoResponse("/_matrix/client/v3/profile/\(encoded)/avatar_url", body: ["avatar_url": avatarUrl])
+        try await putJSONNoResponse("/_matrix/client/v3/profile/\(pathEscape(userId))/avatar_url", body: ["avatar_url": avatarUrl])
+    }
+
+    // MARK: - Direct Rooms (m.direct account data)
+
+    func getDirectRooms(userId: String) async throws -> [String: [String]] {
+        let path = "/_matrix/client/v3/user/\(pathEscape(userId))/account_data/m.direct"
+        do {
+            return try await get(path)
+        } catch MatrixError.httpError(let statusCode, _, _, _) where statusCode == 404 {
+            return [:]
+        }
+    }
+
+    func setDirectRooms(userId: String, directMap: [String: [String]]) async throws {
+        let path = "/_matrix/client/v3/user/\(pathEscape(userId))/account_data/m.direct"
+        try await putJSONNoResponse(path, body: directMap)
     }
 
     // MARK: - User Directory Search
@@ -820,8 +850,7 @@ class MatrixClient {
     // MARK: - Room Members
 
     func getRoomMembers(roomId: String) async throws -> MatrixMembersResponse {
-        let encoded = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
-        return try await get("/_matrix/client/v3/rooms/\(encoded)/members")
+        return try await get("/_matrix/client/v3/rooms/\(pathEscape(roomId))/members")
     }
 
     // MARK: - Room Messages (history)
@@ -829,51 +858,41 @@ class MatrixClient {
     func roomMessages(roomId: String, from: String? = nil, limit: Int = 50, direction: String = "b") async throws -> MatrixMessagesResponse {
         guard let token = accessToken else { throw MatrixError.notAuthenticated }
 
-        let encodedRoomId = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
-        guard var components = URLComponents(url: homeserverURL.appendingPathComponent("/_matrix/client/v3/rooms/\(encodedRoomId)/messages"), resolvingAgainstBaseURL: false) else {
-            throw MatrixError.invalidURL
-        }
         var queryItems = [
             URLQueryItem(name: "dir", value: direction),
             URLQueryItem(name: "limit", value: String(limit))
         ]
         if let from { queryItems.append(URLQueryItem(name: "from", value: from)) }
-        components.queryItems = queryItems
 
-        guard let url = components.url else { throw MatrixError.invalidURL }
+        let url = try buildURL(encodedPath: "/_matrix/client/v3/rooms/\(pathEscape(roomId))/messages", query: queryItems)
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await performRequest(request)
         try validateResponse(response, data: data)
-        return try JSONDecoder().decode(MatrixMessagesResponse.self, from: data)
+        return try decodeResponse(data)
     }
 
     // MARK: - Room State
 
     func getRoomState(roomId: String) async throws -> [MatrixEvent] {
-        let encoded = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
-        return try await get("/_matrix/client/v3/rooms/\(encoded)/state")
+        return try await get("/_matrix/client/v3/rooms/\(pathEscape(roomId))/state")
     }
 
     // MARK: - Set Room Name / Topic
 
     func setRoomName(roomId: String, name: String) async throws {
-        let encoded = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
-        try await putJSONNoResponse("/_matrix/client/v3/rooms/\(encoded)/state/m.room.name", body: ["name": name])
+        try await putJSONNoResponse("/_matrix/client/v3/rooms/\(pathEscape(roomId))/state/m.room.name", body: ["name": name])
     }
 
     func setRoomTopic(roomId: String, topic: String) async throws {
-        let encoded = roomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? roomId
-        try await putJSONNoResponse("/_matrix/client/v3/rooms/\(encoded)/state/m.room.topic", body: ["topic": topic])
+        try await putJSONNoResponse("/_matrix/client/v3/rooms/\(pathEscape(roomId))/state/m.room.topic", body: ["topic": topic])
     }
 
     // MARK: - Space Children
 
     func addSpaceChild(spaceRoomId: String, childRoomId: String, order: String? = nil) async throws {
-        let encodedSpace = spaceRoomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? spaceRoomId
-        let encodedChild = childRoomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? childRoomId
-        let path = "/_matrix/client/v3/rooms/\(encodedSpace)/state/m.space.child/\(encodedChild)"
+        let path = "/_matrix/client/v3/rooms/\(pathEscape(spaceRoomId))/state/m.space.child/\(pathEscape(childRoomId))"
 
         var body: [String: Any] = ["via": [homeserverURL.host ?? ""]]
         if let order { body["order"] = order }
@@ -882,33 +901,68 @@ class MatrixClient {
     }
 
     func removeSpaceChild(spaceRoomId: String, childRoomId: String) async throws {
-        let encodedSpace = spaceRoomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? spaceRoomId
-        let encodedChild = childRoomId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? childRoomId
-        let path = "/_matrix/client/v3/rooms/\(encodedSpace)/state/m.space.child/\(encodedChild)"
-
+        let path = "/_matrix/client/v3/rooms/\(pathEscape(spaceRoomId))/state/m.space.child/\(pathEscape(childRoomId))"
         try await putJSONNoResponse(path, body: [:])
+    }
+
+    // MARK: - URL Building
+
+    // Dynamic path segments are percent-encoded ONCE here; buildURL uses percentEncodedPath
+    // so nothing re-escapes the % (appendingPathComponent would, turning %23 into %2523).
+    private static let pathComponentAllowed: CharacterSet = {
+        var set = CharacterSet.urlPathAllowed
+        set.remove(charactersIn: "/")
+        return set
+    }()
+
+    private func pathEscape(_ component: String) -> String {
+        component.addingPercentEncoding(withAllowedCharacters: Self.pathComponentAllowed) ?? component
+    }
+
+    private func buildURL(encodedPath: String, query: [URLQueryItem]? = nil) throws -> URL {
+        guard var components = URLComponents(url: homeserverURL, resolvingAgainstBaseURL: false) else {
+            throw MatrixError.invalidURL
+        }
+        components.percentEncodedPath = encodedPath
+        if let query { components.queryItems = query }
+        guard let url = components.url else { throw MatrixError.invalidURL }
+        return url
     }
 
     // MARK: - Generic HTTP Helpers
 
+    private func performRequest(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        do {
+            return try await session.data(for: request)
+        } catch let error as MatrixError {
+            throw error
+        } catch {
+            throw MatrixError.networkError(error)
+        }
+    }
+
+    private func decodeResponse<T: Decodable>(_ data: Data) throws -> T {
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            throw MatrixError.decodingError(error)
+        }
+    }
+
     private func get<T: Decodable>(_ path: String) async throws -> T {
         guard let token = accessToken else { throw MatrixError.notAuthenticated }
 
-        let url = homeserverURL.appendingPathComponent(path)
+        let url = try buildURL(encodedPath: path)
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        do {
-            let (data, response) = try await session.data(for: request)
-            try validateResponse(response, data: data)
-            return try JSONDecoder().decode(T.self, from: data)
-        } catch let error as MatrixError { throw error }
-        catch let error as DecodingError { throw MatrixError.decodingError(error) }
-        catch { throw MatrixError.networkError(error) }
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+        return try decodeResponse(data)
     }
 
     private func post<T: Decodable>(_ path: String, body: [String: Any], authenticated: Bool = true) async throws -> T {
-        let url = homeserverURL.appendingPathComponent(path)
+        let url = try buildURL(encodedPath: path)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -918,26 +972,22 @@ class MatrixClient {
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        do {
-            let (data, response) = try await session.data(for: request)
-            try validateResponse(response, data: data)
-            return try JSONDecoder().decode(T.self, from: data)
-        } catch let error as MatrixError { throw error }
-        catch let error as DecodingError { throw MatrixError.decodingError(error) }
-        catch { throw MatrixError.networkError(error) }
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+        return try decodeResponse(data)
     }
 
     private func postNoResponse(_ path: String, body: [String: Any]) async throws {
         guard let token = accessToken else { throw MatrixError.notAuthenticated }
 
-        let url = homeserverURL.appendingPathComponent(path)
+        let url = try buildURL(encodedPath: path)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await performRequest(request)
         try validateResponse(response, data: data)
     }
 
@@ -945,33 +995,29 @@ class MatrixClient {
     private func putJSON<T: Decodable>(_ path: String, body: [String: Any]) async throws -> T {
         guard let token = accessToken else { throw MatrixError.notAuthenticated }
 
-        let url = homeserverURL.appendingPathComponent(path)
+        let url = try buildURL(encodedPath: path)
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        do {
-            let (data, response) = try await session.data(for: request)
-            try validateResponse(response, data: data)
-            return try JSONDecoder().decode(T.self, from: data)
-        } catch let error as MatrixError { throw error }
-        catch let error as DecodingError { throw MatrixError.decodingError(error) }
-        catch { throw MatrixError.networkError(error) }
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+        return try decodeResponse(data)
     }
 
     private func putJSONNoResponse(_ path: String, body: [String: Any]) async throws {
         guard let token = accessToken else { throw MatrixError.notAuthenticated }
 
-        let url = homeserverURL.appendingPathComponent(path)
+        let url = try buildURL(encodedPath: path)
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await performRequest(request)
         try validateResponse(response, data: data)
     }
 
@@ -979,9 +1025,14 @@ class MatrixClient {
         guard let httpResponse = response as? HTTPURLResponse else { return }
         guard (200...299).contains(httpResponse.statusCode) else {
             if let errorResponse = try? JSONDecoder().decode(MatrixErrorResponse.self, from: data) {
-                throw MatrixError.httpError(httpResponse.statusCode, errorResponse.error)
+                throw MatrixError.httpError(
+                    statusCode: httpResponse.statusCode,
+                    errcode: errorResponse.errcode,
+                    message: errorResponse.error ?? "Erreur inconnue",
+                    retryAfterMs: errorResponse.retryAfterMs
+                )
             }
-            throw MatrixError.httpError(httpResponse.statusCode, "Erreur inconnue")
+            throw MatrixError.httpError(statusCode: httpResponse.statusCode, errcode: nil, message: "Erreur inconnue", retryAfterMs: nil)
         }
     }
 }

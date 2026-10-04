@@ -20,7 +20,9 @@ struct moodApp: App {
         WindowGroup {
             RootView(showSplash: $showSplash, authState: authState, matrixStore: matrixStore)
                 .task {
-                    authState.isLoggedIn = true
+                    if await matrixStore.restoreSession() {
+                        authState.isLoggedIn = true
+                    }
                 }
         }
         .defaultSize(width: 1280, height: 780)
