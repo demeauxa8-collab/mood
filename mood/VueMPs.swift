@@ -201,7 +201,7 @@ struct DMRow: View {
             HStack(spacing: 12 * LayoutMetrics.scale) {
                 // Avatar circle + status
                 ZStack(alignment: .bottomTrailing) {
-                    Text(conversation.participant.avatarEmoji)
+                    AvatarGlyph(user: conversation.participant)
                         .font(.mood(20))
                         .frame(width: 32 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
                         .background(MoodTheme.glassBg)
@@ -296,6 +296,7 @@ struct DMChatArea: View {
     @Binding var profileUser: MoodUser?
     var onBack: (() -> Void)?
     @State private var messageText = ""
+    @State private var replyingTo: ChatMessage?
     @State private var activeCall: CallType?
     @State private var showPinnedMessages = false
     @State private var showSearch = false
@@ -335,7 +336,7 @@ struct DMChatArea: View {
             // Header DM — masqué sur compact (NavigationStack fournit le titre)
             if layoutMode == .regular {
                 HStack(spacing: 10 * LayoutMetrics.scale) {
-                    Text(conversation.participant.avatarEmoji)
+                    AvatarGlyph(user: conversation.participant)
                         .font(.mood(14))
                         .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
                         .background(MoodTheme.glassBg)
@@ -403,7 +404,7 @@ struct DMChatArea: View {
                 ScrollViewReader { proxy in
                     LazyVStack(spacing: 0) {
                         VStack(spacing: 10 * LayoutMetrics.scale) {
-                            Text(conversation.participant.avatarEmoji)
+                            AvatarGlyph(user: conversation.participant)
                                 .font(.mood(50))
                                 .frame(width: 80 * LayoutMetrics.scale, height: 80 * LayoutMetrics.scale)
                                 .background(MoodTheme.glassBg)
@@ -439,7 +440,7 @@ struct DMChatArea: View {
                         }
 
                         ForEach(messages) { message in
-                            MessageRow(message: message, server: nil, roomId: roomId) {
+                            MessageRow(message: message, server: nil, roomId: roomId, onReply: { replyingTo = message }) {
                                 profileUser = message.sender
                                 showProfilePopup = true
                             }
@@ -470,6 +471,7 @@ struct DMChatArea: View {
                 isE2E: isEncrypted,
                 typingUsers: roomId.flatMap { matrixStore.typingUsersByRoom[$0] } ?? [],
                 isDisabled: isEncrypted,
+                replyingTo: $replyingTo,
                 onSend: sendCurrentMessage,
                 onAttachFile: attach
             )
@@ -514,10 +516,12 @@ struct DMChatArea: View {
         }
         stopTyping()
         let text = trimmed
+        let replyToEventId = replyingTo?.eventId
         Task {
-            await matrixStore.sendMessage(roomId: roomId, text: text)
+            await matrixStore.sendMessage(roomId: roomId, text: text, replyToEventId: replyToEventId)
         }
         messageText = ""
+        replyingTo = nil
     }
 
     private func markConversationAsRead() {

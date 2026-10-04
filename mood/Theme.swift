@@ -437,3 +437,25 @@ extension View {
         shadow(color: .black.opacity(0.24), radius: 8, y: 8)
     }
 }
+
+// MARK: - Avatar
+
+/// A user's avatar picture when they have one, otherwise their emoji.
+/// Drop-in for `Text(user.avatarEmoji)`: callers keep their font, frame and clip shape.
+struct AvatarGlyph: View {
+    let user: MoodUser
+
+    var body: some View {
+        if let url = user.avatarURL {
+            AsyncImage(url: url) { phase in
+                if case .success(let image) = phase {
+                    image.resizable().scaledToFill()
+                } else {
+                    Text(user.avatarEmoji)
+                }
+            }
+        } else {
+            Text(user.avatarEmoji)
+        }
+    }
+}

@@ -885,6 +885,10 @@ class MatrixClient {
         try await putJSONNoResponse("/_matrix/client/v3/rooms/\(pathEscape(roomId))/state/m.room.name", body: ["name": name])
     }
 
+    func setPinnedEvents(roomId: String, eventIds: [String]) async throws {
+        try await putJSONNoResponse("/_matrix/client/v3/rooms/\(pathEscape(roomId))/state/m.room.pinned_events", body: ["pinned": eventIds])
+    }
+
     func setRoomTopic(roomId: String, topic: String) async throws {
         try await putJSONNoResponse("/_matrix/client/v3/rooms/\(pathEscape(roomId))/state/m.room.topic", body: ["topic": topic])
     }

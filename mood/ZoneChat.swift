@@ -18,6 +18,7 @@ struct ChatArea: View {
     @State private var showThreadPanel = false
     @State private var activeThread: ChatMessage?
     @State private var replyingTo: ChatMessage?
+    @State private var editRequest: UUID?
     @State private var typingTask: Task<Void, Never>?
     @State private var isTyping = false
 
@@ -94,7 +95,8 @@ struct ChatArea: View {
                         profileUser: $profileUser,
                         replyingTo: $replyingTo,
                         activeThread: $activeThread,
-                        showThreadPanel: $showThreadPanel
+                        showThreadPanel: $showThreadPanel,
+                        editRequest: $editRequest
                     )
 
                     if isEncrypted {
@@ -111,6 +113,11 @@ struct ChatArea: View {
                         onSend: sendCurrentMessage,
                         onAttachFile: attach
                     )
+                    .onKeyPress(.upArrow) {
+                        guard messageText.isEmpty, let mine = messages.last(where: { $0.isOwn && $0.eventId != nil }) else { return .ignored }
+                        editRequest = mine.id
+                        return .handled
+                    }
                 }
 
                 // Panels inline sur desktop uniquement
@@ -205,10 +212,12 @@ struct ChatArea: View {
         }
         stopTyping()
         let text = trimmed
+        let replyToEventId = replyingTo?.eventId
         Task {
-            await matrixStore.sendMessage(roomId: roomId, text: text)
+            await matrixStore.sendMessage(roomId: roomId, text: text, replyToEventId: replyToEventId)
         }
         messageText = ""
+        replyingTo = nil
     }
 
     private func markChannelAsRead() {
@@ -404,7 +413,12 @@ struct MessageList: View {
     @Binding var replyingTo: ChatMessage?
     @Binding var activeThread: ChatMessage?
     @Binding var showThreadPanel: Bool
+    @Binding var editRequest: UUID?
     @State private var isAtBottom = true
+
+    private var dividerEventId: String? {
+        roomId.flatMap { matrixStore.newMessagesDivider[$0] }
+    }
 
     private var hasMoreHistory: Bool {
         guard let roomId else { return false }
@@ -412,113 +426,134 @@ struct MessageList: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
+        ScrollViewReader { proxy in
             ScrollView {
-                ScrollViewReader { proxy in
-                    LazyVStack(spacing: 0) {
-                        if hasMoreHistory, let roomId {
-                            LoadMoreHistoryButton(roomId: roomId)
-                        } else {
-                            // Welcome — uniquement au vrai début du channel
-                            VStack(alignment: .leading, spacing: 10 * LayoutMetrics.scale) {
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .fill(MoodTheme.brandAccent.opacity(0.12))
-                                        .frame(width: 56 * LayoutMetrics.scale, height: 56 * LayoutMetrics.scale)
-                                    Image(systemName: channel.icon)
-                                        .font(.mood(26))
-                                        .foregroundStyle(MoodTheme.brandAccent)
-                                }
-
-                                Text("Bienvenue dans #\(channel.name)")
-                                    .font(.mood(22, weight: .bold))
-                                    .foregroundStyle(MoodTheme.textPrimary)
-
-                                Text("C'est le début du channel.")
-                                    .foregroundStyle(MoodTheme.textSecondary)
-                                    .font(.mood(13))
+                LazyVStack(spacing: 0) {
+                    if hasMoreHistory, let roomId {
+                        LoadMoreHistoryButton(roomId: roomId)
+                    } else {
+                        // Welcome — uniquement au vrai début du channel
+                        VStack(alignment: .leading, spacing: 10 * LayoutMetrics.scale) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(MoodTheme.brandAccent.opacity(0.12))
+                                    .frame(width: 56 * LayoutMetrics.scale, height: 56 * LayoutMetrics.scale)
+                                Image(systemName: channel.icon)
+                                    .font(.mood(26))
+                                    .foregroundStyle(MoodTheme.brandAccent)
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16 * LayoutMetrics.scale)
-                            .padding(.top, 24 * LayoutMetrics.scale)
-                            .padding(.bottom, 16 * LayoutMetrics.scale)
-                        }
 
-                        Rectangle()
-                            .fill(MoodTheme.divider)
-                            .frame(height: 1)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 6)
+                            Text("Bienvenue dans #\(channel.name)")
+                                .font(.mood(22, weight: .bold))
+                                .foregroundStyle(MoodTheme.textPrimary)
 
-                        if messages.isEmpty {
-                            Text("Aucun message pour l'instant. Dis bonjour 👋")
-                                .font(.mood(13))
+                            Text("C'est le début du channel.")
                                 .foregroundStyle(MoodTheme.textSecondary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 24 * LayoutMetrics.scale)
+                                .font(.mood(13))
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16 * LayoutMetrics.scale)
+                        .padding(.top, 24 * LayoutMetrics.scale)
+                        .padding(.bottom, 16 * LayoutMetrics.scale)
+                    }
+
+                    Rectangle()
+                        .fill(MoodTheme.divider)
+                        .frame(height: 1)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 6)
+
+                    if messages.isEmpty {
+                        Text("Aucun message pour l'instant. Dis bonjour 👋")
+                            .font(.mood(13))
+                            .foregroundStyle(MoodTheme.textSecondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 24 * LayoutMetrics.scale)
+                    }
+
+                    ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
+                        // Date separator
+                        if index == 0 || !Calendar.current.isDate(message.timestamp, inSameDayAs: messages[index - 1].timestamp) {
+                            DateSeparator(date: message.timestamp)
                         }
 
-                        ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
-                            // Date separator
-                            if index == 0 || !Calendar.current.isDate(message.timestamp, inSameDayAs: messages[index - 1].timestamp) {
-                                DateSeparator(date: message.timestamp)
-                            }
+                        // Discord's red "NOUVEAU" line above the first message that was unread on arrival
+                        if let dividerEventId, message.eventId == dividerEventId {
+                            NewMessagesSeparator()
+                        }
 
-                            // Séparateur NOUVEAU (avant les 3 derniers messages)
-                            if index == messages.count - 3 {
-                                NewMessagesSeparator()
-                            }
-
-                            if message.isSystemMessage {
-                                SystemMessageRow(message: message)
-                                    .id(message.id)
-                            } else {
-                                MessageRow(message: message, server: server, roomId: roomId, onReply: {
-                                    replyingTo = message
-                                }, onThread: {
-                                    activeThread = message
-                                    showThreadPanel = true
-                                }) {
-                                    profileUser = message.sender
-                                    showProfilePopup = true
-                                }
+                        if message.isSystemMessage {
+                            SystemMessageRow(message: message)
                                 .id(message.id)
+                        } else {
+                            MessageRow(message: message, server: server, roomId: roomId, editRequest: $editRequest, onReply: {
+                                replyingTo = message
+                            }, onThread: {
+                                activeThread = message
+                                showThreadPanel = true
+                            }) {
+                                profileUser = message.sender
+                                showProfilePopup = true
                             }
+                            .id(message.id)
                         }
+                    }
 
-                        // Anchor at bottom
-                        Color.clear.frame(height: 1).id("bottom")
-                    }
-                    .onAppear {
-                        proxy.scrollTo("bottom", anchor: .bottom)
-                    }
-                    .onChange(of: messages.count) { _, _ in
-                        proxy.scrollTo("bottom", anchor: .bottom)
-                    }
+                    // Bottom anchor: tracks whether the newest message is on screen
+                    Color.clear
+                        .frame(height: 1)
+                        .id("bottom")
+                        .onAppear { isAtBottom = true }
+                        .onDisappear { isAtBottom = false }
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-
-            // Scroll to bottom button
-            if !isAtBottom {
-                Button {
-                    isAtBottom = true
-                } label: {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(MoodTheme.textPrimary)
-                        .frame(width: 36, height: 36)
-                        .background(MoodTheme.channelList)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(MoodTheme.glassBorder, lineWidth: 0.5))
-                        .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+            .defaultScrollAnchor(.bottom)
+            .onAppear { proxy.scrollTo("bottom", anchor: .bottom) }
+            .onChange(of: messages.last?.id) { _, _ in
+                // Like Discord: follow new messages only when already at the bottom,
+                // or when the new message is mine.
+                if isAtBottom || messages.last?.isOwn == true {
+                    proxy.scrollTo("bottom", anchor: .bottom)
                 }
-                .buttonStyle(.plain)
-                .padding(16)
-                .transition(.opacity)
-                .help("Aller en bas")
             }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if !isAtBottom {
+                    JumpToPresentBar { proxy.scrollTo("bottom", anchor: .bottom) }
+                        .transition(.opacity)
+                }
+            }
+            .animation(MoodMotion.popover, value: isAtBottom)
         }
+    }
+}
+
+/// Discord's "Tu consultes des messages plus anciens — Revenir au présent" bar.
+struct JumpToPresentBar: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Text("Tu consultes des messages plus anciens")
+                    .font(.mood(13, weight: .medium))
+                    .foregroundStyle(MoodTheme.textPrimary)
+                Spacer()
+                HStack(spacing: 4) {
+                    Text("Revenir au présent")
+                        .font(.mood(13, weight: .semibold))
+                    Image(systemName: "arrow.down")
+                        .font(.mood(11, weight: .bold))
+                }
+                .foregroundStyle(MoodTheme.textPrimary)
+            }
+            .padding(.horizontal, 12 * LayoutMetrics.scale)
+            .padding(.vertical, 6 * LayoutMetrics.scale)
+            .background(MoodTheme.brandBlue.opacity(0.85))
+            .clipShape(UnevenRoundedRectangle(topLeadingRadius: 8, topTrailingRadius: 8, style: .continuous))
+            .padding(.horizontal, 16 * LayoutMetrics.scale)
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -529,16 +564,50 @@ struct MessageRow: View {
     let message: ChatMessage
     let server: MoodServer?
     var roomId: String? = nil
+    /// Set by the composer's ↑ shortcut to the message that should enter edit mode.
+    var editRequest: Binding<UUID?> = .constant(nil)
     var onReply: (() -> Void)?
     var onThread: (() -> Void)?
     let onAvatarTap: () -> Void
     @State private var isHovered = false
     @State private var showReactionPicker = false
-    @State private var copiedMessage = false
-    @State private var showPinnedFeedback = false
     @State private var showEllipsisMenu = false
     @State private var showDeleteConfirm = false
-    @State private var showMarkedUnread = false
+    @State private var isEditing = false
+    @State private var editText = ""
+
+    /// Matrix ids needed by every action; nil for local echoes and demo data.
+    private var target: (roomId: String, eventId: String)? {
+        guard let roomId, let eventId = message.eventId else { return nil }
+        return (roomId, eventId)
+    }
+
+    private func react(_ emoji: String) {
+        guard let target else { return }
+        Task { await matrixStore.toggleReaction(roomId: target.roomId, eventId: target.eventId, emoji: emoji) }
+    }
+
+    private func togglePin() {
+        guard let target else { return }
+        Task { await matrixStore.togglePin(roomId: target.roomId, eventId: target.eventId) }
+    }
+
+    private func copyLink() {
+        guard let target else { return }
+        UIPasteboard.general.string = matrixStore.permalink(roomId: target.roomId, eventId: target.eventId)
+    }
+
+    private func startEditing() {
+        editText = message.content
+        isEditing = true
+    }
+
+    private func saveEdit() {
+        let newBody = editText.trimmingCharacters(in: .whitespacesAndNewlines)
+        isEditing = false
+        guard let target, !newBody.isEmpty, newBody != message.content else { return }
+        Task { await matrixStore.editMessage(roomId: target.roomId, eventId: target.eventId, newBody: newBody) }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -550,7 +619,7 @@ struct MessageRow: View {
                         .frame(width: 2, height: 12 * LayoutMetrics.scale)
                         .padding(.leading, 52 * LayoutMetrics.scale)
 
-                    Text(reply.sender.avatarEmoji)
+                    AvatarGlyph(user: reply.sender)
                         .font(.mood(9))
                         .frame(width: 16 * LayoutMetrics.scale, height: 16 * LayoutMetrics.scale)
                         .background(MoodTheme.glassBg)
@@ -577,7 +646,7 @@ struct MessageRow: View {
                         .opacity(isHovered ? 1 : 0)
                 } else {
                     Button(action: onAvatarTap) {
-                        Text(message.sender.avatarEmoji)
+                        AvatarGlyph(user: message.sender)
                             .font(.mood(20))
                             .frame(width: 40 * LayoutMetrics.scale, height: 40 * LayoutMetrics.scale)
                             .background(MoodTheme.glassBg)
@@ -611,6 +680,9 @@ struct MessageRow: View {
                         }
                     }
 
+                    if isEditing {
+                        MessageEditor(text: $editText, onSave: saveEdit, onCancel: { isEditing = false })
+                    } else if !message.content.isEmpty {
                     HStack(spacing: 0) {
                         MarkdownText(text: message.content)
                             .font(.mood(14))
@@ -631,6 +703,7 @@ struct MessageRow: View {
                         }
                     }
                     .opacity(message.sendState == .sending ? 0.55 : 1)
+                    }
 
                     if message.sendState == .failed {
                         HStack(spacing: 6 * LayoutMetrics.scale) {
@@ -658,7 +731,9 @@ struct MessageRow: View {
 
                     // Attachments
                     ForEach(message.attachments) { att in
-                        if att.type == .image {
+                        if att.type == .image, let thumbnail = att.thumbnailURL ?? att.url {
+                            AttachmentImage(url: thumbnail, fullURL: att.url, name: att.name)
+                        } else if att.type == .image {
                             HStack(spacing: 8) {
                                 Text(att.previewEmoji)
                                     .font(.mood(28))
@@ -670,6 +745,8 @@ struct MessageRow: View {
                                             .stroke(MoodTheme.glassBorder, lineWidth: 0.5)
                                     )
                             }
+                        } else if let url = att.url {
+                            AttachmentFileCard(name: att.name, size: att.size, url: url)
                         } else {
                             HStack(spacing: 8) {
                                 Image(systemName: "doc.fill")
@@ -739,7 +816,7 @@ struct MessageRow: View {
                     if let thread = message.threadInfo {
                         Button { onThread?() } label: {
                             HStack(spacing: 6 * LayoutMetrics.scale) {
-                                Text(thread.lastReplier.avatarEmoji)
+                                AvatarGlyph(user: thread.lastReplier)
                                     .font(.mood(10))
                                     .frame(width: 20 * LayoutMetrics.scale, height: 20 * LayoutMetrics.scale)
                                     .background(MoodTheme.glassBg)
@@ -770,6 +847,7 @@ struct MessageRow: View {
                     if !message.reactions.isEmpty {
                         HStack(spacing: 4 * LayoutMetrics.scale) {
                             ForEach(message.reactions) { reaction in
+                                Button { react(reaction.emoji) } label: {
                                 HStack(spacing: 4 * LayoutMetrics.scale) {
                                     Text(reaction.emoji)
                                         .font(.mood(13))
@@ -785,6 +863,9 @@ struct MessageRow: View {
                                     RoundedRectangle(cornerRadius: 7, style: .continuous)
                                         .stroke(reaction.hasReacted ? MoodTheme.brandAccent.opacity(0.4) : MoodTheme.glassBorder, lineWidth: 0.5)
                                 )
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(target == nil)
                             }
 
                             // Bouton ajouter réaction
@@ -816,18 +897,17 @@ struct MessageRow: View {
                             .popover(isPresented: $showReactionPicker, arrowEdge: .top) {
                                 EmojiPicker(isPresented: $showReactionPicker) { emoji in
                                     showReactionPicker = false
+                                    react(emoji)
                                 }
                             }
-                        ActionButton(icon: "arrowshape.turn.up.left", action: { onReply?() })
-                            .help("Répondre")
-                        ActionButton(icon: "text.bubble", action: { onThread?() })
-                            .help("Créer un fil")
-                        ActionButton(icon: showPinnedFeedback ? "pin.fill" : "pin", action: {
-                            withAnimation(.easeInOut(duration: 0.2)) { showPinnedFeedback = true }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                                withAnimation { showPinnedFeedback = false }
-                            }
-                        })
+                        if message.isOwn {
+                            ActionButton(icon: "pencil", action: startEditing)
+                                .help("Modifier")
+                        } else {
+                            ActionButton(icon: "arrowshape.turn.up.left", action: { onReply?() })
+                                .help("Répondre")
+                        }
+                        ActionButton(icon: message.isPinned ? "pin.slash" : "pin", action: togglePin)
                             .help(message.isPinned ? "Désépingler" : "Épingler")
                         ActionButton(icon: "ellipsis", action: { showEllipsisMenu = true })
                             .help("Plus")
@@ -835,9 +915,18 @@ struct MessageRow: View {
                                 VStack(spacing: 2) {
                                     Button {
                                         showEllipsisMenu = false
+                                        onReply?()
+                                    } label: {
+                                        Label("Répondre", systemImage: "arrowshape.turn.up.left")
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+
+                                    Button {
+                                        showEllipsisMenu = false
                                         UIPasteboard.general.string = message.content
-                                        copiedMessage = true
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { copiedMessage = false }
                                     } label: {
                                         Label("Copier le texte", systemImage: "doc.on.doc")
                                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -848,28 +937,30 @@ struct MessageRow: View {
 
                                     Button {
                                         showEllipsisMenu = false
-                                        UIPasteboard.general.string = "mood://message/\(message.id.uuidString)"
+                                        copyLink()
                                     } label: {
-                                        Label("Copier le lien", systemImage: "link")
+                                        Label("Copier le lien du message", systemImage: "link")
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                     }
                                     .buttonStyle(.plain)
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 6)
 
+                                    if message.isOwn {
                                     Divider()
 
                                     Button {
                                         showEllipsisMenu = false
                                         showDeleteConfirm = true
                                     } label: {
-                                        Label("Supprimer", systemImage: "trash")
+                                        Label("Supprimer le message", systemImage: "trash")
                                             .foregroundStyle(.red)
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                     }
                                     .buttonStyle(.plain)
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 6)
+                                    }
                                 }
                                 .padding(.vertical, 6)
                                 .frame(width: 200 * LayoutMetrics.scale)
@@ -895,37 +986,34 @@ struct MessageRow: View {
         )
         .padding(.horizontal, 4)
         .onHover { hovering in isHovered = hovering }
+        .onChange(of: editRequest.wrappedValue) { _, requested in
+            guard requested == message.id else { return }
+            editRequest.wrappedValue = nil
+            startEditing()
+        }
         .contextMenu {
-            Button { onReply?() } label: { Label("Répondre", systemImage: "arrowshape.turn.up.left") }
-            Button { onThread?() } label: { Label("Créer un fil", systemImage: "text.bubble") }
             Button { showReactionPicker = true } label: { Label("Ajouter une réaction", systemImage: "face.smiling") }
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) { showPinnedFeedback = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                    withAnimation { showPinnedFeedback = false }
-                }
-            } label: { Label(message.isPinned ? "Désépingler" : "Épingler le message", systemImage: message.isPinned ? "pin.slash" : "pin") }
+            if message.isOwn {
+                Button(action: startEditing) { Label("Modifier le message", systemImage: "pencil") }
+            }
+            Button { onReply?() } label: { Label("Répondre", systemImage: "arrowshape.turn.up.left") }
             Divider()
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) { showMarkedUnread = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    withAnimation { showMarkedUnread = false }
-                }
-            } label: { Label("Marquer comme non lu", systemImage: "circle.fill") }
+            Button(action: togglePin) { Label(message.isPinned ? "Désépingler" : "Épingler le message", systemImage: message.isPinned ? "pin.slash" : "pin") }
             Button {
                 UIPasteboard.general.string = message.content
-                copiedMessage = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { copiedMessage = false }
             } label: { Label("Copier le texte", systemImage: "doc.on.doc") }
-            Button {
-                UIPasteboard.general.string = "mood://message/\(message.id.uuidString)"
-            } label: { Label("Copier le lien du message", systemImage: "link") }
-            Divider()
-            Button(role: .destructive) { showDeleteConfirm = true } label: { Label("Supprimer le message", systemImage: "trash") }
+            Button(action: copyLink) { Label("Copier le lien du message", systemImage: "link") }
+            if message.isOwn {
+                Divider()
+                Button(role: .destructive) { showDeleteConfirm = true } label: { Label("Supprimer le message", systemImage: "trash") }
+            }
         }
         .alert("Supprimer le message", isPresented: $showDeleteConfirm) {
             Button("Annuler", role: .cancel) {}
-            Button("Supprimer", role: .destructive) {}
+            Button("Supprimer", role: .destructive) {
+                guard let target else { return }
+                Task { await matrixStore.deleteMessage(roomId: target.roomId, eventId: target.eventId) }
+            }
         } message: {
             Text("Es-tu sûr de vouloir supprimer ce message ? Cette action est irréversible.")
         }
@@ -1096,7 +1184,7 @@ struct MemberRow: View {
         Button(action: onTap) {
             HStack(spacing: 10 * LayoutMetrics.scale) {
                 ZStack(alignment: .bottomTrailing) {
-                    Text(member.avatarEmoji)
+                    AvatarGlyph(user: member)
                         .font(.mood(14))
                         .frame(width: 32 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
                         .background(MoodTheme.glassBg)
@@ -1380,7 +1468,7 @@ struct PinnedMessagesPanel: View {
                     VStack(spacing: 8) {
                         ForEach(messages) { msg in
                             HStack(alignment: .top, spacing: 10 * LayoutMetrics.scale) {
-                                Text(msg.sender.avatarEmoji)
+                                AvatarGlyph(user: msg.sender)
                                     .font(.mood(12))
                                     .frame(width: 28 * LayoutMetrics.scale, height: 28 * LayoutMetrics.scale)
                                     .background(MoodTheme.glassBg)
@@ -1470,7 +1558,7 @@ struct ThreadPanel: View {
                 VStack(spacing: 0) {
                     // Original message
                     HStack(alignment: .top, spacing: 10 * LayoutMetrics.scale) {
-                        Text(message.sender.avatarEmoji)
+                        AvatarGlyph(user: message.sender)
                             .font(.mood(20))
                             .frame(width: 36 * LayoutMetrics.scale, height: 36 * LayoutMetrics.scale)
                             .background(MoodTheme.glassBg)
@@ -1508,7 +1596,7 @@ struct ThreadPanel: View {
                     // Replies
                     ForEach(mockReplies) { reply in
                         HStack(alignment: .top, spacing: 10 * LayoutMetrics.scale) {
-                            Text(reply.sender.avatarEmoji)
+                            AvatarGlyph(user: reply.sender)
                                 .font(.mood(12))
                                 .frame(width: 30 * LayoutMetrics.scale, height: 30 * LayoutMetrics.scale)
                                 .background(MoodTheme.glassBg)
@@ -1743,4 +1831,112 @@ struct SystemMessageRow: View {
     .environment(MatrixStore())
     .environment(AuthState())
     .preferredColorScheme(.dark)
+}
+
+// MARK: - Inline Message Editor
+// Discord: the message turns into a field — "échap pour annuler • entrée pour enregistrer".
+
+struct MessageEditor: View {
+    @Binding var text: String
+    let onSave: () -> Void
+    let onCancel: () -> Void
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4 * LayoutMetrics.scale) {
+            TextField("", text: $text, axis: .vertical)
+                .textFieldStyle(.plain)
+                .font(.mood(14))
+                .foregroundStyle(MoodTheme.textPrimary)
+                .focused($isFocused)
+                .onSubmit(onSave)
+                .onKeyPress(.escape) { onCancel(); return .handled }
+                .padding(.horizontal, 12 * LayoutMetrics.scale)
+                .padding(.vertical, 9 * LayoutMetrics.scale)
+                .background(MoodTheme.inputBg)
+                .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
+
+            HStack(spacing: 4) {
+                Text("échap pour")
+                Button("annuler", action: onCancel).buttonStyle(.plain).foregroundStyle(MoodTheme.brandBlue)
+                Text("• entrée pour")
+                Button("enregistrer", action: onSave).buttonStyle(.plain).foregroundStyle(MoodTheme.brandBlue)
+            }
+            .font(.mood(11))
+            .foregroundStyle(MoodTheme.textMuted)
+        }
+        .onAppear { isFocused = true }
+    }
+}
+
+// MARK: - Attachments
+
+struct AttachmentImage: View {
+    let url: URL
+    let fullURL: URL?
+    let name: String
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        AsyncImage(url: url) { phase in
+            switch phase {
+            case .success(let image):
+                image.resizable().scaledToFit()
+            case .failure:
+                Label(name, systemImage: "photo")
+                    .font(.mood(13))
+                    .foregroundStyle(MoodTheme.textMuted)
+                    .frame(width: 200 * LayoutMetrics.scale, height: 120 * LayoutMetrics.scale)
+                    .background(MoodTheme.glassBg)
+            default:
+                MoodTheme.glassBg
+                    .frame(width: 320 * LayoutMetrics.scale, height: 200 * LayoutMetrics.scale)
+                    .overlay { ProgressView().controlSize(.small) }
+            }
+        }
+        .frame(maxWidth: 400 * LayoutMetrics.scale, maxHeight: 300 * LayoutMetrics.scale, alignment: .leading)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .onTapGesture { if let fullURL { openURL(fullURL) } }
+        .help(name)
+    }
+}
+
+struct AttachmentFileCard: View {
+    let name: String
+    let size: Int?
+    let url: URL
+
+    var body: some View {
+        Link(destination: url) {
+            HStack(spacing: 10 * LayoutMetrics.scale) {
+                Image(systemName: "doc.fill")
+                    .font(.mood(26))
+                    .foregroundStyle(MoodTheme.brandBlue)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name)
+                        .font(.mood(14, weight: .medium))
+                        .foregroundStyle(MoodTheme.brandBlue)
+                        .lineLimit(1)
+                    if let size {
+                        Text(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
+                            .font(.mood(11))
+                            .foregroundStyle(MoodTheme.textMuted)
+                    }
+                }
+                Spacer(minLength: 16)
+                Image(systemName: "arrow.down.to.line")
+                    .font(.mood(16))
+                    .foregroundStyle(MoodTheme.textSecondary)
+            }
+            .padding(12 * LayoutMetrics.scale)
+            .frame(width: 400 * LayoutMetrics.scale, alignment: .leading)
+            .background(MoodTheme.glassBg)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(MoodTheme.glassBorder, lineWidth: 0.5)
+            )
+        }
+        .help("Télécharger \(name)")
+    }
 }

@@ -634,7 +634,7 @@ struct InviteModal: View {
             VStack(spacing: 4) {
                 ForEach(MockData.users.prefix(3)) { user in
                     HStack(spacing: 10) {
-                        Text(user.avatarEmoji)
+                        AvatarGlyph(user: user)
                             .font(.system(size: 14))
                             .frame(width: 32, height: 32)
                             .background(MoodTheme.glassBg)

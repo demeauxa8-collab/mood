@@ -131,6 +131,11 @@ struct MessageInputBar: View {
                             guard !isDisabled else { return }
                             onSend?()
                         }
+                        .onKeyPress(.escape) {
+                            guard replyingTo != nil else { return .ignored }
+                            replyingTo = nil
+                            return .handled
+                        }
                 }
 
                 // Boutons droite

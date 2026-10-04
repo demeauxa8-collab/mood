@@ -461,7 +461,7 @@ struct CategorySection: View {
                             VStack(spacing: 2) {
                                 ForEach(users) { user in
                                     HStack(spacing: 8 * LayoutMetrics.scale) {
-                                        Text(user.avatarEmoji)
+                                        AvatarGlyph(user: user)
                                             .font(.mood(12))
                                             .frame(width: 24 * LayoutMetrics.scale, height: 24 * LayoutMetrics.scale)
                                             .background(MoodTheme.glassBg)
@@ -623,7 +623,7 @@ struct UserStatusPanel: View {
                     }
                 } label: {
                     ZStack(alignment: .bottomTrailing) {
-                        Text(user.avatarEmoji)
+                        AvatarGlyph(user: user)
                             .font(.mood(18))
                             .frame(width: 32 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
                             .background(MoodTheme.hoverBg)

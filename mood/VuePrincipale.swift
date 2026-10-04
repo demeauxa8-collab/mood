@@ -165,6 +165,12 @@ struct ContentView: View {
         .onChange(of: selectedServer?.id) { _, newValue in
             if newValue != nil { showExplore = false }
         }
+        .onChange(of: selectedChannel?.id) { oldValue, _ in
+            if let oldValue { matrixStore.clearNewMessagesDivider(forConversationID: oldValue) }
+        }
+        .onChange(of: selectedDM?.id) { oldValue, _ in
+            if let oldValue { matrixStore.clearNewMessagesDivider(forConversationID: oldValue) }
+        }
         .onChange(of: matrixStore.servers) { _, newServers in
             if let pendingServerID, let server = newServers.first(where: { $0.id == pendingServerID }) {
                 self.pendingServerID = nil
@@ -937,7 +943,7 @@ struct CompactDMListView: View {
                 ForEach(MockData.users.filter { !$0.status.isOfflineLike }) { user in
                     VStack(spacing: 4) {
                         ZStack(alignment: .bottomTrailing) {
-                            Text(user.avatarEmoji)
+                            AvatarGlyph(user: user)
                                 .font(.system(size: 18))
                                 .frame(width: 44, height: 44)
                                 .background(MoodTheme.glassBg)
@@ -988,7 +994,7 @@ private struct CompactDMRow: View {
     var body: some View {
         HStack(spacing: 10) {
             ZStack(alignment: .bottomTrailing) {
-                Text(conversation.participant.avatarEmoji)
+                AvatarGlyph(user: conversation.participant)
                     .font(.system(size: 18))
                     .frame(width: 38, height: 38)
                     .background(MoodTheme.glassBg)
@@ -1043,7 +1049,7 @@ struct CompactDMChatWrapper: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 HStack(spacing: 8) {
-                    Text(conversation.participant.avatarEmoji)
+                    AvatarGlyph(user: conversation.participant)
                         .font(.system(size: 14))
                     Text(conversation.participant.displayName)
                         .font(.system(size: 16, weight: .semibold))
@@ -1137,7 +1143,7 @@ struct CompactProfileView: View {
                     .frame(height: 100)
 
                     // Avatar qui chevauche le banner
-                    Text(user.avatarEmoji)
+                    AvatarGlyph(user: user)
                         .font(.system(size: 36))
                         .frame(width: 72, height: 72)
                         .background(MoodTheme.channelList)
@@ -1671,7 +1677,7 @@ struct FriendRow: View {
         HStack(spacing: 14 * LayoutMetrics.scale) {
             // Avatar circle + status
             ZStack(alignment: .bottomTrailing) {
-                Text(user.avatarEmoji)
+                AvatarGlyph(user: user)
                     .font(.mood(21))
                     .frame(width: 40 * LayoutMetrics.scale, height: 40 * LayoutMetrics.scale)
                     .background(MoodTheme.glassBg)
@@ -1782,7 +1788,7 @@ struct AllFriendRow: View {
             HStack(spacing: 12 * LayoutMetrics.scale) {
                 Button(action: onShowProfile) {
                     ZStack(alignment: .bottomTrailing) {
-                        Text(user.avatarEmoji)
+                        AvatarGlyph(user: user)
                             .font(.mood(18))
                             .frame(width: 32 * LayoutMetrics.scale, height: 32 * LayoutMetrics.scale)
                             .background(MoodTheme.glassBg)

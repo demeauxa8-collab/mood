@@ -74,6 +74,8 @@ class MatrixStore {
     private var reactionEvents: [String: [(emoji: String, sender: String, eventId: String)]] = [:] // targetEventId -> reactions
     private var redactedEventIds: Set<String> = []
     private var latestEventIdByRoom: [String: String] = [:]
+    /// First unread message when the room was opened — where Discord draws its "NOUVEAU" line.
+    private(set) var newMessagesDivider: [String: String] = [:]
     private var latestUnreadEventIdByRoom: [String: String] = [:]
     private var readThroughUnreadEventIdByRoom: [String: String] = [:]
     private var pendingReadReceipts: [String: String] = [:]
@@ -94,6 +96,7 @@ class MatrixStore {
         var spaceChildren: [String] // roomIds of children (for spaces)
         var avatarUrl: String? // room avatar mxc URL
         var heroes: [String] // m.heroes du sync, fallback DM quand les membres ne sont pas résolus
+        var pinnedEventIds: [String] = [] // m.room.pinned_events
     }
 
     private var rooms: [MatrixRoom] = []
@@ -490,6 +493,8 @@ class MatrixStore {
             }
         case "m.room.encryption":
             room.isEncrypted = true
+        case "m.room.pinned_events":
+            room.pinnedEventIds = event.content?["pinned"]?.arrayValue?.compactMap(\.stringValue) ?? []
         case "m.room.create":
             if let roomType = event.content?["type"]?.stringValue {
                 room.roomType = roomType
@@ -708,26 +713,7 @@ class MatrixStore {
         let timestamp = Date(timeIntervalSince1970: TimeInterval(event.originServerTs ?? 0) / 1000)
         let eventId = event.eventId ?? UUID().uuidString
 
-        // Determine avatar
-        let avatarMxc = room?.memberAvatars[senderUserId]
-        let avatarEmoji = avatarMxc != nil ? "👤" : emojiForUser(senderUserId)
-
-        // Determine presence-based status
-        let presenceInfo = presenceByUser[senderUserId]
-        let status: MoodUser.UserStatus = (presenceInfo?.presence == "online" || presenceInfo?.currentlyActive == true) ? .online : .offline
-
-        let sender = MoodUser(
-            id: stableUUID(from: senderUserId),
-            username: extractLocalpart(senderUserId),
-            displayName: displayName,
-            avatarEmoji: avatarEmoji,
-            roleColor: colorForUser(senderUserId),
-            status: status,
-            bio: "",
-            joinedDate: Date(),
-            badges: [],
-            activity: nil
-        )
+        let sender = makeUser(senderUserId, displayName: displayName, avatarMxc: room?.memberAvatars[senderUserId])
 
         // Parse reply
         var replyTo: ReplyRef?
@@ -751,12 +737,20 @@ class MatrixStore {
 
         // Parse attachments
         var attachments: [MessageAttachment] = []
-        if msgtype == "m.image" {
-            let fileName = event.content?["body"]?.stringValue ?? "image"
-            attachments.append(MessageAttachment(id: stableUUID(from: "\(eventId)_att"), type: .image, name: fileName, previewEmoji: "🖼️"))
-        } else if msgtype == "m.file" {
-            let fileName = event.content?["body"]?.stringValue ?? "file"
-            attachments.append(MessageAttachment(id: stableUUID(from: "\(eventId)_att"), type: .file, name: fileName, previewEmoji: "📎"))
+        if msgtype == "m.image" || msgtype == "m.file" || msgtype == "m.video" || msgtype == "m.audio" {
+            let isImage = msgtype == "m.image"
+            let fileName = event.content?["body"]?.stringValue ?? (isImage ? "image" : "fichier")
+            let mxc = event.content?["url"]?.stringValue
+            let size = event.content?["info"]?.dictValue?["size"]?.intValue
+            attachments.append(MessageAttachment(
+                id: stableUUID(from: "\(eventId)_att"),
+                type: isImage ? .image : .file,
+                name: fileName,
+                previewEmoji: isImage ? "🖼️" : "📎",
+                url: resolveMediaURL(mxc),
+                thumbnailURL: isImage ? resolveMediaURL(mxc, width: 800, height: 600) : nil,
+                size: size
+            ))
         }
 
         // System messages
@@ -778,10 +772,10 @@ class MatrixStore {
             }.sorted { $0.emoji < $1.emoji }
         }
 
-        return ChatMessage(
+        var message = ChatMessage(
             id: overrideId ?? stableUUID(from: eventId),
             sender: sender,
-            content: body,
+            content: attachments.isEmpty ? body : "",
             timestamp: timestamp,
             isGrouped: false,
             reactions: reactions,
@@ -792,6 +786,35 @@ class MatrixStore {
             sendState: .sent,
             eventId: event.eventId,
             txnId: event.transactionId
+        )
+        message.isOwn = senderUserId == userId
+        return message
+    }
+
+    /// Single place that turns a Matrix user into a UI user (real avatar, presence, Matrix id).
+    func makeUser(_ matrixUserId: String, displayName: String? = nil, avatarMxc: String? = nil,
+                  fallbackStatus: MoodUser.UserStatus = .offline) -> MoodUser {
+        let presenceInfo = presenceByUser[matrixUserId]
+        let status: MoodUser.UserStatus
+        switch presenceInfo?.presence {
+        case "online": status = .online
+        case "unavailable": status = .idle
+        case "offline": status = .offline
+        default: status = presenceInfo?.currentlyActive == true ? .online : fallbackStatus
+        }
+        return MoodUser(
+            id: stableUUID(from: matrixUserId),
+            username: extractLocalpart(matrixUserId),
+            displayName: displayName ?? extractLocalpart(matrixUserId),
+            avatarEmoji: emojiForUser(matrixUserId),
+            roleColor: colorForUser(matrixUserId),
+            status: status,
+            bio: presenceInfo?.statusMsg ?? "",
+            joinedDate: Date(),
+            badges: [],
+            activity: nil,
+            matrixId: matrixUserId,
+            avatarURL: resolveMediaURL(avatarMxc, width: 96, height: 96)
         )
     }
 
@@ -901,24 +924,8 @@ class MatrixStore {
             let lastMessage = lastMsg?.content ?? ""
             let lastDate = lastMsg?.timestamp ?? Date()
 
-            let presence = otherUserId.flatMap { presenceByUser[$0] }
-            let status: MoodUser.UserStatus = (presence?.presence == "online" || presence?.currentlyActive == true) ? .online : .offline
-
             let avatarMxc = otherUserId.flatMap { room.memberAvatars[$0] }
-            let participantKey = otherUserId ?? room.roomId
-
-            let participant = MoodUser(
-                id: stableUUID(from: participantKey),
-                username: otherUserId.map(extractLocalpart) ?? displayName,
-                displayName: displayName,
-                avatarEmoji: avatarMxc != nil ? "👤" : emojiForUser(participantKey),
-                roleColor: colorForUser(participantKey),
-                status: status,
-                bio: "",
-                joinedDate: Date(),
-                badges: [],
-                activity: nil
-            )
+            let participant = makeUser(otherUserId ?? room.roomId, displayName: displayName, avatarMxc: avatarMxc ?? room.avatarUrl)
 
             return DMConversation(
                 id: stableUUID(from: room.roomId),
@@ -935,7 +942,17 @@ class MatrixStore {
     // MARK: - Public Actions
 
     // Écho local immédiat + envoi via la file hors-ligne : jamais bloquant pour l'UI
+    func clearNewMessagesDivider(roomId: String) {
+        newMessagesDivider.removeValue(forKey: roomId)
+    }
+
+    /// Called when the user leaves a channel or DM (UI ids are stable hashes of room ids).
+    func clearNewMessagesDivider(forConversationID id: UUID) {
+        if let roomId = stableIdReverse[id] { clearNewMessagesDivider(roomId: roomId) }
+    }
+
     func sendMessage(roomId: String, text: String, replyToEventId: String? = nil, threadRootEventId: String? = nil) async {
+        clearNewMessagesDivider(roomId: roomId)
         let txnId = UUID().uuidString
         let echo = makeLocalEcho(roomId: roomId, body: text, txnId: txnId, replyToEventId: replyToEventId)
         insertSorted(echo, roomId: roomId)
@@ -1123,6 +1140,40 @@ class MatrixStore {
         }
     }
 
+    /// Clicking a reaction chip: adds my reaction, or removes it if I already reacted.
+    func toggleReaction(roomId: String, eventId: String, emoji: String) async {
+        if let mine = reactionEvents[eventId]?.first(where: { $0.emoji == emoji && $0.sender == userId }) {
+            do {
+                try await client.redactEvent(roomId: roomId, eventId: mine.eventId)
+            } catch {
+                errorMessage = "Impossible de retirer la réaction : \(error.localizedDescription)"
+            }
+        } else {
+            await sendReaction(roomId: roomId, eventId: eventId, emoji: emoji)
+        }
+    }
+
+    func togglePin(roomId: String, eventId: String) async {
+        guard let index = rooms.firstIndex(where: { $0.roomId == roomId }) else { return }
+        var pinned = rooms[index].pinnedEventIds
+        if let existing = pinned.firstIndex(of: eventId) {
+            pinned.remove(at: existing)
+        } else {
+            pinned.append(eventId)
+        }
+        do {
+            try await client.setPinnedEvents(roomId: roomId, eventIds: pinned)
+            rooms[index].pinnedEventIds = pinned
+        } catch {
+            errorMessage = "Épinglage impossible (droits insuffisants ?) : \(error.localizedDescription)"
+        }
+    }
+
+    /// Shareable link to a message, the Matrix equivalent of Discord's "Copier le lien du message".
+    func permalink(roomId: String, eventId: String) -> String {
+        "https://matrix.to/#/\(roomId)/\(eventId)"
+    }
+
     func setTyping(roomId: String, typing: Bool) async {
         guard let userId else { return }
         try? await client.sendTyping(roomId: roomId, userId: userId, typing: typing)
@@ -1144,6 +1195,14 @@ class MatrixStore {
 
     private func markRoomAsRead(roomId: String, eventId: String?, unreadEventId: String?) {
         guard let roomIndex = rooms.firstIndex(where: { $0.roomId == roomId }) else { return }
+
+        let unread = rooms[roomIndex].unreadCount
+        if unread > 0, newMessagesDivider[roomId] == nil {
+            let confirmed = (messagesByRoom[roomId] ?? []).filter { $0.eventId != nil }
+            if unread <= confirmed.count {
+                newMessagesDivider[roomId] = confirmed[confirmed.count - unread].eventId
+            }
+        }
 
         rooms[roomIndex].unreadCount = 0
         rooms[roomIndex].mentionCount = 0
@@ -1616,12 +1675,24 @@ class MatrixStore {
 
     func messages(for channel: Channel) -> [ChatMessage] {
         guard let roomId = roomId(for: channel) else { return [] }
-        return computeGrouping(messagesByRoom[roomId] ?? [])
+        return timeline(roomId: roomId)
     }
 
     func messages(forDM dm: DMConversation) -> [ChatMessage] {
         guard let roomId = roomId(for: dm) else { return [] }
-        return computeGrouping(messagesByRoom[roomId] ?? [])
+        return timeline(roomId: roomId)
+    }
+
+    /// Pins live in room state and can change from any device, so they are applied at read time.
+    private func timeline(roomId: String) -> [ChatMessage] {
+        let pinned = Set(rooms.first(where: { $0.roomId == roomId })?.pinnedEventIds ?? [])
+        var messages = computeGrouping(messagesByRoom[roomId] ?? [])
+        if !pinned.isEmpty {
+            for index in messages.indices {
+                messages[index].isPinned = messages[index].eventId.map(pinned.contains) ?? false
+            }
+        }
+        return messages
     }
 
     func typingUsers(for channel: Channel) -> [String] {
@@ -1659,30 +1730,18 @@ class MatrixStore {
 
     private func buildCurrentUser(userId: String) async {
         var displayName = extractLocalpart(userId)
-        var avatarEmoji = emojiForUser(userId)
+        var avatarMxc: String?
 
         // Try to fetch real profile
         if let profile = try? await client.getProfile(userId: userId) {
             if let name = profile.displayname, !name.isEmpty {
                 displayName = name
             }
-            if profile.avatarUrl != nil {
-                avatarEmoji = "👤"
-            }
+            avatarMxc = profile.avatarUrl
         }
 
-        self.currentUser = MoodUser(
-            id: stableUUID(from: userId),
-            username: extractLocalpart(userId),
-            displayName: displayName,
-            avatarEmoji: avatarEmoji,
-            roleColor: .blue,
-            status: .online,
-            bio: "",
-            joinedDate: Date(),
-            badges: [],
-            activity: nil
-        )
+        // Sync starts by setting presence "online", so that is our status until told otherwise.
+        self.currentUser = makeUser(userId, displayName: displayName, avatarMxc: avatarMxc, fallbackStatus: .online)
     }
 
     // MARK: - Credential Storage (Keychain)

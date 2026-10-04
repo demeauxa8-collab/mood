@@ -49,7 +49,7 @@ struct UserProfilePopup: View {
 
                 // Avatar straddling the banner
                 ZStack(alignment: .bottomTrailing) {
-                    Text(user.avatarEmoji)
+                    AvatarGlyph(user: user)
                         .font(.system(size: 36))
                         .frame(width: avatarSize, height: avatarSize)
                         .background(MoodTheme.popupBg)

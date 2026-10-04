@@ -335,7 +335,7 @@ struct MyAccountContent: View {
                 HStack(spacing: 14) {
                     // Avatar
                     ZStack(alignment: .bottomTrailing) {
-                        Text(user.avatarEmoji)
+                        AvatarGlyph(user: user)
                             .font(.system(size: 34))
                             .frame(width: 70, height: 70)
                             .background(MoodTheme.glassBg)
@@ -471,7 +471,7 @@ struct ProfileContent: View {
 
             SettingsSection(title: "AVATAR") {
                 HStack(spacing: 14) {
-                    Text(user.avatarEmoji)
+                    AvatarGlyph(user: user)
                         .font(.system(size: 30))
                         .frame(width: 60, height: 60)
                         .background(MoodTheme.glassBg)

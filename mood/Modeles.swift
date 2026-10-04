@@ -15,15 +15,20 @@ struct MoodUser: Identifiable, Hashable {
     let activity: UserActivity?
     let isBot: Bool
     let discriminator: String?
+    /// Full Matrix id (@user:server); nil for demo users.
+    let matrixId: String?
+    /// Resolved avatar thumbnail; falls back to `avatarEmoji` when nil.
+    let avatarURL: URL?
 
     init(id: UUID, username: String, displayName: String, avatarEmoji: String,
          roleColor: Color, status: UserStatus, bio: String, joinedDate: Date,
          badges: [String], activity: UserActivity?, isBot: Bool = false,
-         discriminator: String? = nil) {
+         discriminator: String? = nil, matrixId: String? = nil, avatarURL: URL? = nil) {
         self.id = id; self.username = username; self.displayName = displayName
         self.avatarEmoji = avatarEmoji; self.roleColor = roleColor; self.status = status
         self.bio = bio; self.joinedDate = joinedDate; self.badges = badges
         self.activity = activity; self.isBot = isBot; self.discriminator = discriminator
+        self.matrixId = matrixId; self.avatarURL = avatarURL
     }
 
     struct UserActivity {
@@ -243,7 +248,10 @@ struct MessageAttachment: Identifiable {
     let id: UUID
     let type: AttachmentType
     let name: String
-    let previewEmoji: String // placeholder pour l'image
+    let previewEmoji: String // shown when there is no media URL (demo data)
+    var url: URL? = nil
+    var thumbnailURL: URL? = nil
+    var size: Int? = nil
 
     enum AttachmentType {
         case image, file
@@ -276,6 +284,8 @@ struct ChatMessage: Identifiable {
     var sendState: MessageSendState
     let eventId: String? // event_id Matrix, nil pour un écho local pas encore confirmé
     let txnId: String?
+    /// Sent by the signed-in user: enables edit and delete.
+    var isOwn: Bool = false
 
     init(id: UUID, sender: MoodUser, content: String, timestamp: Date, isGrouped: Bool,
          reactions: [MessageReaction] = [], replyTo: ReplyRef? = nil,

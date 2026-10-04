@@ -245,7 +245,7 @@ struct DiscordParticipantTile: View {
                             .frame(width: 74, height: 74)
                     }
 
-                    Text(user.avatarEmoji)
+                    AvatarGlyph(user: user)
                         .font(.system(size: 36))
                         .frame(width: 64, height: 64)
                         .background(Color(hex: "5865f2"))
@@ -551,7 +551,7 @@ struct VoiceCallView: View {
                         .stroke(MoodTheme.onlineGreen, lineWidth: 3)
                         .frame(width: 112, height: 112)
                 }
-                Text(participant.avatarEmoji)
+                AvatarGlyph(user: participant)
                     .font(.system(size: 48))
                     .frame(width: 100, height: 100)
                     .background(MoodTheme.brandAccent)
@@ -578,7 +578,7 @@ struct VoiceCallView: View {
             // Flux vidéo simulé (plein écran)
             MoodTheme.glassBg
             VStack(spacing: 8) {
-                Text(participant.avatarEmoji).font(.system(size: 48))
+                AvatarGlyph(user: participant).font(.system(size: 48))
                 Text(participant.displayName)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(MoodTheme.textPrimary)
@@ -834,7 +834,7 @@ struct VideoCallView: View {
                 if isCameraOff {
                     // Caméra off — avatar centré
                     VStack(spacing: 12) {
-                        Text(participant.avatarEmoji)
+                        AvatarGlyph(user: participant)
                             .font(.system(size: 48))
                             .frame(width: 100, height: 100)
                             .background(MoodTheme.brandAccent)
@@ -851,7 +851,7 @@ struct VideoCallView: View {
                     ZStack {
                         MoodTheme.glassBg
                         VStack(spacing: 8) {
-                            Text(participant.avatarEmoji).font(.system(size: 48))
+                            AvatarGlyph(user: participant).font(.system(size: 48))
                             Text(participant.displayName)
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(MoodTheme.textPrimary)
@@ -865,7 +865,7 @@ struct VideoCallView: View {
                 VStack(spacing: 16) {
                     ZStack {
 
-                        Text(participant.avatarEmoji)
+                        AvatarGlyph(user: participant)
                             .font(.system(size: 48))
                             .frame(width: 100, height: 100)
                             .background(MoodTheme.brandAccent)
