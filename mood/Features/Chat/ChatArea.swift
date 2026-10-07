@@ -11,9 +11,13 @@ struct ChatArea: View {
     let server: MoodServer
     @Binding var showProfilePopup: Bool
     @Binding var profileUser: MoodUser?
+    /// Opens another channel of the server (a search result that lives elsewhere); nil where search is unavailable.
+    var onOpenChannel: ((Channel) -> Void)? = nil
     @State private var messageText = ""
     @State private var showMemberList = true
     @State private var showSearch = false
+    @State private var search = MessageSearchModel()
+    @FocusState private var searchFocused: Bool
     @State private var showPinnedMessages = false
     @State private var showThreadPanel = false
     @State private var activeThread: ChatMessage?
@@ -60,7 +64,11 @@ struct ChatArea: View {
                 ChannelHeader(
                     channel: channel,
                     showMemberList: $showMemberList,
-                    showSearch: $showSearch,
+                    searchText: $search.query,
+                    isSearchActive: showSearch,
+                    searchFocus: $searchFocused,
+                    onSubmitSearch: runSearch,
+                    onClearSearch: closeSearch,
                     showPinnedMessages: $showPinnedMessages
                 )
 
@@ -72,11 +80,6 @@ struct ChatArea: View {
 
             HStack(spacing: 0) {
                 VStack(spacing: 0) {
-                    // Search panel
-                    if showSearch {
-                        SearchPanel(showSearch: $showSearch)
-                    }
-
                     // Pinned messages panel
                     if showPinnedMessages {
                         PinnedMessagesPanel(
@@ -122,7 +125,16 @@ struct ChatArea: View {
 
                 // Panels inline sur desktop uniquement
                 if layoutMode == .regular {
-                    if showThreadPanel, let thread = activeThread {
+                    if showSearch {
+                        Rectangle().fill(MoodTheme.divider).frame(width: 1)
+
+                        SearchPanel(
+                            model: search,
+                            scope: .server(server),
+                            onClose: closeSearch,
+                            onOpen: openSearchResult
+                        )
+                    } else if showThreadPanel, let thread = activeThread {
                         Rectangle().fill(MoodTheme.divider).frame(width: 1)
 
                         ThreadPanel(
@@ -146,6 +158,14 @@ struct ChatArea: View {
             }
         }
         .background(MoodTheme.chatBackground)
+        .messageSearchSupport(
+            model: search,
+            scope: .server(server),
+            isOpen: showSearch,
+            focus: $searchFocused,
+            resetKey: server.id,
+            onClose: closeSearch
+        )
         .onAppear { markChannelAsRead() }
         .onChange(of: channel.id) { _, _ in markChannelAsRead() }
         .onChange(of: messageText) { _, newValue in
@@ -225,6 +245,27 @@ struct ChatArea: View {
         matrixStore.markAsRead(roomId: roomId)
     }
 
+    // MARK: Search
+
+    private func runSearch() {
+        showSearch = true
+        search.submit(store: matrixStore, scope: .server(server))
+    }
+
+    private func closeSearch() {
+        showSearch = false
+        searchFocused = false
+        search.reset()
+    }
+
+    /// A result opens its channel when it is not the current one, then the channel scrolls to the message.
+    private func openSearchResult(_ hit: SearchHit) {
+        matrixStore.requestJump(roomId: hit.roomId, eventId: hit.eventId)
+        if case .channel(let target, _) = hit.destination, target.id != channel.id {
+            onOpenChannel?(target)
+        }
+    }
+
     private func scheduleTypingNotification() {
         guard let roomId else { return }
         if !isTyping {
@@ -278,7 +319,11 @@ struct EncryptedRoomNotice: View {
 struct ChannelHeader: View {
     let channel: Channel
     @Binding var showMemberList: Bool
-    @Binding var showSearch: Bool
+    @Binding var searchText: String
+    let isSearchActive: Bool
+    var searchFocus: FocusState<Bool>.Binding
+    let onSubmitSearch: () -> Void
+    let onClearSearch: () -> Void
     @Binding var showPinnedMessages: Bool
     @State private var showNotifAlert = false
 
@@ -328,14 +373,14 @@ struct ChannelHeader: View {
                 }
                 .help("Liste des membres")
 
-                Button {
-                    showSearch.toggle()
-                } label: {
-                    HeaderSearchField(isActive: showSearch)
-                }
-                .buttonStyle(.plain)
+                HeaderSearchField(
+                    text: $searchText,
+                    isActive: isSearchActive,
+                    focus: searchFocus,
+                    onSubmit: onSubmitSearch,
+                    onClear: onClearSearch
+                )
                 .padding(.leading, 4 * LayoutMetrics.scale)
-                .help("Rechercher")
             }
         }
         .padding(.leading, 16 * LayoutMetrics.scale)
@@ -365,38 +410,69 @@ struct HeaderButton: View {
     }
 }
 
+/// Discord's header search: a real text field. Enter runs the search, Esc clears it and closes the results.
 struct HeaderSearchField: View {
+    @Binding var text: String
+    /// The results panel is open.
     let isActive: Bool
+    var focus: FocusState<Bool>.Binding
+    let onSubmit: () -> Void
+    let onClear: () -> Void
     @State private var isHovered = false
+
+    private var isHighlighted: Bool { isHovered || isActive || focus.wrappedValue }
 
     var body: some View {
         HStack(spacing: 8 * LayoutMetrics.scale) {
-            Text(isActive ? "Recherche ouverte" : "Rechercher")
-                .font(.mood(15))
-                .foregroundStyle(isActive ? MoodTheme.textSecondary : MoodTheme.textMuted)
-                .lineLimit(1)
+            TextField(
+                "Rechercher",
+                text: $text,
+                prompt: Text("Rechercher").foregroundStyle(MoodTheme.textMuted)
+            )
+            .textFieldStyle(.plain)
+            .font(.mood(15))
+            .foregroundStyle(MoodTheme.textPrimary)
+            .focused(focus)
+            .submitLabel(.search)
+            .autocorrectionDisabled()
+            .textInputAutocapitalization(.never)
+            .onSubmit(onSubmit)
+            .onKeyPress(.escape) {
+                onClear()
+                return .handled
+            }
 
-            Spacer(minLength: 8 * LayoutMetrics.scale)
-
-            Image(systemName: isActive ? "xmark.circle.fill" : "magnifyingglass")
-                .font(.mood(15, weight: .semibold))
-                .foregroundStyle(isActive ? MoodTheme.textSecondary : MoodTheme.textMuted)
+            if isActive || !text.isEmpty {
+                Button(action: onClear) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.mood(15, weight: .semibold))
+                        .foregroundStyle(MoodTheme.textSecondary)
+                }
+                .buttonStyle(.plain)
+                .help("Effacer la recherche")
+            } else {
+                Image(systemName: "magnifyingglass")
+                    .font(.mood(15, weight: .semibold))
+                    .foregroundStyle(MoodTheme.textMuted)
+            }
         }
         .padding(.horizontal, 10 * LayoutMetrics.scale)
         // Discord shrinks the search box before it lets the channel title wrap.
         .frame(minWidth: 120 * LayoutMetrics.scale, maxWidth: 244 * LayoutMetrics.scale)
         .frame(height: 32 * LayoutMetrics.scale)
-        .background(isHovered || isActive ? MoodTheme.inputBg : MoodTheme.headerSearchBackground)
+        .background(isHighlighted ? MoodTheme.inputBg : MoodTheme.headerSearchBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous)
                 .strokeBorder(
-                    isActive ? MoodTheme.brandBlue.opacity(0.55) : MoodTheme.headerSearchBorder,
+                    focus.wrappedValue || isActive ? MoodTheme.brandBlue.opacity(0.55) : MoodTheme.headerSearchBorder,
                     lineWidth: 1 * LayoutMetrics.scale
                 )
         )
         .contentShape(Rectangle())
+        .onTapGesture { focus.wrappedValue = true }
         .onHover { hovering in isHovered = hovering }
+        .help("Rechercher (Cmd+F)")
     }
 }
 
@@ -548,6 +624,7 @@ struct MessageList: View {
                 }
             }
             .animation(MoodMotion.popover, value: isAtBottom)
+            .jumpToRequestedMessage(roomId: roomId, messages: messages, proxy: proxy)
         }
     }
 }
@@ -1241,91 +1318,6 @@ struct MemberRow: View {
             .background(isHovered ? MoodTheme.hoverBg : Color.clear)
             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             .padding(.horizontal, 8)
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in isHovered = hovering }
-    }
-}
-
-// MARK: - Search Panel
-
-struct SearchPanel: View {
-    @Binding var showSearch: Bool
-    @State private var searchText = ""
-
-    var body: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8 * LayoutMetrics.scale) {
-                Image(systemName: "magnifyingglass")
-                    .font(.mood(13))
-                    .foregroundStyle(MoodTheme.textMuted)
-
-                TextField("Rechercher dans ce channel...", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(.mood(13))
-                    .foregroundStyle(MoodTheme.textPrimary)
-
-                Button {
-                    showSearch = false
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.mood(11))
-                        .foregroundStyle(MoodTheme.textPrimary)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 12 * LayoutMetrics.scale)
-            .padding(.vertical, 8 * LayoutMetrics.scale)
-            .background(MoodTheme.glassBg)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(MoodTheme.glassBorder, lineWidth: 0.5)
-            )
-
-            // Filter chips
-            HStack(spacing: 6) {
-                SearchFilterChip(label: "de:", icon: "person")
-                SearchFilterChip(label: "contient:", icon: "photo")
-                SearchFilterChip(label: "avant:", icon: "calendar")
-                SearchFilterChip(label: "après:", icon: "calendar")
-                Spacer()
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(MoodTheme.chatBackground)
-        .overlay(
-            Rectangle().fill(MoodTheme.divider).frame(height: 1), alignment: .bottom
-        )
-    }
-}
-
-struct SearchFilterChip: View {
-    let label: String
-    let icon: String
-    @State private var isHovered = false
-    @State private var isActive = false
-
-    var body: some View {
-        Button {
-            isActive.toggle()
-        } label: {
-            HStack(spacing: 4 * LayoutMetrics.scale) {
-                Image(systemName: icon)
-                    .font(.mood(10))
-                Text(label)
-                    .font(.mood(11))
-            }
-            .foregroundStyle(isActive ? MoodTheme.brandAccent : MoodTheme.textSecondary)
-            .padding(.horizontal, 8 * LayoutMetrics.scale)
-            .padding(.vertical, 4 * LayoutMetrics.scale)
-            .background(isActive ? MoodTheme.brandAccent.opacity(0.15) : (isHovered ? MoodTheme.hoverBg : MoodTheme.glassBg))
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(isActive ? MoodTheme.brandAccent.opacity(0.4) : Color.clear, lineWidth: 0.5)
-            )
         }
         .buttonStyle(.plain)
         .onHover { hovering in isHovered = hovering }

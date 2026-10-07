@@ -379,7 +379,8 @@ struct ContentView: View {
                 channel: channel,
                 server: server,
                 showProfilePopup: $showProfilePopup,
-                profileUser: $profileUser
+                profileUser: $profileUser,
+                onOpenChannel: openChannel(_:)
             )
         } else {
             EmptyStateView()
