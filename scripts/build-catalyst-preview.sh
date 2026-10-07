@@ -23,7 +23,7 @@ xcrun swiftc \
   -sdk "$SDK_PATH" \
   -F "$IOS_SUPPORT_FRAMEWORKS" \
   -module-name Mood \
-  -emit-executable "$ROOT_DIR"/mood/*.swift \
+  -emit-executable $(find "$ROOT_DIR/mood" -name "*.swift") \
   -o "$APP_DIR/Contents/MacOS/$APP_NAME"
 
 cat > "$APP_DIR/Contents/Info.plist" <<PLIST
@@ -57,7 +57,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-ICON_SOURCE="$ROOT_DIR/mood/Assets.xcassets/AppIcon.appiconset/icon_1024.png"
+ICON_SOURCE="$ROOT_DIR/mood/Resources/Assets.xcassets/AppIcon.appiconset/icon_1024.png"
 ICONSET="$TMP_DIR/AppIcon.iconset"
 if [[ -f "$ICON_SOURCE" ]]; then
   mkdir -p "$ICONSET"
