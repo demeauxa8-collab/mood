@@ -10,7 +10,16 @@ struct DesktopTitleBar: View {
     var symbol: String = "bubble.left.and.bubble.right.fill"
     var onBack: () -> Void = {}
     var onForward: () -> Void = {}
+    /// What the inbox lists: unread channels and DMs come from these, so demo data works too.
+    var servers: [MoodServer] = []
+    var conversations: [DMConversation] = []
+    var onOpenChannel: (Channel, MoodServer) -> Void = { _, _ in }
+    var onOpenConversation: (DMConversation) -> Void = { _ in }
+    var onMarkAllRead: () -> Void = {}
 
+    @Environment(MatrixStore.self) private var matrixStore
+    @Environment(\.openURL) private var openURL
+    @State private var showInbox = false
     @State private var inboxHovered = false
     @State private var helpHovered = false
     @State private var backHovered = false
@@ -44,14 +53,25 @@ struct DesktopTitleBar: View {
                         icon: "tray.full.fill",
                         help: "Boîte de réception",
                         isHovered: $inboxHovered,
-                        action: {}
+                        badge: hasInboxAlert,
+                        action: { showInbox.toggle() }
                     )
+                    .popover(isPresented: $showInbox, arrowEdge: .top) {
+                        InboxPopover(
+                            servers: servers,
+                            conversations: conversations,
+                            onOpenChannel: onOpenChannel,
+                            onOpenConversation: onOpenConversation,
+                            onMarkAllRead: onMarkAllRead
+                        )
+                        .environment(matrixStore)
+                    }
 
                     titleButton(
                         icon: "questionmark.circle.fill",
-                        help: "Aide",
+                        help: "Aide — ouvrir la page du projet",
                         isHovered: $helpHovered,
-                        action: {}
+                        action: { openURL(Self.helpURL) }
                     )
                 }
                 .padding(.trailing, 14 * LayoutMetrics.scale)
@@ -75,11 +95,19 @@ struct DesktopTitleBar: View {
         .background(MoodTheme.titleBar)
     }
 
+    private static let helpURL = URL(string: "https://github.com/demeauxa8-collab/mood")!
+
+    /// Red dot on the inbox: someone mentioned me in a channel, or a DM is unread.
+    private var hasInboxAlert: Bool {
+        servers.contains { $0.mentionCount > 0 } || conversations.contains { $0.unreadCount > 0 }
+    }
+
     private func titleButton(
         icon: String,
         help: String,
         isHovered: Binding<Bool>,
         isEnabled: Bool = true,
+        badge: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -89,6 +117,15 @@ struct DesktopTitleBar: View {
                 .frame(width: 28 * LayoutMetrics.scale, height: 28 * LayoutMetrics.scale)
                 .background(isHovered.wrappedValue ? MoodTheme.hoverBg : Color.clear)
                 .clipShape(RoundedRectangle(cornerRadius: 7 * LayoutMetrics.scale, style: .continuous))
+                .overlay(alignment: .topTrailing) {
+                    if badge {
+                        Circle()
+                            .fill(MoodTheme.mentionBadge)
+                            .frame(width: 8 * LayoutMetrics.scale, height: 8 * LayoutMetrics.scale)
+                            .overlay(Circle().stroke(MoodTheme.titleBar, lineWidth: 1.5 * LayoutMetrics.scale))
+                            .offset(x: -3 * LayoutMetrics.scale, y: 3 * LayoutMetrics.scale)
+                    }
+                }
         }
         .buttonStyle(.plain)
         .opacity(isEnabled ? 1 : 0.42)

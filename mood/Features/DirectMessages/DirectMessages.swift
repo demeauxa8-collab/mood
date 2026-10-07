@@ -300,6 +300,8 @@ struct DMChatArea: View {
     @State private var activeCall: CallType?
     @State private var showPinnedMessages = false
     @State private var showSearch = false
+    @State private var search = MessageSearchModel()
+    @FocusState private var searchFocused: Bool
     @State private var showInlineProfile = false
     @State private var typingTask: Task<Void, Never>?
     @State private var isTyping = false
@@ -363,7 +365,6 @@ struct DMChatArea: View {
                         }
                         HeaderButton(icon: "pin") {
                             showPinnedMessages.toggle()
-                            showSearch = false
                         }
                         .help("Messages épinglés")
 
@@ -375,11 +376,14 @@ struct DMChatArea: View {
                                 .adaptiveFrame(width: 320, height: 400, mode: layoutMode)
                         }
 
-                        HeaderButton(icon: "magnifyingglass") {
-                            showSearch.toggle()
-                            showPinnedMessages = false
-                        }
-                        .help("Rechercher")
+                        HeaderSearchField(
+                            text: $search.query,
+                            isActive: showSearch,
+                            focus: $searchFocused,
+                            onSubmit: runSearch,
+                            onClear: closeSearch
+                        )
+                        .padding(.leading, 4 * LayoutMetrics.scale)
                     }
                 }
                 .padding(.horizontal, 16 * LayoutMetrics.scale)
@@ -388,98 +392,117 @@ struct DMChatArea: View {
                 Rectangle().fill(MoodTheme.divider).frame(height: 1)
             }
 
-            // Search panel
-            if showSearch {
-                SearchPanel(showSearch: $showSearch)
-            }
+            HStack(spacing: 0) {
+                VStack(spacing: 0) {
+                    // Pinned messages panel
+                    if showPinnedMessages {
+                        PinnedMessagesPanel(
+                            messages: messages.filter { $0.isPinned },
+                            server: nil,
+                            showPanel: $showPinnedMessages
+                        )
+                    }
 
-            // Pinned messages panel
-            if showPinnedMessages {
-                PinnedMessagesPanel(
-                    messages: messages.filter { $0.isPinned },
-                    server: nil,
-                    showPanel: $showPinnedMessages
-                )
-            }
+                    // Messages
+                    ScrollView {
+                        ScrollViewReader { proxy in
+                            LazyVStack(spacing: 0) {
+                                VStack(spacing: 10 * LayoutMetrics.scale) {
+                                    AvatarGlyph(user: conversation.participant)
+                                        .font(.mood(50))
+                                        .frame(width: 80 * LayoutMetrics.scale, height: 80 * LayoutMetrics.scale)
+                                        .background(MoodTheme.glassBg)
+                                        .clipShape(Circle())
 
-            // Messages
-            ScrollView {
-                ScrollViewReader { proxy in
-                    LazyVStack(spacing: 0) {
-                        VStack(spacing: 10 * LayoutMetrics.scale) {
-                            AvatarGlyph(user: conversation.participant)
-                                .font(.mood(50))
-                                .frame(width: 80 * LayoutMetrics.scale, height: 80 * LayoutMetrics.scale)
-                                .background(MoodTheme.glassBg)
-                                .clipShape(Circle())
+                                    Text(conversation.participant.displayName)
+                                        .font(.mood(20, weight: .bold))
+                                        .foregroundStyle(MoodTheme.textPrimary)
 
-                            Text(conversation.participant.displayName)
-                                .font(.mood(20, weight: .bold))
-                                .foregroundStyle(MoodTheme.textPrimary)
-
-                            Text("@\(conversation.participant.username)")
-                                .font(.mood(13))
-                                .foregroundStyle(MoodTheme.textSecondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 28 * LayoutMetrics.scale)
-
-                        Rectangle()
-                            .fill(MoodTheme.divider)
-                            .frame(height: 1)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 6)
-
-                        if hasMoreHistory, let roomId {
-                            LoadMoreHistoryButton(roomId: roomId)
-                        }
-
-                        if messages.isEmpty {
-                            Text("Aucun message pour l'instant. Dis bonjour 👋")
-                                .font(.mood(13))
-                                .foregroundStyle(MoodTheme.textSecondary)
+                                    Text("@\(conversation.participant.username)")
+                                        .font(.mood(13))
+                                        .foregroundStyle(MoodTheme.textSecondary)
+                                }
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 24 * LayoutMetrics.scale)
-                        }
+                                .padding(.vertical, 28 * LayoutMetrics.scale)
 
-                        ForEach(messages) { message in
-                            MessageRow(message: message, server: nil, roomId: roomId, onReply: { replyingTo = message }) {
-                                profileUser = message.sender
-                                showProfilePopup = true
+                                Rectangle()
+                                    .fill(MoodTheme.divider)
+                                    .frame(height: 1)
+                                    .padding(.horizontal, 16)
+                                    .padding(.bottom, 6)
+
+                                if hasMoreHistory, let roomId {
+                                    LoadMoreHistoryButton(roomId: roomId)
+                                }
+
+                                if messages.isEmpty {
+                                    Text("Aucun message pour l'instant. Dis bonjour 👋")
+                                        .font(.mood(13))
+                                        .foregroundStyle(MoodTheme.textSecondary)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 24 * LayoutMetrics.scale)
+                                }
+
+                                ForEach(messages) { message in
+                                    MessageRow(message: message, server: nil, roomId: roomId, onReply: { replyingTo = message }) {
+                                        profileUser = message.sender
+                                        showProfilePopup = true
+                                    }
+                                    .id(message.id)
+                                }
                             }
-                            .id(message.id)
+                            .onAppear {
+                                if let lastID = messages.last?.id {
+                                    proxy.scrollTo(lastID, anchor: .bottom)
+                                }
+                            }
+                            .onChange(of: messages.count) { _, _ in
+                                if let lastID = messages.last?.id {
+                                    proxy.scrollTo(lastID, anchor: .bottom)
+                                }
+                            }
+                            .jumpToRequestedMessage(roomId: roomId, messages: messages, proxy: proxy)
                         }
                     }
-                    .onAppear {
-                        if let lastID = messages.last?.id {
-                            proxy.scrollTo(lastID, anchor: .bottom)
-                        }
+                    .scrollDismissesKeyboard(.interactively)
+
+                    if isEncrypted {
+                        EncryptedRoomNotice()
                     }
-                    .onChange(of: messages.count) { _, _ in
-                        if let lastID = messages.last?.id {
-                            proxy.scrollTo(lastID, anchor: .bottom)
-                        }
-                    }
+
+                    MessageInputBar(
+                        text: $messageText,
+                        channelName: conversation.participant.displayName,
+                        isE2E: isEncrypted,
+                        typingUsers: roomId.flatMap { matrixStore.typingUsersByRoom[$0] } ?? [],
+                        isDisabled: isEncrypted,
+                        replyingTo: $replyingTo,
+                        onSend: sendCurrentMessage,
+                        onAttachFile: attach
+                    )
+                }
+
+                if showSearch, layoutMode == .regular {
+                    Rectangle().fill(MoodTheme.divider).frame(width: 1)
+
+                    SearchPanel(
+                        model: search,
+                        scope: .dm(conversation),
+                        onClose: closeSearch,
+                        onOpen: openSearchResult
+                    )
                 }
             }
-            .scrollDismissesKeyboard(.interactively)
-
-            if isEncrypted {
-                EncryptedRoomNotice()
-            }
-
-            MessageInputBar(
-                text: $messageText,
-                channelName: conversation.participant.displayName,
-                isE2E: isEncrypted,
-                typingUsers: roomId.flatMap { matrixStore.typingUsersByRoom[$0] } ?? [],
-                isDisabled: isEncrypted,
-                replyingTo: $replyingTo,
-                onSend: sendCurrentMessage,
-                onAttachFile: attach
-            )
         }
         .background(MoodTheme.chatBackground)
+        .messageSearchSupport(
+            model: search,
+            scope: .dm(conversation),
+            isOpen: showSearch,
+            focus: $searchFocused,
+            resetKey: conversation.id,
+            onClose: closeSearch
+        )
         .onAppear { markConversationAsRead() }
         .onChange(of: conversation.id) { _, _ in markConversationAsRead() }
         .onChange(of: messageText) { _, newValue in
@@ -530,6 +553,24 @@ struct DMChatArea: View {
     private func markConversationAsRead() {
         guard let roomId else { return }
         matrixStore.markAsRead(roomId: roomId)
+    }
+
+    // MARK: Search
+
+    private func runSearch() {
+        showSearch = true
+        search.submit(store: matrixStore, scope: .dm(conversation))
+    }
+
+    private func closeSearch() {
+        showSearch = false
+        searchFocused = false
+        search.reset()
+    }
+
+    /// Every result lives in this conversation: scroll to the message.
+    private func openSearchResult(_ hit: SearchHit) {
+        matrixStore.requestJump(roomId: hit.roomId, eventId: hit.eventId)
     }
 
     private func scheduleTypingNotification() {
