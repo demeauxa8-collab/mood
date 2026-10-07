@@ -194,7 +194,7 @@ enum QuickSwitcherSearch {
         let words = text.split(whereSeparator: { !$0.isLetter && !$0.isNumber })
         if words.contains(where: { $0.hasPrefix(token) }) { return 60 }
         if text.contains(token) { return 40 }
-        if token.count >= 2, isSubsequence(token, of: text) { return 15 }
+        if token.count >= 3, isSubsequence(token, of: text) { return 15 }
         return 0
     }
 
