@@ -237,7 +237,8 @@ struct ContentView: View {
                                 DMListView(
                                     conversations: conversations,
                                     selectedDM: selectedDMBinding,
-                                    showSettings: $showSettings
+                                    showSettings: $showSettings,
+                                    onOpenQuickSwitcher: { withAnimation(MoodMotion.popover) { showQuickSwitcher = true } }
                                 )
                             } else if let server = activeServer {
                                 ChannelListColumn(
@@ -279,6 +280,12 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(MoodTheme.windowBackground)
+        .onChange(of: selectedChannel?.id) { _, id in
+            if let id { QuickSwitcherRecents.record(key: QuickSwitcherDestination.key(channel: id)) }
+        }
+        .onChange(of: selectedDM?.id) { _, id in
+            if let id { QuickSwitcherRecents.record(key: QuickSwitcherDestination.key(conversation: id)) }
+        }
         .overlay(alignment: .bottomLeading) {
             UserStatusPanel(showSettings: $showSettings)
                 .frame(width: LayoutMetrics.userPanelWidth)
@@ -299,12 +306,17 @@ struct ContentView: View {
         }
         .overlay {
             if showQuickSwitcher {
-                ZStack {
+                ZStack(alignment: .top) {
                     Color.black.opacity(0.5)
                         .ignoresSafeArea()
-                        .onTapGesture { showQuickSwitcher = false }
-                    QuickSwitcher(isPresented: $showQuickSwitcher)
-                        .padding(.bottom, 100)
+                        .onTapGesture { withAnimation(MoodMotion.popover) { showQuickSwitcher = false } }
+                    QuickSwitcher(
+                        isPresented: $showQuickSwitcher,
+                        servers: servers,
+                        conversations: conversations,
+                        onSelect: openQuickSwitcherDestination
+                    )
+                    .padding(.top, 120 * LayoutMetrics.scale)
                 }
                 .transition(.opacity)
             }
@@ -329,6 +341,24 @@ struct ContentView: View {
             showDMs = true
             selectedServer = nil
             selectedChannel = nil
+        }
+    }
+
+    /// Navigates to a quick-switcher result: a channel of a server, a DM, or a server's first channel.
+    private func openQuickSwitcherDestination(_ destination: QuickSwitcherDestination) {
+        showExplore = false
+        switch destination {
+        case .channel(let serverID, let channelID):
+            guard let server = servers.first(where: { $0.id == serverID }),
+                  let channel = server.channel(withID: channelID) else { return }
+            showDMs = false
+            selectedDM = nil
+            selectedServer = server
+            openChannel(channel)
+        case .conversation(let id):
+            openConversation(withID: id)
+        case .server(let id):
+            openServer(withID: id)
         }
     }
 

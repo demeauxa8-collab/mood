@@ -7,14 +7,15 @@ struct DMListView: View {
     let conversations: [DMConversation]
     @Binding var selectedDM: DMConversation?
     @Binding var showSettings: Bool
+    /// Opens the desktop quick switcher overlay hosted by ContentView.
+    var onOpenQuickSwitcher: () -> Void = {}
     @State private var showComingSoon = false
-    @State private var showQuickSwitcher = false
     @State private var showNewMessage = false
 
     var body: some View {
         VStack(spacing: 0) {
             // Barre de recherche
-            Button { showQuickSwitcher = true } label: {
+            Button(action: onOpenQuickSwitcher) {
                 HStack(spacing: 0) {
                     Spacer(minLength: 0)
                     Text("Recherche ou lance une conversation")
@@ -117,10 +118,6 @@ struct DMListView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Cette fonctionnalité arrive dans une prochaine version de Mood.")
-        }
-        .sheet(isPresented: $showQuickSwitcher) {
-            QuickSwitcher(isPresented: $showQuickSwitcher)
-                .presentationDetents([.medium])
         }
         .sheet(isPresented: $showNewMessage) {
             NewDMSheet { conversationId in
