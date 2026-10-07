@@ -2105,4 +2105,149 @@ class MatrixStore {
         let hash = userId.unicodeScalars.reduce(0) { $0 &+ Int($1.value) }
         return colors[abs(hash) % colors.count]
     }
+
+    // MARK: - Search & Inbox
+
+    enum InboxLoadState: Equatable {
+        case idle, loading, loaded
+        case failed(String)
+    }
+
+    /// Set by a search result or a mention: the channel scrolls to this message once it is loaded.
+    var jumpTarget: JumpTarget?
+    /// Recent mentions and replies (`GET /notifications?only=highlight`), newest first.
+    private(set) var inboxMentions: [InboxMention] = []
+    private(set) var inboxState: InboxLoadState = .idle
+
+    /// The channel or DM a Matrix room is shown as, nil for rooms the UI does not list (left, invited).
+    func destination(forRoomId roomId: String) -> RoomDestination? {
+        let id = stableUUID(from: roomId)
+        for server in servers {
+            if let channel = server.channel(withID: id) { return .channel(channel, server) }
+        }
+        if let conversation = dmConversations.first(where: { $0.id == id }) { return .dm(conversation) }
+        return nil
+    }
+
+    /// Asks the open channel to scroll to `eventId`. Dropped after a few seconds if the message never loads,
+    /// so a stale request cannot hijack the scroll position later.
+    func requestJump(roomId: String, eventId: String) {
+        let target = JumpTarget(roomId: roomId, eventId: eventId)
+        jumpTarget = target
+        Task {
+            try? await Task.sleep(for: .seconds(5))
+            if jumpTarget == target { jumpTarget = nil }
+        }
+    }
+
+    /// One page of server-side message search. `channels` / `senders` narrow it (Discord's "dans:" / "de:").
+    /// Encrypted rooms cannot be searched by the homeserver: they are skipped and counted.
+    func searchMessages(
+        term: String,
+        scope: SearchScope,
+        channels: [Channel] = [],
+        senders: [MoodUser] = [],
+        nextBatch: String? = nil
+    ) async throws -> SearchPage {
+        let roomIds: [String]
+        switch scope {
+        case .server(let server):
+            let pool = channels.isEmpty ? server.categories.flatMap(\.channels) : channels
+            roomIds = pool.compactMap { roomId(for: $0) }
+        case .dm(let conversation):
+            roomIds = [roomId(for: conversation)].compactMap { $0 }
+        }
+
+        let searchable = roomIds.filter { !isRoomEncrypted($0) }
+        let skipped = roomIds.count - searchable.count
+        guard !roomIds.isEmpty else {
+            return SearchPage(hits: [], total: 0, nextBatch: nil, highlights: [], skippedEncryptedRooms: 0, isUnavailable: false)
+        }
+        guard !searchable.isEmpty else { return .unavailable }
+
+        let response = try await client.search(
+            term: term,
+            roomIds: searchable,
+            senderIds: senders.compactMap(\.matrixId),
+            nextBatch: nextBatch
+        )
+        let events = response.searchCategories.roomEvents
+        let hits = (events?.results ?? []).compactMap { result -> SearchHit? in
+            guard let roomId = result.roomId else { return nil }
+            return makeSearchHit(result.result, roomId: roomId)
+        }
+        return SearchPage(
+            hits: hits,
+            total: events?.count,
+            nextBatch: events?.nextBatch,
+            highlights: events?.highlights ?? [],
+            skippedEncryptedRooms: skipped,
+            isUnavailable: false
+        )
+    }
+
+    private func makeSearchHit(_ event: MatrixEvent, roomId: String) -> SearchHit? {
+        guard let eventId = event.eventId,
+              !redactedEventIds.contains(eventId),
+              let destination = destination(forRoomId: roomId) else { return nil }
+        if let sender = event.sender, ignoredUserIds.contains(sender) { return nil }
+
+        // Prefer the copy already in the timeline: it carries edits and reactions.
+        let message: ChatMessage
+        if let index = messageIndex(roomId: roomId, eventId: eventId), let loaded = messagesByRoom[roomId]?[index] {
+            message = loaded
+        } else if let made = makeMessage(from: event, roomId: roomId) {
+            message = made
+        } else {
+            return nil
+        }
+        return SearchHit(eventId: eventId, roomId: roomId, message: message, destination: destination)
+    }
+
+    /// Refreshes the inbox's Mentions tab.
+    func refreshInbox() async {
+        guard userId != nil else { return }
+        if inboxMentions.isEmpty { inboxState = .loading }
+        do {
+            let response = try await client.notifications(limit: 50, only: "highlight")
+            inboxMentions = response.notifications.compactMap(makeInboxMention)
+            inboxState = .loaded
+        } catch {
+            inboxState = .failed(error.localizedDescription)
+        }
+    }
+
+    private func makeInboxMention(_ item: MatrixNotification) -> InboxMention? {
+        let event = item.event
+        guard event.type == "m.room.message",
+              let eventId = event.eventId,
+              let senderId = event.sender,
+              senderId != userId,
+              !ignoredUserIds.contains(senderId),
+              let destination = destination(forRoomId: item.roomId) else { return nil }
+
+        let source = room(item.roomId)
+        let sender = makeUser(senderId, displayName: source?.members[senderId], avatarMxc: source?.memberAvatars[senderId])
+        let timestamp = Date(timeIntervalSince1970: TimeInterval(event.originServerTs ?? item.ts ?? 0) / 1000)
+        return InboxMention(
+            id: eventId,
+            roomId: item.roomId,
+            sender: sender,
+            text: Self.plainBody(of: event),
+            timestamp: timestamp,
+            isRead: item.read,
+            destination: destination
+        )
+    }
+
+    /// The message text without the legacy reply fallback ("> <@user> quoted line" + blank line).
+    static func plainBody(of event: MatrixEvent) -> String {
+        var body = event.content?["m.new_content"]?.dictValue?["body"]?.stringValue
+            ?? event.content?["body"]?.stringValue
+            ?? ""
+        if body.hasPrefix("> "), let split = body.range(of: "\n\n") {
+            body = String(body[split.upperBound...])
+        }
+        return body.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }

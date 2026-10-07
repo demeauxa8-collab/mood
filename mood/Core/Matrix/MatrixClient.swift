@@ -1056,4 +1056,64 @@ class MatrixClient {
             throw MatrixError.httpError(statusCode: httpResponse.statusCode, errcode: nil, message: "Erreur inconnue", retryAfterMs: nil)
         }
     }
+
+    // MARK: - Search & Inbox
+
+    /// Server-side full-text search (`POST /search`), newest messages first.
+    /// Encrypted rooms are not indexed by the homeserver, so callers should leave them out of `roomIds`.
+    func search(
+        term: String,
+        roomIds: [String],
+        senderIds: [String] = [],
+        nextBatch: String? = nil,
+        limit: Int = 25
+    ) async throws -> MatrixSearchResponse {
+        guard let token = accessToken else { throw MatrixError.notAuthenticated }
+
+        var filter: [String: Any] = ["limit": limit]
+        if !roomIds.isEmpty { filter["rooms"] = roomIds }
+        if !senderIds.isEmpty { filter["senders"] = senderIds }
+
+        let body: [String: Any] = [
+            "search_categories": [
+                "room_events": [
+                    "search_term": term,
+                    "filter": filter,
+                    "order_by": "recent",
+                    "event_context": ["before_limit": 0, "after_limit": 0]
+                ] as [String: Any]
+            ]
+        ]
+
+        var query: [URLQueryItem]?
+        if let nextBatch { query = [URLQueryItem(name: "next_batch", value: nextBatch)] }
+
+        let url = try buildURL(encodedPath: "/_matrix/client/v3/search", query: query)
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+        return try decodeResponse(data)
+    }
+
+    /// Events that notified this account (`GET /notifications`); `only: "highlight"` keeps mentions and replies.
+    func notifications(from: String? = nil, limit: Int = 30, only: String? = nil) async throws -> MatrixNotificationsResponse {
+        guard let token = accessToken else { throw MatrixError.notAuthenticated }
+
+        var query = [URLQueryItem(name: "limit", value: String(limit))]
+        if let from { query.append(URLQueryItem(name: "from", value: from)) }
+        if let only { query.append(URLQueryItem(name: "only", value: only)) }
+
+        let url = try buildURL(encodedPath: "/_matrix/client/v3/notifications", query: query)
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+        return try decodeResponse(data)
+    }
 }
