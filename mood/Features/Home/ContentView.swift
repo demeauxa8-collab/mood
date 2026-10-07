@@ -175,9 +175,8 @@ struct ContentView: View {
             if let oldValue { matrixStore.clearNewMessagesDivider(forConversationID: oldValue) }
         }
         .onChange(of: matrixStore.servers) { _, newServers in
-            if let pendingServerID, let server = newServers.first(where: { $0.id == pendingServerID }) {
+            if let pendingServerID, openJoinedRoom(withID: pendingServerID) {
                 self.pendingServerID = nil
-                openServer(server)
             } else if selectedServer == nil, let first = newServers.first {
                 selectedServer = first
                 selectedChannel = first.categories.first?.channels.first
@@ -365,7 +364,9 @@ struct ContentView: View {
     @ViewBuilder
     private var desktopMainContent: some View {
         if showExplore {
-            ExploreServersView()
+            ExploreServersView(onOpenRoom: { id in
+                if !openJoinedRoom(withID: id) { pendingServerID = id }
+            })
         } else if showDMs {
             if let dm = selectedDM {
                 DMChatArea(
@@ -505,6 +506,26 @@ struct ContentView: View {
         } else {
             pendingServerID = id
         }
+    }
+
+    /// Opens a just-joined room: its server when it is a space, else its channel inside whichever server lists it
+    /// (a plain room lands in the "Matrix" server). False while sync has not delivered it yet.
+    @discardableResult
+    private func openJoinedRoom(withID id: UUID) -> Bool {
+        if let server = servers.first(where: { $0.id == id }) {
+            openServer(server)
+            return true
+        }
+        if let server = servers.first(where: { $0.channel(withID: id) != nil }),
+           let channel = server.channel(withID: id) {
+            showDMs = false
+            showExplore = false
+            selectedDM = nil
+            selectedServer = server
+            openChannel(channel)
+            return true
+        }
+        return false
     }
 
     private func openServer(_ server: MoodServer) {

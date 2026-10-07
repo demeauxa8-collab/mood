@@ -1724,12 +1724,7 @@ class MatrixStore {
     }
 
     func fetchPublicRooms(limit: Int = 50, filter: String? = nil) async -> [MatrixPublicRoom] {
-        do {
-            let response = try await client.getPublicRooms(limit: limit, filter: filter)
-            return response.chunk ?? []
-        } catch {
-            return []
-        }
+        (try? await loadPublicRooms(limit: limit, filter: filter)) ?? []
     }
 
     func addRoomToSpace(spaceRoomId: String, childRoomId: String) async {
@@ -2104,5 +2099,18 @@ class MatrixStore {
         let colors: [Color] = [.blue, .purple, .orange, .pink, .green, .red, .cyan, .yellow, .mint, .indigo]
         let hash = userId.unicodeScalars.reduce(0) { $0 &+ Int($1.value) }
         return colors[abs(hash) % colors.count]
+    }
+
+    // MARK: - Quick Switcher & Explore
+
+    /// Throwing twin of `fetchPublicRooms`, so Explore can tell "nothing found" from "request failed".
+    func loadPublicRooms(limit: Int = 50, filter: String? = nil) async throws -> [MatrixPublicRoom] {
+        let response = try await client.getPublicRooms(limit: limit, filter: filter)
+        return response.chunk ?? []
+    }
+
+    /// True once sync has delivered the room as joined (Explore then offers "Ouvrir" instead of "Rejoindre").
+    func hasJoined(roomId: String) -> Bool {
+        rooms.contains { $0.roomId == roomId }
     }
 }
