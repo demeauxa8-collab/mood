@@ -184,6 +184,7 @@ struct SidebarNavItem: View {
 // MARK: - DM Row
 
 struct DMRow: View {
+    @Environment(MatrixStore.self) private var matrixStore
     let conversation: DMConversation
     let isSelected: Bool
     let action: () -> Void
@@ -259,9 +260,11 @@ struct DMRow: View {
         .onHover { hovering in isHovered = hovering }
         .contextMenu {
             Button { showProfile = true } label: { Label("Voir le profil", systemImage: "person.crop.circle") }
-            Button { showCallAlert = true } label: { Label("Appel vocal", systemImage: "phone") }
-            Button { showCallAlert = true } label: { Label("Appel vidéo", systemImage: "video") }
-            Divider()
+            if matrixStore.callsAvailable {
+                Button { showCallAlert = true } label: { Label("Appel vocal", systemImage: "phone") }
+                Button { showCallAlert = true } label: { Label("Appel vidéo", systemImage: "video") }
+                Divider()
+            }
             Button { isMuted.toggle() } label: { Label(isMuted ? "Rétablir les notifications" : "Rendre muet", systemImage: isMuted ? "bell" : "bell.slash") }
             Button(role: .destructive) {
                 withAnimation(.easeInOut(duration: 0.2)) { showClosedFeedback = true }
@@ -347,14 +350,17 @@ struct DMChatArea: View {
                     Spacer()
 
                     HStack(spacing: 6 * LayoutMetrics.scale) {
-                        HeaderButton(icon: "phone.fill") {
-                            activeCall = .voice
+                        // Calls are simulated: demo only, never in a real Matrix session.
+                        if matrixStore.callsAvailable {
+                            HeaderButton(icon: "phone.fill") {
+                                activeCall = .voice
+                            }
+                            .help("Appel vocal")
+                            HeaderButton(icon: "video.fill") {
+                                activeCall = .video
+                            }
+                            .help("Appel vidéo")
                         }
-                        .help("Appel vocal")
-                        HeaderButton(icon: "video.fill") {
-                            activeCall = .video
-                        }
-                        .help("Appel vidéo")
                         HeaderButton(icon: "pin") {
                             showPinnedMessages.toggle()
                             showSearch = false

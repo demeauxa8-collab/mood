@@ -2103,6 +2103,9 @@ class MatrixStore {
 
     // MARK: - Quick Switcher & Explore
 
+    /// Calls and video are simulated (Calls.swift): only the demo, without a Matrix session, may show them.
+    var callsAvailable: Bool { userId == nil }
+
     /// Throwing twin of `fetchPublicRooms`, so Explore can tell "nothing found" from "request failed".
     func loadPublicRooms(limit: Int = 50, filter: String? = nil) async throws -> [MatrixPublicRoom] {
         let response = try await client.getPublicRooms(limit: limit, filter: filter)

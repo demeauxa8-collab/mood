@@ -1809,8 +1809,10 @@ struct FriendRow: View {
             HStack(spacing: 6 * LayoutMetrics.scale) {
                 FriendActionButton(icon: "bubble.left.fill", action: onMessage)
                     .help("Envoyer un message")
-                FriendActionButton(icon: "phone.fill", action: onCall)
-                    .help("Appel vocal")
+                if matrixStore.callsAvailable {
+                    FriendActionButton(icon: "phone.fill", action: onCall)
+                        .help("Appel vocal")
+                }
             }
         }
         .padding(.horizontal, 18 * LayoutMetrics.scale)
@@ -1826,8 +1828,10 @@ struct FriendRow: View {
         }
         .contextMenu {
             Button { onMessage() } label: { Label("Envoyer un message", systemImage: "bubble.left") }
-            Button { onCall() } label: { Label("Appel vocal", systemImage: "phone") }
-            Button { showVideoCallAlert = true } label: { Label("Appel vidéo", systemImage: "video") }
+            if matrixStore.callsAvailable {
+                Button { onCall() } label: { Label("Appel vocal", systemImage: "phone") }
+                Button { showVideoCallAlert = true } label: { Label("Appel vidéo", systemImage: "video") }
+            }
             Divider()
             Button(role: .destructive) { showRemoveConfirm = true } label: { Label("Retirer l'ami", systemImage: "person.badge.minus") }
             Button(role: .destructive) { showBlockConfirm = true } label: { Label("Bloquer", systemImage: "nosign") }
@@ -1941,11 +1945,13 @@ struct AllFriendRow: View {
                         Button { onMessage() } label: {
                             Label("Envoyer un message", systemImage: "bubble.left")
                         }
-                        Button { onCall() } label: {
-                            Label("Appel vocal", systemImage: "phone")
-                        }
-                        Button { showVideoCallAlert = true } label: {
-                            Label("Appel vidéo", systemImage: "video")
+                        if matrixStore.callsAvailable {
+                            Button { onCall() } label: {
+                                Label("Appel vocal", systemImage: "phone")
+                            }
+                            Button { showVideoCallAlert = true } label: {
+                                Label("Appel vidéo", systemImage: "video")
+                            }
                         }
                         Divider()
                         Button(role: .destructive) { showRemoveConfirm = true } label: {
@@ -1986,8 +1992,10 @@ struct AllFriendRow: View {
         }
         .contextMenu {
             Button { onMessage() } label: { Label("Envoyer un message", systemImage: "bubble.left") }
-            Button { onCall() } label: { Label("Appel vocal", systemImage: "phone") }
-            Button { showVideoCallAlert = true } label: { Label("Appel vidéo", systemImage: "video") }
+            if matrixStore.callsAvailable {
+                Button { onCall() } label: { Label("Appel vocal", systemImage: "phone") }
+                Button { showVideoCallAlert = true } label: { Label("Appel vidéo", systemImage: "video") }
+            }
             Divider()
             Button(role: .destructive) { showRemoveConfirm = true } label: { Label("Retirer l'ami", systemImage: "person.badge.minus") }
             Button(role: .destructive) { showBlockConfirm = true } label: { Label("Bloquer", systemImage: "nosign") }
