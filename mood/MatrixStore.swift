@@ -88,7 +88,7 @@ class MatrixStore {
     private var isSendingReadReceipts = false
 
     // Room metadata
-    struct MatrixRoom {
+    struct MatrixRoom: Codable {
         let roomId: String
         var name: String
         var topic: String
@@ -110,6 +110,14 @@ class MatrixStore {
     }
 
     private var rooms: [MatrixRoom] = []
+
+    // MARK: - Disk cache
+    private var syncCache: SyncCache?
+    /// Raw timeline events kept for the disk cache (last `SyncCache.eventsPerRoom` per room).
+    private var cachedTimelines: [String: [MatrixEvent]] = [:]
+    private var cacheSaveTask: Task<Void, Never>?
+    /// After restoring from cache, rooms absent from the first full sync were left meanwhile.
+    private var pruneUnseenRoomsOnNextSync = false
 
     // MARK: - Init
 
@@ -212,6 +220,10 @@ class MatrixStore {
         failedOutgoing = [:]
         outbox.removeAll()
         UserDefaults.standard.removeObject(forKey: Self.syncTokenKey)
+        cacheSaveTask?.cancel()
+        syncCache?.delete()
+        syncCache = nil
+        cachedTimelines = [:]
         clearCredentials()
     }
 
@@ -247,12 +259,64 @@ class MatrixStore {
             self.userId = storedUserId
         }
 
-        syncToken = UserDefaults.standard.string(forKey: Self.syncTokenKey)
+        // Show the cached rooms and messages right away, then let a full sync
+        // (no `since`) bring the truth: an incremental sync would only return rooms that
+        // changed meanwhile, and nothing else survives a relaunch.
+        syncToken = nil
+        UserDefaults.standard.removeObject(forKey: Self.syncTokenKey)
+        restoreFromCache(userId: self.userId ?? storedUserId)
         restoreOutboxEchoes()
         Task { await buildCurrentUser(userId: self.userId ?? storedUserId) }
         startSyncLoop()
         flushOutbox()
         return true
+    }
+
+    // MARK: - Disk Cache
+
+    private func restoreFromCache(userId: String) {
+        syncCache = SyncCache(userId: userId)
+        guard let snapshot = syncCache?.load() else { return }
+        rooms = snapshot.rooms
+        directRoomIds = Set(snapshot.directRoomIds)
+        ignoredUserIds = Set(snapshot.ignoredUserIds)
+        cachedTimelines = snapshot.timelines
+        for (roomId, events) in snapshot.timelines {
+            for event in events {
+                processTimelineEvent(event, roomId: roomId)
+            }
+        }
+        pruneUnseenRoomsOnNextSync = true
+        rebuildUIModels()
+    }
+
+    private func rememberForCache(_ events: [MatrixEvent], roomId: String) {
+        var list = cachedTimelines[roomId] ?? []
+        let known = Set(list.compactMap(\.eventId))
+        list.append(contentsOf: events.filter { $0.eventId.map { !known.contains($0) } ?? false })
+        if list.count > SyncCache.eventsPerRoom {
+            list.removeFirst(list.count - SyncCache.eventsPerRoom)
+        }
+        cachedTimelines[roomId] = list
+    }
+
+    /// Debounced: a burst of syncs (catch-up after being offline) writes the file once.
+    private func scheduleCacheSave() {
+        cacheSaveTask?.cancel()
+        cacheSaveTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard let self, !Task.isCancelled else { return }
+            if self.syncCache == nil, let userId = self.userId {
+                self.syncCache = SyncCache(userId: userId) // first session after login
+            }
+            guard let syncCache = self.syncCache else { return }
+            syncCache.save(SyncSnapshot(
+                rooms: self.rooms,
+                timelines: self.cachedTimelines,
+                directRoomIds: Array(self.directRoomIds),
+                ignoredUserIds: Array(self.ignoredUserIds)
+            ))
+        }
     }
 
     // MARK: - Sync Loop
@@ -275,7 +339,7 @@ class MatrixStore {
 
                     self.processSyncResponse(response)
                     self.syncToken = response.nextBatch
-                    UserDefaults.standard.set(response.nextBatch, forKey: Self.syncTokenKey)
+                    self.scheduleCacheSave()
                     backoff = 1
                     await self.retryPendingReadReceipts()
 
@@ -380,6 +444,15 @@ class MatrixStore {
         }
 
         // Joined rooms
+        if pruneUnseenRoomsOnNextSync {
+            pruneUnseenRoomsOnNextSync = false
+            let joined = Set(response.rooms?.join?.keys.map { $0 } ?? [])
+            for roomId in rooms.map(\.roomId) where !joined.contains(roomId) {
+                rooms.removeAll { $0.roomId == roomId }
+                messagesByRoom.removeValue(forKey: roomId)
+                cachedTimelines.removeValue(forKey: roomId)
+            }
+        }
         guard let joinedRooms = response.rooms?.join else {
             rebuildUIModels()
             return
@@ -430,6 +503,7 @@ class MatrixStore {
                     }
                     processTimelineEvent(event, roomId: roomId)
                 }
+                rememberForCache(timelineEvents, roomId: roomId)
             }
 
             // Ephemeral events (typing, receipts)
@@ -569,6 +643,8 @@ class MatrixStore {
                 if reactionEvents[targetEventId] == nil {
                     reactionEvents[targetEventId] = []
                 }
+                // The same reaction can arrive twice (cache replay, then full sync).
+                guard reactionEvents[targetEventId]?.contains(where: { $0.eventId == eventId }) != true else { return }
                 reactionEvents[targetEventId]?.append((emoji: key, sender: sender, eventId: eventId))
 
                 // Update existing message reactions
