@@ -253,12 +253,17 @@ struct MatrixPublicRoom: Codable, Sendable {
     let topic: String?
     let numJoinedMembers: Int?
     let avatarUrl: String?
+    let canonicalAlias: String?
+    /// "m.space" for spaces, absent for ordinary rooms.
+    let roomType: String?
 
     enum CodingKeys: String, CodingKey {
         case roomId = "room_id"
         case name, topic
         case numJoinedMembers = "num_joined_members"
         case avatarUrl = "avatar_url"
+        case canonicalAlias = "canonical_alias"
+        case roomType = "room_type"
     }
 }
 

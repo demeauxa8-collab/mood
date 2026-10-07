@@ -175,9 +175,8 @@ struct ContentView: View {
             if let oldValue { matrixStore.clearNewMessagesDivider(forConversationID: oldValue) }
         }
         .onChange(of: matrixStore.servers) { _, newServers in
-            if let pendingServerID, let server = newServers.first(where: { $0.id == pendingServerID }) {
+            if let pendingServerID, openJoinedRoom(withID: pendingServerID) {
                 self.pendingServerID = nil
-                openServer(server)
             } else if selectedServer == nil, let first = newServers.first {
                 selectedServer = first
                 selectedChannel = first.categories.first?.channels.first
@@ -237,7 +236,8 @@ struct ContentView: View {
                                 DMListView(
                                     conversations: conversations,
                                     selectedDM: selectedDMBinding,
-                                    showSettings: $showSettings
+                                    showSettings: $showSettings,
+                                    onOpenQuickSwitcher: { withAnimation(MoodMotion.popover) { showQuickSwitcher = true } }
                                 )
                             } else if let server = activeServer {
                                 ChannelListColumn(
@@ -279,6 +279,12 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(MoodTheme.windowBackground)
+        .onChange(of: selectedChannel?.id) { _, id in
+            if let id { QuickSwitcherRecents.record(key: QuickSwitcherDestination.key(channel: id)) }
+        }
+        .onChange(of: selectedDM?.id) { _, id in
+            if let id { QuickSwitcherRecents.record(key: QuickSwitcherDestination.key(conversation: id)) }
+        }
         .overlay(alignment: .bottomLeading) {
             UserStatusPanel(showSettings: $showSettings)
                 .frame(width: LayoutMetrics.userPanelWidth)
@@ -299,12 +305,17 @@ struct ContentView: View {
         }
         .overlay {
             if showQuickSwitcher {
-                ZStack {
+                ZStack(alignment: .top) {
                     Color.black.opacity(0.5)
                         .ignoresSafeArea()
-                        .onTapGesture { showQuickSwitcher = false }
-                    QuickSwitcher(isPresented: $showQuickSwitcher)
-                        .padding(.bottom, 100)
+                        .onTapGesture { withAnimation(MoodMotion.popover) { showQuickSwitcher = false } }
+                    QuickSwitcher(
+                        isPresented: $showQuickSwitcher,
+                        servers: servers,
+                        conversations: conversations,
+                        onSelect: openQuickSwitcherDestination
+                    )
+                    .padding(.top, 120 * LayoutMetrics.scale)
                 }
                 .transition(.opacity)
             }
@@ -332,10 +343,30 @@ struct ContentView: View {
         }
     }
 
+    /// Navigates to a quick-switcher result: a channel of a server, a DM, or a server's first channel.
+    private func openQuickSwitcherDestination(_ destination: QuickSwitcherDestination) {
+        showExplore = false
+        switch destination {
+        case .channel(let serverID, let channelID):
+            guard let server = servers.first(where: { $0.id == serverID }),
+                  let channel = server.channel(withID: channelID) else { return }
+            showDMs = false
+            selectedDM = nil
+            selectedServer = server
+            openChannel(channel)
+        case .conversation(let id):
+            openConversation(withID: id)
+        case .server(let id):
+            openServer(withID: id)
+        }
+    }
+
     @ViewBuilder
     private var desktopMainContent: some View {
         if showExplore {
-            ExploreServersView()
+            ExploreServersView(onOpenRoom: { id in
+                if !openJoinedRoom(withID: id) { pendingServerID = id }
+            })
         } else if showDMs {
             if let dm = selectedDM {
                 DMChatArea(
@@ -475,6 +506,26 @@ struct ContentView: View {
         } else {
             pendingServerID = id
         }
+    }
+
+    /// Opens a just-joined room: its server when it is a space, else its channel inside whichever server lists it
+    /// (a plain room lands in the "Matrix" server). False while sync has not delivered it yet.
+    @discardableResult
+    private func openJoinedRoom(withID id: UUID) -> Bool {
+        if let server = servers.first(where: { $0.id == id }) {
+            openServer(server)
+            return true
+        }
+        if let server = servers.first(where: { $0.channel(withID: id) != nil }),
+           let channel = server.channel(withID: id) {
+            showDMs = false
+            showExplore = false
+            selectedDM = nil
+            selectedServer = server
+            openChannel(channel)
+            return true
+        }
+        return false
     }
 
     private func openServer(_ server: MoodServer) {
@@ -1758,8 +1809,10 @@ struct FriendRow: View {
             HStack(spacing: 6 * LayoutMetrics.scale) {
                 FriendActionButton(icon: "bubble.left.fill", action: onMessage)
                     .help("Envoyer un message")
-                FriendActionButton(icon: "phone.fill", action: onCall)
-                    .help("Appel vocal")
+                if matrixStore.callsAvailable {
+                    FriendActionButton(icon: "phone.fill", action: onCall)
+                        .help("Appel vocal")
+                }
             }
         }
         .padding(.horizontal, 18 * LayoutMetrics.scale)
@@ -1775,8 +1828,10 @@ struct FriendRow: View {
         }
         .contextMenu {
             Button { onMessage() } label: { Label("Envoyer un message", systemImage: "bubble.left") }
-            Button { onCall() } label: { Label("Appel vocal", systemImage: "phone") }
-            Button { showVideoCallAlert = true } label: { Label("Appel vidéo", systemImage: "video") }
+            if matrixStore.callsAvailable {
+                Button { onCall() } label: { Label("Appel vocal", systemImage: "phone") }
+                Button { showVideoCallAlert = true } label: { Label("Appel vidéo", systemImage: "video") }
+            }
             Divider()
             Button(role: .destructive) { showRemoveConfirm = true } label: { Label("Retirer l'ami", systemImage: "person.badge.minus") }
             Button(role: .destructive) { showBlockConfirm = true } label: { Label("Bloquer", systemImage: "nosign") }
@@ -1890,11 +1945,13 @@ struct AllFriendRow: View {
                         Button { onMessage() } label: {
                             Label("Envoyer un message", systemImage: "bubble.left")
                         }
-                        Button { onCall() } label: {
-                            Label("Appel vocal", systemImage: "phone")
-                        }
-                        Button { showVideoCallAlert = true } label: {
-                            Label("Appel vidéo", systemImage: "video")
+                        if matrixStore.callsAvailable {
+                            Button { onCall() } label: {
+                                Label("Appel vocal", systemImage: "phone")
+                            }
+                            Button { showVideoCallAlert = true } label: {
+                                Label("Appel vidéo", systemImage: "video")
+                            }
                         }
                         Divider()
                         Button(role: .destructive) { showRemoveConfirm = true } label: {
@@ -1935,8 +1992,10 @@ struct AllFriendRow: View {
         }
         .contextMenu {
             Button { onMessage() } label: { Label("Envoyer un message", systemImage: "bubble.left") }
-            Button { onCall() } label: { Label("Appel vocal", systemImage: "phone") }
-            Button { showVideoCallAlert = true } label: { Label("Appel vidéo", systemImage: "video") }
+            if matrixStore.callsAvailable {
+                Button { onCall() } label: { Label("Appel vocal", systemImage: "phone") }
+                Button { showVideoCallAlert = true } label: { Label("Appel vidéo", systemImage: "video") }
+            }
             Divider()
             Button(role: .destructive) { showRemoveConfirm = true } label: { Label("Retirer l'ami", systemImage: "person.badge.minus") }
             Button(role: .destructive) { showBlockConfirm = true } label: { Label("Bloquer", systemImage: "nosign") }
