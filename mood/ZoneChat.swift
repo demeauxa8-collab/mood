@@ -414,7 +414,14 @@ struct MessageList: View {
     @Binding var activeThread: ChatMessage?
     @Binding var showThreadPanel: Bool
     @Binding var editRequest: UUID?
+    @Environment(ServerActions.self) private var serverActions
     @State private var isAtBottom = true
+
+    /// Discord shows its setup checklist in the first channel of a new, still empty server.
+    private var isFirstChannelOfServer: Bool {
+        roomId != nil && server.categories.first?.channels.first?.id == channel.id
+            && server.categories.flatMap(\.channels).count <= 1
+    }
 
     private var dividerEventId: String? {
         roomId.flatMap { matrixStore.newMessagesDivider[$0] }
@@ -431,6 +438,8 @@ struct MessageList: View {
                 LazyVStack(spacing: 0) {
                     if hasMoreHistory, let roomId {
                         LoadMoreHistoryButton(roomId: roomId)
+                    } else if messages.isEmpty, isFirstChannelOfServer {
+                        ServerWelcomeChecklist(server: server)
                     } else {
                         // Welcome — uniquement au vrai début du channel
                         VStack(alignment: .leading, spacing: 10 * LayoutMetrics.scale) {
@@ -443,13 +452,28 @@ struct MessageList: View {
                                     .foregroundStyle(MoodTheme.brandAccent)
                             }
 
-                            Text("Bienvenue dans #\(channel.name)")
-                                .font(.mood(22, weight: .bold))
+                            Text("Bienvenue dans #\(channel.name) !")
+                                .font(.mood(28, weight: .bold))
                                 .foregroundStyle(MoodTheme.textPrimary)
 
-                            Text("C'est le début du channel.")
+                            Text("C'est le début du salon #\(channel.name).")
                                 .foregroundStyle(MoodTheme.textSecondary)
-                                .font(.mood(13))
+                                .font(.mood(15))
+
+                            if roomId != nil {
+                                Button {
+                                    serverActions.pending = .editChannel(channel.id)
+                                } label: {
+                                    Label("Modifier le salon", systemImage: "pencil")
+                                        .font(.mood(13, weight: .medium))
+                                        .foregroundStyle(MoodTheme.textPrimary)
+                                        .padding(.horizontal, 10 * LayoutMetrics.scale)
+                                        .padding(.vertical, 6 * LayoutMetrics.scale)
+                                        .background(MoodTheme.serverBar)
+                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 16 * LayoutMetrics.scale)

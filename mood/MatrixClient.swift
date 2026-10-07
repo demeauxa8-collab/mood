@@ -315,6 +315,13 @@ struct AnyCodable: Codable, @unchecked Sendable {
     var boolValue: Bool? { value as? Bool }
     var dictValue: [String: AnyCodable]? { value as? [String: AnyCodable] }
     var arrayValue: [AnyCodable]? { value as? [AnyCodable] }
+
+    /// Back to plain JSON (for re-sending a state event we received).
+    var jsonObject: Any {
+        if let dict = value as? [String: AnyCodable] { return dict.mapValues(\.jsonObject) }
+        if let array = value as? [AnyCodable] { return array.map(\.jsonObject) }
+        return value
+    }
 }
 
 // MARK: - MatrixClient
@@ -889,6 +896,10 @@ class MatrixClient {
 
     func setRoomName(roomId: String, name: String) async throws {
         try await putJSONNoResponse("/_matrix/client/v3/rooms/\(pathEscape(roomId))/state/m.room.name", body: ["name": name])
+    }
+
+    func setStateEvent(roomId: String, type: String, stateKey: String = "", content: [String: Any]) async throws {
+        try await putJSONNoResponse("/_matrix/client/v3/rooms/\(pathEscape(roomId))/state/\(pathEscape(type))/\(pathEscape(stateKey))", body: content)
     }
 
     func setPinnedEvents(roomId: String, eventIds: [String]) async throws {

@@ -67,6 +67,7 @@ struct RootView: View {
     @Binding var showSplash: Bool
     var authState: AuthState
     var matrixStore: MatrixStore
+    @State private var serverActions = ServerActions()
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var layoutMode: LayoutMode {
@@ -77,6 +78,7 @@ struct RootView: View {
         ZStack {
             if authState.isLoggedIn {
                 ContentView()
+                    .environment(serverActions)
                     .environment(matrixStore)
                     .environment(authState)
                     .environment(\.layoutMode, layoutMode)

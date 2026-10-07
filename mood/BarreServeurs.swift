@@ -76,6 +76,7 @@ struct ServerSidebarView: View {
                     ForEach(servers) { server in
                         SidebarIcon(
                             emoji: server.iconEmoji,
+                            imageURL: server.iconURL,
                             isSelected: !showDMs && selectedServer?.id == server.id,
                             hasUnread: server.hasUnread,
                             mentionCount: server.mentionCount,
@@ -150,6 +151,7 @@ struct ServerSidebarView: View {
 
 struct SidebarIcon: View {
     var emoji: String?
+    var imageURL: URL?
     var systemIcon: String?
     let isSelected: Bool
     let hasUnread: Bool
@@ -173,7 +175,14 @@ struct SidebarIcon: View {
         Button(action: action) {
             ZStack(alignment: .bottomTrailing) {
                 Group {
-                    if let emoji = emoji {
+                    if let imageURL {
+                        AsyncImage(url: imageURL) { image in
+                            image.resizable().scaledToFill()
+                        } placeholder: {
+                            Text(emoji ?? "")
+                                .font(.mood(20))
+                        }
+                    } else if let emoji = emoji {
                         Text(emoji)
                             .font(.mood(20))
                     } else if let icon = systemIcon {
@@ -591,132 +600,6 @@ struct CreateServerModal: View {
 }
 
 // MARK: - Invite Modal
-
-struct InviteModal: View {
-    @Environment(\.layoutMode) private var layoutMode
-    @Binding var isPresented: Bool
-    let serverName: String
-    @State private var copied = false
-    @State private var invitedUsers: Set<UUID> = []
-
-    private let inviteLink = "https://mood.app/invite/aB3kD9z"
-
-    var body: some View {
-        VStack(spacing: 16) {
-            HStack {
-                Text("Inviter des amis dans \(serverName)")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(MoodTheme.textPrimary)
-                Spacer()
-                Button { isPresented = false } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12))
-                        .foregroundStyle(MoodTheme.textPrimary)
-                }
-                .buttonStyle(.plain)
-            }
-
-            // Search friends
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 12))
-                    .foregroundStyle(MoodTheme.textMuted)
-                Text("Rechercher un ami...")
-                    .font(.system(size: 13))
-                    .foregroundStyle(MoodTheme.textMuted)
-                Spacer()
-            }
-            .padding(10)
-            .background(MoodTheme.glassBg)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-            // Friend list for inviting
-            VStack(spacing: 4) {
-                ForEach(MockData.users.prefix(3)) { user in
-                    HStack(spacing: 10) {
-                        AvatarGlyph(user: user)
-                            .font(.system(size: 14))
-                            .frame(width: 32, height: 32)
-                            .background(MoodTheme.glassBg)
-                            .clipShape(Circle())
-                        Text(user.displayName)
-                            .font(.system(size: 13))
-                            .foregroundStyle(MoodTheme.textPrimary)
-                        Spacer()
-                        Button {
-                            _ = invitedUsers.insert(user.id)
-                        } label: {
-                            Text(invitedUsers.contains(user.id) ? "Envoyé" : "Inviter")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 5)
-                                .background(invitedUsers.contains(user.id) ? MoodTheme.onlineGreen : MoodTheme.brandAccent)
-                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(invitedUsers.contains(user.id))
-                    }
-                    .padding(.vertical, 4)
-                }
-            }
-
-            Rectangle().fill(MoodTheme.divider).frame(height: 1)
-
-            // Invite link
-            VStack(alignment: .leading, spacing: 6) {
-                Text("OU ENVOIE UN LIEN D'INVITATION")
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(0.4)
-                    .foregroundStyle(MoodTheme.textSecondary)
-
-                HStack {
-                    Text(inviteLink)
-                        .font(.system(size: 13))
-                        .foregroundStyle(MoodTheme.textPrimary)
-                        .lineLimit(1)
-
-                    Spacer()
-
-                    Button {
-                        UIPasteboard.general.string = inviteLink
-                        copied = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { copied = false }
-                    } label: {
-                        Text(copied ? "Copié !" : "Copier")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
-                            .background(copied ? MoodTheme.onlineGreen : MoodTheme.brandAccent)
-                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(10)
-                .background(MoodTheme.glassBg)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-                HStack(spacing: 6) {
-                    Image(systemName: "clock")
-                        .font(.system(size: 10))
-                    Text("Ce lien expire dans 7 jours")
-                        .font(.system(size: 11))
-                }
-                .foregroundStyle(MoodTheme.textMuted)
-            }
-        }
-        .padding(20)
-        .adaptiveFrame(width: 420, mode: layoutMode)
-        .background(MoodTheme.popupBg)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(MoodTheme.glassBorder, lineWidth: 0.5)
-        )
-        .popoverElevation()
-    }
-}
 
 struct ModalButton: View {
     let title: String

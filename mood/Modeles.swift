@@ -120,6 +120,7 @@ struct MoodServer: Identifiable, Hashable {
     let memberRoles: [UUID: ServerRole]
     let hasUnread: Bool
     let mentionCount: Int
+    var iconURL: URL? = nil
 
     func roleFor(_ user: MoodUser) -> ServerRole {
         memberRoles[user.id] ?? .member
@@ -149,7 +150,8 @@ struct MoodServer: Identifiable, Hashable {
             members: members,
             memberRoles: memberRoles,
             hasUnread: updatedChannels.contains { $0.unreadCount > 0 },
-            mentionCount: updatedChannels.reduce(0) { $0 + $1.mentionCount }
+            mentionCount: updatedChannels.reduce(0) { $0 + $1.mentionCount },
+            iconURL: iconURL
         )
     }
 

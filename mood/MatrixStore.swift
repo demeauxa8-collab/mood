@@ -104,7 +104,9 @@ class MatrixStore {
         var heroes: [String] // m.heroes du sync, fallback DM quand les membres ne sont pas résolus
         var pinnedEventIds: [String] = [] // m.room.pinned_events
         var powerLevels: [String: Int] = [:] // m.room.power_levels users
+        var powerLevelsContent: [String: AnyCodable] = [:] // full event, re-sent when a role changes
         var creator: String? // sender of m.room.create
+        var bannedUsers: [String: String] = [:] // userId -> display name
     }
 
     private var rooms: [MatrixRoom] = []
@@ -495,6 +497,11 @@ class MatrixStore {
                     room.members.removeValue(forKey: memberUserId)
                     room.memberAvatars.removeValue(forKey: memberUserId)
                 }
+                if membership == "ban" {
+                    room.bannedUsers[memberUserId] = event.content?["displayname"]?.stringValue ?? extractLocalpart(memberUserId)
+                } else {
+                    room.bannedUsers.removeValue(forKey: memberUserId)
+                }
             }
         case "m.room.canonical_alias":
             if room.name == room.roomId,
@@ -517,6 +524,7 @@ class MatrixStore {
                 levels[user] = level.intValue ?? 0
             }
             room.powerLevels = levels
+            room.powerLevelsContent = event.content ?? [:]
         case "m.space.child":
             if let childRoomId = event.stateKey {
                 let via = event.content?["via"]?.arrayValue
@@ -906,7 +914,8 @@ class MatrixStore {
                     members: serverMembers.users,
                     memberRoles: serverMembers.roles,
                     hasUnread: childRooms.contains(where: { $0.unreadCount > 0 }),
-                    mentionCount: childRooms.reduce(0) { $0 + $1.mentionCount }
+                    mentionCount: childRooms.reduce(0) { $0 + $1.mentionCount },
+                    iconURL: resolveMediaURL(space.avatarUrl, width: 96, height: 96)
                 )
                 builtServers.append(server)
             }
@@ -1758,6 +1767,140 @@ class MatrixStore {
 
     func roomId(for server: MoodServer) -> String? {
         stableIdReverse[server.id]
+    }
+
+    // MARK: - Server & channel management (Discord server settings on top of Matrix spaces)
+
+    private func room(_ roomId: String?) -> MatrixRoom? {
+        guard let roomId else { return nil }
+        return rooms.first { $0.roomId == roomId }
+    }
+
+    func topic(of server: MoodServer) -> String {
+        room(roomId(for: server))?.topic ?? ""
+    }
+
+    /// My power level in the space: 100 admin, 50 moderator, 0 member.
+    func myPowerLevel(in server: MoodServer) -> Int {
+        guard let space = room(roomId(for: server)), let userId else { return 0 }
+        if space.creator == userId { return 100 }
+        return space.powerLevels[userId] ?? 0
+    }
+
+    func bannedUsers(in server: MoodServer) -> [MoodUser] {
+        let spaceId = roomId(for: server)
+        let channelIds = server.categories.flatMap(\.channels).compactMap { roomId(for: $0) }
+        var banned: [String: String] = [:]
+        for room in rooms where room.roomId == spaceId || channelIds.contains(room.roomId) {
+            banned.merge(room.bannedUsers) { current, _ in current }
+        }
+        return banned.sorted { $0.value < $1.value }.map { makeUser($0.key, displayName: $0.value) }
+    }
+
+    private func serverRoomIds(_ server: MoodServer) -> [String] {
+        server.categories.flatMap(\.channels).compactMap { roomId(for: $0) } + [roomId(for: server)].compactMap { $0 }
+    }
+
+    /// Discord's "Créer un salon": a room added as a child of the space.
+    func createChannel(in server: MoodServer, name: String, topic: String = "", isPrivate: Bool) async -> UUID? {
+        guard let spaceId = roomId(for: server) else { return nil }
+        let cleaned = name.trimmingCharacters(in: .whitespaces).lowercased().replacingOccurrences(of: " ", with: "-")
+        guard !cleaned.isEmpty, let channelId = await createRoom(name: cleaned, topic: topic, isPublic: !isPrivate) else { return nil }
+        do {
+            try await client.addSpaceChild(spaceRoomId: spaceId, childRoomId: channelId)
+            return stableUUID(from: channelId)
+        } catch {
+            errorMessage = "Le salon a été créé mais pas ajouté au serveur : \(error.localizedDescription)"
+            return nil
+        }
+    }
+
+    /// Matrix cannot delete a room: remove it from the space, then leave it.
+    func deleteChannel(_ channel: Channel, from server: MoodServer) async {
+        guard let channelId = roomId(for: channel) else { return }
+        if let spaceId = roomId(for: server) {
+            try? await client.removeSpaceChild(spaceRoomId: spaceId, childRoomId: channelId)
+        }
+        await leaveRoom(channelId)
+    }
+
+    func updateServer(_ server: MoodServer, name: String, topic: String) async {
+        guard let spaceId = roomId(for: server) else { return }
+        if name != server.name { await setRoomName(roomId: spaceId, name: name) }
+        if topic != self.topic(of: server) { await setRoomTopic(roomId: spaceId, topic: topic) }
+    }
+
+    func updateChannel(_ channel: Channel, name: String, topic: String) async {
+        guard let channelId = roomId(for: channel) else { return }
+        if name != channel.name { await setRoomName(roomId: channelId, name: name) }
+        if topic != channel.topic { await setRoomTopic(roomId: channelId, topic: topic) }
+    }
+
+    /// Kicking or banning from a Discord server means every room of the space.
+    func kickFromServer(_ server: MoodServer, user: MoodUser) async {
+        guard let target = user.matrixId else { return }
+        for roomId in serverRoomIds(server) { await kickUser(roomId: roomId, userId: target) }
+    }
+
+    func banFromServer(_ server: MoodServer, user: MoodUser) async {
+        guard let target = user.matrixId else { return }
+        for roomId in serverRoomIds(server) { await banUser(roomId: roomId, userId: target) }
+    }
+
+    func unbanFromServer(_ server: MoodServer, user: MoodUser) async {
+        guard let target = user.matrixId else { return }
+        for roomId in serverRoomIds(server) where room(roomId)?.bannedUsers[target] != nil {
+            await unbanUser(roomId: roomId, userId: target)
+        }
+    }
+
+    /// Discord role ↔ Matrix power level, applied to the space and every channel.
+    func setRole(_ role: ServerRole, for user: MoodUser, in server: MoodServer) async {
+        guard let target = user.matrixId else { return }
+        let level: Int
+        switch role {
+        case .owner, .admin: level = 100
+        case .moderator: level = 50
+        case .member: level = 0
+        }
+        for roomId in serverRoomIds(server) {
+            guard let index = rooms.firstIndex(where: { $0.roomId == roomId }) else { continue }
+            var content = rooms[index].powerLevelsContent.mapValues(\.jsonObject)
+            var users = content["users"] as? [String: Any] ?? [:]
+            if level == 0 { users.removeValue(forKey: target) } else { users[target] = level }
+            content["users"] = users
+            do {
+                try await client.setStateEvent(roomId: roomId, type: "m.room.power_levels", content: content)
+                rooms[index].powerLevels[target] = level
+            } catch {
+                errorMessage = "Impossible de changer le rôle (droits insuffisants ?) : \(error.localizedDescription)"
+                return
+            }
+        }
+        rebuildUIModels()
+    }
+
+    func updateServerIcon(_ server: MoodServer, imageData: Data, filename: String) async {
+        guard let spaceId = roomId(for: server) else { return }
+        do {
+            let upload = try await client.uploadMedia(data: imageData, filename: filename, contentType: "image/jpeg")
+            try await client.setStateEvent(roomId: spaceId, type: "m.room.avatar", content: ["url": upload.contentUri])
+        } catch {
+            errorMessage = "Impossible de changer l'icône : \(error.localizedDescription)"
+        }
+    }
+
+    /// Shareable invite link for the server (a matrix.to link to the space).
+    func inviteLink(for server: MoodServer) -> String? {
+        roomId(for: server).map { "https://matrix.to/#/\($0)" }
+    }
+
+    func inviteToServer(_ server: MoodServer, matrixUserId: String) async {
+        guard let spaceId = roomId(for: server) else { return }
+        await inviteUser(roomId: spaceId, userId: matrixUserId)
+        for channel in server.categories.flatMap(\.channels) {
+            if let channelId = roomId(for: channel) { await inviteUser(roomId: channelId, userId: matrixUserId) }
+        }
     }
 
     func markServerAsRead(_ server: MoodServer) {
