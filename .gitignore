@@ -20,3 +20,7 @@ Pods/
 # Swift Package Manager
 .build/
 Package.resolved
+
+# Local secrets (see Config.example.xcconfig)
+Config.xcconfig
+build/

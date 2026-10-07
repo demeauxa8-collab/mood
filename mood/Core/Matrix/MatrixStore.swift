@@ -829,14 +829,6 @@ class MatrixStore {
             }
         }
 
-        // Parse thread info
-        var threadRootId: String?
-        if let relatesTo = event.content?["m.relates_to"]?.dictValue,
-           let relType = relatesTo["rel_type"]?.stringValue, relType == "m.thread",
-           let rootId = relatesTo["event_id"]?.stringValue {
-            threadRootId = rootId
-        }
-
         // Parse attachments
         var attachments: [MessageAttachment] = []
         if msgtype == "m.image" || msgtype == "m.file" || msgtype == "m.video" || msgtype == "m.audio" {
@@ -855,11 +847,6 @@ class MatrixStore {
             ))
         }
 
-        // System messages
-        var isSystem = false
-        var systemType: SystemMessageType?
-        // Matrix doesn't have "system message" as a msgtype, but we can detect membership changes
-        // These are handled separately via state events
 
         // Build reactions from stored data
         var reactions: [MessageReaction] = []
@@ -883,8 +870,7 @@ class MatrixStore {
             reactions: reactions,
             replyTo: replyTo,
             attachments: attachments,
-            isSystemMessage: isSystem,
-            systemType: systemType,
+            isSystemMessage: false,
             sendState: .sent,
             eventId: event.eventId,
             txnId: event.transactionId
