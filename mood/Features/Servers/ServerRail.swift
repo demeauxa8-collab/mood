@@ -125,15 +125,6 @@ struct ServerSidebarView: View {
                         selectedServer = nil
                     }
                     .help("Explorer les serveurs")
-
-                    SidebarIcon(
-                        systemIcon: "arrow.down.to.line",
-                        isSelected: false,
-                        hasUnread: false,
-                        mentionCount: 0,
-                        iconColor: MoodTheme.textSecondary
-                    ) {}
-                    .help("Télécharger l'application")
                 }
                 .padding(.bottom, 12 * LayoutMetrics.scale)
                 .padding(.horizontal, 15 * LayoutMetrics.scale)
