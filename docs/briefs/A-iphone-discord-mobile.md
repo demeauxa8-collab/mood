@@ -47,3 +47,27 @@ Motion: instant tab switches; chat push/pop is a plain horizontal slide (system 
   chat.png, notifications.png, toi.png. Look at each one; compare to Discord iOS.
 - No `MockData` reached when a real Matrix session exists (demo data only with `-uiPreview`).
 - Commits on `codex/iphone-discord`, small and descriptive. Do not push to `main`.
+
+## Update (Augustin, 07/10) — Liquid Glass + closer to Discord iOS
+
+**References:** 6 official Discord iPhone screenshots (App Store, v348, Oct 2026) are attached to your
+prompt and stored outside git in `~/discord-ios-ref/` on the Studio. Match them closely:
+- `discord-ios-3`: **Messages** = server rail on the left, then "Messages" title, search field +
+  "Ajouter des amis" pill + "+" button, rows (avatar with status, name, last message preview, relative time "15m/1h"),
+  and at the bottom a floating **user pill** (avatar, name, "En ligne") + bell button.
+- `discord-ios-4`: **Server** = rail + channel list with a server banner/header card (name, verified badge,
+  "1 062 membres · Communauté"), "Rechercher" pill + invite + events buttons, categories "Discussion ⌄",
+  channels, voice channel with its members, and a floating bottom bar "Rejoindre le salon vocal".
+- `discord-ios-1`: **Chat** = back chevron, "# général ›" with "En ligne - 125" under it, messages
+  (avatar, name colored by role, "Aujourd'hui à 14:11"), floating composer "Envoyer un message dans #…"
+  with gift / emoji / mic, emoji picker sheet (Émoji / GIF / Autocollants tabs, search).
+These replace the 3-tab design in the section above where they differ: follow the screenshots.
+
+**Liquid Glass (iPhone only — desktop must not change):** use iOS 26 Liquid Glass for every floating
+control: bottom user pill / navigation, composer, header icon buttons, "Rejoindre le salon vocal" bar,
+menus and sheets. SwiftUI: `.glassEffect(.regular, in: .capsule)` (or `.rect(cornerRadius:)`),
+`GlassEffectContainer` to group neighbors, `.buttonStyle(.glass)` / `.glassProminent` for primary actions,
+`.tabBarMinimizeBehavior` if you use a TabView. Deployment target is iOS 17: wrap in
+`if #available(iOS 26.0, *)` and fall back to `.ultraThinMaterial` + hairline border below 26.
+Content (lists, messages) stays on Discord's dark opaque backgrounds; glass is only for controls that float
+above content. No glows, no gradients behind glass.

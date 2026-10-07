@@ -154,10 +154,7 @@ struct SidebarIcon: View {
     let action: () -> Void
 
     @State private var isHovered = false
-    @State private var isMuted = false
-    @State private var showComingSoon = false
     @State private var showLeaveConfirm = false
-    @State private var hideMutedChannels = false
 
     // Discord's 2025 rail keeps every icon a rounded square; only the pill changes.
     private let cornerRadius: CGFloat = LayoutMetrics.serverIconCornerRadius
@@ -229,21 +226,8 @@ struct SidebarIcon: View {
                 Button { onMarkRead?() } label: { Label("Marquer comme lu", systemImage: "checkmark.circle") }
                     .disabled(!hasUnread && mentionCount == 0)
                 Divider()
-                Button { showComingSoon = true } label: { Label("Inviter des gens", systemImage: "person.badge.plus") }
-                Button { isMuted.toggle() } label: { Label(isMuted ? "Rétablir le son" : "Rendre muet", systemImage: isMuted ? "bell" : "bell.slash") }
-                Button { showComingSoon = true } label: { Label("Paramètres de notification", systemImage: "bell") }
-                Button { showComingSoon = true } label: { Label("Confidentialité", systemImage: "shield") }
-                Divider()
-                Button { showComingSoon = true } label: { Label("Modifier le profil serveur", systemImage: "pencil") }
-                Button { hideMutedChannels.toggle() } label: { Label(hideMutedChannels ? "Afficher les channels muets" : "Masquer les channels muets", systemImage: hideMutedChannels ? "eye" : "eye.slash") }
-                Divider()
                 Button(role: .destructive) { showLeaveConfirm = true } label: { Label("Quitter le serveur", systemImage: "rectangle.portrait.and.arrow.right") }
             }
-        }
-        .alert("Bientôt disponible", isPresented: $showComingSoon) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("Cette fonctionnalité arrive dans une prochaine version de Mood.")
         }
         .alert("Quitter le serveur", isPresented: $showLeaveConfirm) {
             Button("Annuler", role: .cancel) {}
