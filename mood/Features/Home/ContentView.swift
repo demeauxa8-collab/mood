@@ -214,7 +214,12 @@ struct ContentView: View {
             DesktopTitleBar(
                 title: desktopWindowTitle,
                 symbol: showDMs ? "person.2.fill" : "bubble.left.and.bubble.right.fill",
-                onBack: desktopBack
+                onBack: desktopBack,
+                servers: servers,
+                conversations: conversations,
+                onOpenChannel: openChannel(_:in:),
+                onOpenConversation: openInboxConversation(_:),
+                onMarkAllRead: markAllInboxRead
             )
 
             HStack(spacing: 0) {
@@ -513,6 +518,34 @@ struct ContentView: View {
     private func openChannel(_ channel: Channel) {
         let readChannel = markChannelRead(channel)
         selectedChannel = readChannel
+    }
+
+    // MARK: Inbox (desktop title bar)
+
+    /// Opens a channel from anywhere: switches to its server first.
+    private func openChannel(_ channel: Channel, in server: MoodServer) {
+        showDMs = false
+        showExplore = false
+        selectedDM = nil
+        selectedServer = server
+        openChannel(channel)
+    }
+
+    private func openInboxConversation(_ conversation: DMConversation) {
+        showExplore = false
+        showDMs = true
+        openDM(conversation)
+    }
+
+    private func markAllInboxRead() {
+        for server in servers {
+            for channel in server.categories.flatMap(\.channels) where channel.unreadCount > 0 || channel.mentionCount > 0 {
+                markChannelRead(channel)
+            }
+        }
+        for conversation in conversations where conversation.unreadCount > 0 {
+            markConversationRead(conversation)
+        }
     }
 
     @discardableResult
