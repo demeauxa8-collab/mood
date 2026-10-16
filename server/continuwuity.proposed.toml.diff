@@ -1,0 +1,27 @@
+# PROPOSITION UNIQUEMENT — non appliquée à la configuration active.
+# Source vérifiée : ~/mood-server/src/src/core/config/mod.rs, version 26.9.1.
+--- continuwuity.toml (active)
++++ continuwuity.toml (proposed; requires scheduled restart)
+@@ [global] @@
++# Pourquoi : aucun suffixe ajouté aux nouveaux noms. Risque : aucun changement des noms existants.
++new_user_displayname_suffix = ""
+- url_preview_domain_explicit_allowlist = ["github.com", "www.youtube.com", "en.wikipedia.org", "fr.wikipedia.org"]
++# Pourquoi : ne plus envoyer les liens au moteur serveur d'aperçus. Risque : disparition des aperçus dans tous les salons.
++url_preview_domain_explicit_allowlist = []
++# Pourquoi : garder toutes les autres listes d'autorisation vides. Risque : un aperçu demandé sera refusé.
++url_preview_domain_contains_allowlist = []
++# Pourquoi : même protection pour les autorisations par fragment d'URL. Risque : aucun aperçu automatique.
++url_preview_url_contains_allowlist = []
+
+# RÉTENTION DES MÉDIAS : aucune option native de durée automatique trouvée dans
+# la configuration 26.9.1. Ne pas inventer media_retention ni supprimer des fichiers
+# à la main. prune_missing_media ne gère PAS une durée : il efface la métadonnée
+# des fichiers absents au démarrage, avec risque de perte si le disque est inaccessible.
+# Proposition à décider : conservation sans purge pour l'instant, suivre l'espace,
+# puis étudier une purge supportée et restaurable avant toute suppression.
+# LIMITES DE DÉBIT : aucune clé globale rate_limit dans cette configuration/source.
+# Ne pas confondre max_request_size (déjà 25 Mio) avec des requêtes par seconde.
+# Proposition : étudier une couche proxy dédiée uniquement à Mood 8443, avec des
+# quotas par endpoint / identité et exemptions /sync ; aucune installation ici.
+# Risque : 429 intempestifs et blocage des utilisateurs partageant une même IP.
+# Ne jamais modifier le Funnel 443 ni appliquer ce fichier comme patch automatique.

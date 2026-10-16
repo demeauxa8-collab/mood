@@ -1,5 +1,87 @@
 # Handoff — Mood
 
+## État au 14 octobre 2026 — backend en ligne, l'app sert vraiment
+
+Mood fonctionne de bout en bout avec de **vrais comptes** : compte Mood (Supabase) → fonction
+`matrix-session` → serveur Matrix Continuwuity `mood.local` sur le Mac Studio, public sur
+`https://mac-studio-de-charlesmacstudio.tail80a3cb.ts.net:8443`. Augustin a échangé des messages entre
+deux comptes (Mac ↔ iPhone simulé) le 14/10 au soir.
+
+- **À lire d'abord** : [BACKEND.md](BACKEND.md) (architecture, config, exploitation, sécurité, preuves,
+  bugs trouvés en vrai) et [MODE-EMPLOI.md](MODE-EMPLOI.md) (utiliser Mood, en français simple).
+- Rapports des pistes : [SERVER-SETUP.md](SERVER-SETUP.md), [OPS.md](OPS.md),
+  [MATRIX-SESSION-STATUS.md](MATRIX-SESSION-STATUS.md), [PROVISIONING-F.md](PROVISIONING-F.md),
+  [FEATURE-CHECK.md](FEATURE-CHECK.md), [ACCOUNT-FEATURES.md](ACCOUNT-FEATURES.md),
+  [MESSAGING-SERVERS.md](MESSAGING-SERVERS.md), [FINISH-BASICS.md](FINISH-BASICS.md).
+- **Code** : branche `codex/pixel-merge` du clone `~/mood-codex-merge` sur le Studio (pistes D → L
+  fusionnées + correctifs). **Rien n'est poussé sur GitHub** (attendre le oui d'Augustin).
+- **App en service** : `~/mood-codex-merge/build/DerivedData/Build/Products/Debug-maccatalyst/mood.app`
+  (« Mood Merge ») et le simulateur « iPhone 18 Pro » (`6AB9444A-…`, via DeviceHub). Mise à jour :
+  `~/mood-logs/build-all.sh <tag>` (Mac + iPhone + tests), puis relancer. Les sessions survivent aux
+  relances (fichier privé en attendant la signature).
+- Contrôles serveur réutilisables : `python3 server/feature-check.py`, `python3 server/dm-sync-check.py`.
+
+En attente : piste M (« Mot de passe oublié ? » + confirmation par code, `~/mood-codex-M`), app Discord
+à créer par Augustin, FileVault sur le Studio, push GitHub, renommage « Mood Merge » → « Mood »,
+signature de l'app (trousseau, vrai iPhone), chiffrement de bout en bout.
+
+## Mise à jour du 15 octobre 2026 (soir)
+
+- **Mood tourne sur le vrai iPhone d'Augustin** (« iPhone de ADM », équipe personnelle gratuite
+  `ABMR854J9L`, identifiant `com.demeauxa8.mood` pour les builds appareil). Le profil expire tous les
+  7 jours : `scripts/install-iphone.sh` réinstalle **via Xcode** (la signature par SSH échoue,
+  `errSecInternalComponent`) ; Xcode doit être ouvert sur `~/mood-codex-merge/mood.xcodeproj`,
+  destination « iPhone de ADM ».
+- Fusionnés : **P** (sauvegardes chiffrées `age`, surveillance, rotation — la clé privée doit quitter le
+  Studio, voir `docs/SERVER-HARDENING.md`), **O1** (chiffrement de bout en bout phase 1 :
+  `matrix-sdk-crypto-ffi-0.17.0`, `mood/Vendor/MatrixSDKCrypto` **hors git**, 301 Mo, reconstruit par
+  `scripts/build-crypto.sh` ; à recopier dans tout nouveau clone), **N2** (médias, vocaux, GIF, emoji,
+  brouillons), plus les correctifs du test réel (noms des auteurs, feuilles iPhone statut et serveur).
+  150 tests verts.
+- Plan vie privée : [PRIVACY-PLAN.md](PRIVACY-PLAN.md). File de nuit sur le Studio
+  (`~/mood-patches/night-queue.sh`, journal `~/mood-logs/night-queue.log`) : **O2** (chiffrement phase 2,
+  `~/mood-codex-O2`, interrupteur `MoodE2EE` coupé tant que la validation ne passe pas) puis reprise de
+  **N1** (conversation, `~/mood-codex-N1`, coupé par la limite ChatGPT).
+
+## Nuit du 15 au 16 octobre 2026 — version de démo
+
+- Rendez-vous du 16/10 : suivre [DEMO.md](DEMO.md) (préparation, parcours de 5 minutes, ce qu'on ne montre
+  pas, quoi faire si ça coince). **Studio au calme pendant la démo** : la surcharge du 15/10 au soir (3 Codex
+  + builds, charge 57) a coupé Tailscale Funnel ; `tailscale down && tailscale up --accept-routes` l'a rétabli.
+- Fusionnés : **N1** (fils, transférer, non lus, liens de message, recherche), **R partie 1** (écrans iPhone
+  natifs), nouvelle icône + nom « Mood » + `Mood.dmg` (`scripts/make-dmg.sh`, voir [RELEASE.md](RELEASE.md)).
+- Revue des 51 écrans iPhone (`~/mood-patches/capture-review.py after`, simulateur de revue) et correctifs
+  `502dadd` : heures « Aujourd'hui à », « Salons textuels », texte de saisie entier, flèche retour dans les
+  feuilles à étapes (`MobileSheet(onBack:)`), fil de discussion natif, barre audio des vocaux.
+- **R** fini et fusionné (`65a5ea2`) : réglages du serveur iPhone en listes natives, brouillon de pièce
+  jointe en carte. **Version de démo = `65a5ea2`**, installée partout (Mac, simulateur, iPhone via
+  `scripts/install-iphone.sh` = build Xcode + `devicectl`), `Mood.dmg` refait.
+- **S** (sécurité locale) et **O2** (chiffrement phase 2) finis, fusionnés par Codex **T** dans la candidate
+  `codex/candidate-t` (`~/mood-codex-T`, + R) : builds verts, 189 tests, 9/9 MP, 11/11 chiffrement,
+  migration sans déconnexion testée ; `MoodE2EE` et verrou coupés par défaut, masquage du contenu des
+  notifications **activé** par défaut (à confirmer). Rapport : `~/mood-codex-T/docs/MERGE-T.md`.
+  **Pas installée** : à valider par Augustin après le rendez-vous, puis `git merge codex/candidate-t`.
+- Contrôles serveur (16/10, 03:00) : feature-check 137 PASS / 2 FAIL connus, dm-sync-check 9/9.
+
+## Priorité actuelle — 7 octobre 2026
+
+La priorité n°1 des travaux UI desktop est la fidélité pixel par pixel, en
+commençant par conserver et généraliser les séparateurs validés de la page Amis.
+Lire [UI-DESKTOP-PIXEL-PERFECT.md](UI-DESKTOP-PIXEL-PERFECT.md) et `../AGENTS.md`.
+Tous les essais restent dans le laboratoire « Mood Pixels » ; la version clean
+du Mac Studio reste intacte. Aucun commit ni envoi GitHub sans autorisation.
+Cette règle prime sur toute recommandation historique de commit ci-dessous.
+
+Passe « Pixels 2 » locale : `DesktopPixelRule` centralise les traits d’un pixel
+physique et 41 séparateurs ont été migrés. Build signé ad hoc et 16 tests réussis.
+Le paquet installé reste `/Users/Adm/Applications/Mood Pixels.app`, en mode démo.
+Les glyphes ne sont pas encore identiques : l’essai `-pixelTextMasks` reste
+désactivé par défaut car il dégrade un des quatre libellés comparés.
+Prochaine priorité : rasterisation des lettres, puis symboles non mesurés,
+paramètres et autres états/densités. Ne pas annoncer toutes les pages validées.
+
+## Archive historique
+
 **État arrêté au 9 août 2026.** Ce document s'adresse à quelqu'un — humain ou agent — qui
 reprend le projet sans contexte. Il dit où en est le code, ce qui bloque, et par où reprendre.
 

@@ -1,0 +1,28 @@
+[global]
+# No suffix appended to new display names (matrix-session sets the real name).
+new_user_displayname_suffix = ""
+server_name = "mood.local"
+database_path = "/Users/Adm/mood-server/data"
+address = ["127.0.0.1"]
+port = 6167
+allow_federation = false
+allow_registration = true
+registration_token_file = "/Users/Adm/mood-server/registration_token"
+max_request_size = 26214400
+allow_local_presence = true
+allow_incoming_presence = false
+allow_outgoing_presence = false
+allow_local_typing = true
+allow_local_read_receipts = true
+admins_list = []
+admins_from_room = false
+url_preview_domain_explicit_allowlist = ["github.com", "www.youtube.com", "en.wikipedia.org", "fr.wikipedia.org"]
+url_preview_max_spider_size = 256000
+url_preview_timeout = 15
+url_preview_allow_audio_video = false
+# Keep upstream private/link-local IP restrictions enabled.
+log = "warn"
+log_colors = false
+admin_log_capture = "off"
+# Avoid the upstream first-run token printed to stderr and automatic first admin.
+force_disable_first_run_mode = true

@@ -1,0 +1,71 @@
+{
+  "date": "2026-10-15T18:11:12.635475+00:00",
+  "branch": "codex/messaging-media",
+  "source_commit": "822bc0fe9d03bcabfbdc45c0df2c457a467043eb",
+  "simulator": {
+    "name": "Mood N2 iPhone",
+    "id": "320F3D8B-0CAF-4F8F-94C0-AF9AAA77FF90"
+  },
+  "builds": [
+    {
+      "platform": "Mac Catalyst",
+      "log": "/tmp/mood-n2-mac-delivery.log",
+      "result": "** BUILD SUCCEEDED **",
+      "sha256": "f8ab588b3d9ebf860581b7cde42d008113ee5ef64eda1e77a3248595c9c037a3"
+    },
+    {
+      "platform": "Mood N2 iPhone",
+      "log": "/tmp/mood-n2-ios-delivery.log",
+      "result": "** BUILD SUCCEEDED **",
+      "sha256": "e0a431312bac77864830f1d015173196df158dbb29207871c816c903ab08d03b"
+    }
+  ],
+  "tests": [
+    {
+      "path": "/Users/Adm/mood-codex-N2/build/DerivedData/Logs/Test/Test-mood-2026.10.15_20-01-42-+0200.xcresult",
+      "source_commit": "53b724b",
+      "scope": "Full suite before animation cache accounting correction",
+      "result": "Passed",
+      "totalTestCount": 148,
+      "passedTests": 148,
+      "failedTests": 0,
+      "skippedTests": 0
+    },
+    {
+      "path": "/Users/Adm/mood-codex-N2/build/DerivedData/Logs/Test/Test-mood-2026.10.15_20-04-23-+0200.xcresult",
+      "source_commit": "5ff413e",
+      "scope": "MediaComposerTests and MediaURLTests after animation cache accounting correction",
+      "result": "Passed",
+      "totalTestCount": 18,
+      "passedTests": 18,
+      "failedTests": 0,
+      "skippedTests": 0
+    }
+  ],
+  "artifacts": [
+    {
+      "file": "components.png",
+      "sha256": "e19abafd80cd5681d606b00f586baf1a2423885ad127693d62aa3c96e2477ae2",
+      "visually_inspected": true
+    },
+    {
+      "file": "emoji.png",
+      "sha256": "fee05269da3ea177f9855ab1d8e5fa6fe22ff554635624b937193dec4dac4055",
+      "visually_inspected": true
+    },
+    {
+      "file": "server-validation.json",
+      "sha256": "2d0c6a1d83280f6a8ea2beabd5b699e19cc9d3f824435e51549186d01add8921",
+      "visually_inspected": false
+    }
+  ],
+  "ui_changes_after_tests": "Empty-placeholder container and animation aspect ratio fixed, emoji search theme contrast fixed. Both platforms rebuilt and gallery screenshots visually inspected. No further full suite run for these view-only changes.",
+  "status": "Partial: reusable composer is not wired into conversation hosts; scope clarification requested.",
+  "limits": [
+    "No Mac application launched.",
+    "No real Mood account or Supabase operation.",
+    "Server probes use fresh disposable n2check-* accounts, all deactivated.",
+    "Screenshots are isolated demo components, not a real conversation E2E proof.",
+    "No microphone recording, camera capture, actual keyboard gesture or fullscreen interaction validated."
+  ]
+}

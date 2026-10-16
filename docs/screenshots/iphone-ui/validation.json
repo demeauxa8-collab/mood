@@ -1,0 +1,540 @@
+{
+  "date": "2026-10-16T02:50:42.101362+02:00",
+  "branch": "codex/iphone-ui",
+  "source_commit": "405d6b252769ec69e85bb11852ce05406e0e885d",
+  "simulator": {
+    "name": "Mood R iPhone",
+    "id": "74CF31F5-9565-4142-B844-E27058C8F892"
+  },
+  "builds": {
+    "iphone": "BUILD SUCCEEDED",
+    "mac_catalyst": "BUILD SUCCEEDED",
+    "mac_app_launched": false
+  },
+  "tests": {
+    "result": "Passed",
+    "passed": 160,
+    "suites": 29,
+    "failed": 0,
+    "skipped": 0,
+    "marker": "TEST EXECUTE SUCCEEDED"
+  },
+  "capture_count_per_phase": 51,
+  "account_mode": "uiPreview fixtures only",
+  "screenshots": {
+    "before": [
+      {
+        "screen": "account-credentials",
+        "sha256": "4cc99779a653665e1e2e5b7d3b6516801aec966c349e524c5e605abc12f7297b",
+        "visually_inspected": true
+      },
+      {
+        "screen": "account",
+        "sha256": "d09cb1981bb6cd6135edce4fdde7d2514723d42e3e6c480111a3003cb5480faa",
+        "visually_inspected": true
+      },
+      {
+        "screen": "appearance",
+        "sha256": "23484ab8200056ba0adb9df81d2e5c3b9e5efe529a149cc4f857eb09bbcdba01",
+        "visually_inspected": true
+      },
+      {
+        "screen": "attachment-draft",
+        "sha256": "0b81043d44b0d0546c490c59bcb6e219247f567e3553d0338f314b0996ac24aa",
+        "visually_inspected": true
+      },
+      {
+        "screen": "attachments",
+        "sha256": "b72f3a53d72f13f327ea82aef22a8c7de6ee518b24ea377c790f85bdd2a65ce2",
+        "visually_inspected": true
+      },
+      {
+        "screen": "audio",
+        "sha256": "57cfbcab14f620981e586189cba528f9807884c9c1b3f998a11301c93b7d0b00",
+        "visually_inspected": true
+      },
+      {
+        "screen": "chat",
+        "sha256": "f12bec717a5aba852dad7d8812bc742fe1a99a8b7b0456be53bebb27755b6e07",
+        "visually_inspected": true
+      },
+      {
+        "screen": "create-channel-error",
+        "sha256": "ed43eba488802f6e8b0b7cc3c7e5b28231a2d4462c33a53001068939deb4770f",
+        "visually_inspected": true
+      },
+      {
+        "screen": "create-channel-loading",
+        "sha256": "ed43eba488802f6e8b0b7cc3c7e5b28231a2d4462c33a53001068939deb4770f",
+        "visually_inspected": true
+      },
+      {
+        "screen": "create-channel",
+        "sha256": "ed43eba488802f6e8b0b7cc3c7e5b28231a2d4462c33a53001068939deb4770f",
+        "visually_inspected": true
+      },
+      {
+        "screen": "create-server-form",
+        "sha256": "63f19caa2ab2f95bd370b795bcac410770139d9135c544106b5f3b5c4e850bc3",
+        "visually_inspected": true
+      },
+      {
+        "screen": "create-server",
+        "sha256": "73ce34afa7bb92525926a4cd3d89730c783f0d89707ac8475cfe644c36854f2a",
+        "visually_inspected": true
+      },
+      {
+        "screen": "custom-status",
+        "sha256": "525d55649c769279a2773956a480bcf63f0532bbef882c8ffa2b4d9a031ac37e",
+        "visually_inspected": true
+      },
+      {
+        "screen": "devices",
+        "sha256": "9b0a48a0eb207a8ceb5b74b5a2325b84b5affb6ba892ab061e975d7176641f79",
+        "visually_inspected": true
+      },
+      {
+        "screen": "discord-import",
+        "sha256": "fb4791143c9d09904f9446093d1a9df3afdaf783dce5663f6e0dcb1a55aa57dd",
+        "visually_inspected": true
+      },
+      {
+        "screen": "edit-channel",
+        "sha256": "8695be8c0665fe7d40b9d9db446fe24ba4e6a699371a09a835c14f187fc2c582",
+        "visually_inspected": true
+      },
+      {
+        "screen": "emoji",
+        "sha256": "899b8f55dffefc2847086de02b56dc930221115245bfa20b8a3776c644bdc56b",
+        "visually_inspected": true
+      },
+      {
+        "screen": "encryption",
+        "sha256": "9deef0ab5b371bfed0c40f165b0854bb2724c4a9fccb19604cc12463b77b6666",
+        "visually_inspected": true
+      },
+      {
+        "screen": "explore",
+        "sha256": "9780ca0ebe90e70e215335b37cabda863b14a90b8ee4f49498db6f39f160fdc6",
+        "visually_inspected": true
+      },
+      {
+        "screen": "group-dm",
+        "sha256": "bc4a699ac97a762b0812459ff9afb6c46ff0ccf9c992d01155705a5c5cf43914",
+        "visually_inspected": true
+      },
+      {
+        "screen": "home",
+        "sha256": "6f52439dc174f9ea02c078e9c1d62d80b5d96d905dc498cb83e9bc5989a487cd",
+        "visually_inspected": true
+      },
+      {
+        "screen": "invite",
+        "sha256": "99cb38b87052f34a7fbfe4b1b0f29198af1cae06b836fd855b33989e3927096f",
+        "visually_inspected": true
+      },
+      {
+        "screen": "join-server",
+        "sha256": "f733c391ca649100b11e3398d9df05bc30efe7161608a872fc9e0e621d504575",
+        "visually_inspected": true
+      },
+      {
+        "screen": "members-empty",
+        "sha256": "2e7334d94db01571016c180f405db1be6c6273e4880a7290b8404baa23b8b77c",
+        "visually_inspected": true
+      },
+      {
+        "screen": "members",
+        "sha256": "00df2e84b39a13cebdf51fd31727f24e2085b02a8553cd91aadc601b569ac93e",
+        "visually_inspected": true
+      },
+      {
+        "screen": "new-dm-results",
+        "sha256": "60766e75c30114b6d960b3e6899e4ea4c7ac1d7d5e85a18aa8bf099bebad6495",
+        "visually_inspected": true
+      },
+      {
+        "screen": "new-dm",
+        "sha256": "7dc0752f2744ca4e22d9227c5fe0dc80f4b4a091eeacce5fb2560108be236107",
+        "visually_inspected": true
+      },
+      {
+        "screen": "notification-settings",
+        "sha256": "c3bc4a1974b18012d860ddc97e7a97ed00ed99b1171083c0463db1e84dd952fb",
+        "visually_inspected": true
+      },
+      {
+        "screen": "notifications",
+        "sha256": "750c8a8342ef7571496a32ba4df7424f7d56c2ff30b86cf19fdbd3c294f06af8",
+        "visually_inspected": true
+      },
+      {
+        "screen": "pins-empty",
+        "sha256": "2631c9084e5cdbc25eab30bfb4aee643989259fa9cc174de463dc4dd816ea319",
+        "visually_inspected": true
+      },
+      {
+        "screen": "pins",
+        "sha256": "a43beb92f8b1fbfe10a92116f04a11bc82f17b3a364cb30fc48ddcbc023ceb11",
+        "visually_inspected": true
+      },
+      {
+        "screen": "privacy",
+        "sha256": "4f25617e6ba09e9a380b89e9358e69b51779973e9d247b05ba4aa3ef7f4fd810",
+        "visually_inspected": true
+      },
+      {
+        "screen": "profile-long",
+        "sha256": "351563ff308690552592a22f6870bd2154d6c3233646ecd79f923adb4489cb4f",
+        "visually_inspected": true
+      },
+      {
+        "screen": "profile-popup",
+        "sha256": "2b83d2a4a89b55daf4b2c1f368c3067e8bc957043f630b7b8326154a62dfff38",
+        "visually_inspected": true
+      },
+      {
+        "screen": "profile-settings",
+        "sha256": "28cf32af5058911bbfbb8395f606a647a69e8888c2c965a9971d5ee9222bcae2",
+        "visually_inspected": true
+      },
+      {
+        "screen": "profile",
+        "sha256": "0049223b35b3a81cef224f55994091b78ca0eb09f24ff7d128db5b821d1e3943",
+        "visually_inspected": true
+      },
+      {
+        "screen": "search-error",
+        "sha256": "77e5ea2ac73c325e26b770c4ba93e8d0bef302648d59342ae6bcbec32406927c",
+        "visually_inspected": true
+      },
+      {
+        "screen": "search-loading",
+        "sha256": "02dd3ff6fceaea6ef7966f11cd3d680c57db304fb17d2fb36a04480839eecdd9",
+        "visually_inspected": true
+      },
+      {
+        "screen": "search-results",
+        "sha256": "20b38c1e8e375a632efe62400325515f4e887e810758e47cda453720916af280",
+        "visually_inspected": true
+      },
+      {
+        "screen": "search",
+        "sha256": "e2eb273d1e806fbdc0fdb2b4ef3bd8ebb8bcd171a7d92a80d7e16b34920b60fd",
+        "visually_inspected": true
+      },
+      {
+        "screen": "server-bans",
+        "sha256": "e8424e1d76743a616cccaeda2db8229c58fc57579c6034c1e4821e12aa470ebd",
+        "visually_inspected": true
+      },
+      {
+        "screen": "server-invites",
+        "sha256": "39425b3b4310901d698b2f599fe74bb87082e43e00c2699ffb3540eb4b73b925",
+        "visually_inspected": true
+      },
+      {
+        "screen": "server-members",
+        "sha256": "ac3422725facdc23087e3bd534d0d0207a614a3f0f6901a0c9c9f8a24c7ed82c",
+        "visually_inspected": true
+      },
+      {
+        "screen": "server-overview",
+        "sha256": "6b9ff4ded8f7222201c10620dc9941e7779a26f455542dc0b762943b5e500d21",
+        "visually_inspected": true
+      },
+      {
+        "screen": "server-roles",
+        "sha256": "6f0e4b4220032c0c9aa8a9111efb3253684f26e4f8cf764b80bd26b6d713c901",
+        "visually_inspected": true
+      },
+      {
+        "screen": "server-settings",
+        "sha256": "c501eb7a2cd94b57988d2e78746485822953c70112007f4dc6b02b2a2103d76b",
+        "visually_inspected": true
+      },
+      {
+        "screen": "server",
+        "sha256": "8d1cbd0bc3a4e060bf54d7c3c88c335f29c0f724d7b7782bcaacec4289a0b072",
+        "visually_inspected": true
+      },
+      {
+        "screen": "settings",
+        "sha256": "dc2d2a2fb2bfeece838f257a07245e9e679dbe38226feec3d93768b684a917de",
+        "visually_inspected": true
+      },
+      {
+        "screen": "thread",
+        "sha256": "6166a912119c982e048ce6aaa5e3f94765ad44cc5e0064db16a9a321efe841c9",
+        "visually_inspected": true
+      },
+      {
+        "screen": "username",
+        "sha256": "e5a4f0742c038b99dac78f20aef94f5bfc9fc9899e87a9e1e0d9b3947a778c7a",
+        "visually_inspected": true
+      },
+      {
+        "screen": "video",
+        "sha256": "292e8cdcfad59d2cbe3eb59277d9d4dc5b733ff48268402e1e07da34735f04f8",
+        "visually_inspected": true
+      }
+    ],
+    "after": [
+      {
+        "screen": "account-credentials",
+        "sha256": "81aea326ea94e8c53d592d927bcf1b4609133cd06332d9df27027049821dca1c",
+        "visually_inspected": true
+      },
+      {
+        "screen": "account",
+        "sha256": "065ab9b322e64c3d70be5f4e20715a03ca417eae272eb9d1c1845c416df9e75e",
+        "visually_inspected": true
+      },
+      {
+        "screen": "appearance",
+        "sha256": "6a622b9c8d01374a0945ac53b368e68c1e41a177db73e6dc7e28a681f9db831b",
+        "visually_inspected": true
+      },
+      {
+        "screen": "attachment-draft",
+        "sha256": "2aaa3222b897237b38341f0a49d446350b690260a5f0e58d7c5b7c3c24a43224",
+        "visually_inspected": true
+      },
+      {
+        "screen": "attachments",
+        "sha256": "9b4e675d778ddd6c89c5cdbc9974324e3d6b20c2885f6a4672551deea8195823",
+        "visually_inspected": true
+      },
+      {
+        "screen": "audio",
+        "sha256": "ad69c4e3cab840768a9723531bbf6cef4a3bf63f44b6a79f405fec917efd09b8",
+        "visually_inspected": true
+      },
+      {
+        "screen": "chat",
+        "sha256": "77264ea404cd867abf12a48a8ad17a2dd541e56bcbff0789207f51b843bf091d",
+        "visually_inspected": true
+      },
+      {
+        "screen": "create-channel-error",
+        "sha256": "27f529c67c25e324cd69849e0214000c355e4546e0f98ad05cf4b5ab10a5c02b",
+        "visually_inspected": true
+      },
+      {
+        "screen": "create-channel-loading",
+        "sha256": "18f5cb0e08802cf6e9cc48e32034b45c498a715005b3d0d59fcb7fcedff8eae6",
+        "visually_inspected": true
+      },
+      {
+        "screen": "create-channel",
+        "sha256": "c80e11889ca32ea681fb8cfc6f8c9855b678c572d6e81a30e51d97c1a3cbb82c",
+        "visually_inspected": true
+      },
+      {
+        "screen": "create-server-form",
+        "sha256": "72fc13083c899917410b5dabc6655e7c78fc221899b77b23a6ac76f8221b2c72",
+        "visually_inspected": true
+      },
+      {
+        "screen": "create-server",
+        "sha256": "5a77f83b8799b6df3dbf9cc62faa93ec85552949fef830abb59a716eefbdb6fe",
+        "visually_inspected": true
+      },
+      {
+        "screen": "custom-status",
+        "sha256": "0874a2ccd9bc227a8d787d800c486cb649f7ee3cbe678425f39fe350677cddb3",
+        "visually_inspected": true
+      },
+      {
+        "screen": "devices",
+        "sha256": "378e63d578d3c947d94880199a8374239667c5fe7d17ae97c079181f51d02a7b",
+        "visually_inspected": true
+      },
+      {
+        "screen": "discord-import",
+        "sha256": "d6bd2aa574d8845968c2f7398aed073bc8e11a7eb2c1468124b022ce84dcd20a",
+        "visually_inspected": true
+      },
+      {
+        "screen": "edit-channel",
+        "sha256": "452f74412fcbd588cbb7c71e3834d3078b78e0c7dbbadc4f82eaa0a29a26b311",
+        "visually_inspected": true
+      },
+      {
+        "screen": "emoji",
+        "sha256": "1247ce946c88203307fcdbc90fa2a7b1eebff2cfbe6c6080c1e37e09029b43f8",
+        "visually_inspected": true
+      },
+      {
+        "screen": "encryption",
+        "sha256": "c808feb37f6e7e737ec4daf3f8a480a1b3db435908f10d367e1ab80c6280e8a6",
+        "visually_inspected": true
+      },
+      {
+        "screen": "explore",
+        "sha256": "8f63b52694f85ca6222b9dbdd51f7cd528203f91979d8b872f6c2dcedc6f01a5",
+        "visually_inspected": true
+      },
+      {
+        "screen": "group-dm",
+        "sha256": "99daaf800d901e003c3eb1dd16bfcf547edcb034f04f80edf0791a8d5b6b3779",
+        "visually_inspected": true
+      },
+      {
+        "screen": "home",
+        "sha256": "4fa41811aeb1310ee701229619a9aecef0e035d08dbed5f829468c4f5d936224",
+        "visually_inspected": true
+      },
+      {
+        "screen": "invite",
+        "sha256": "99bdd120f37e41496024d568797f5ab5b7e93f263c7a209ddf1f298fd806de4f",
+        "visually_inspected": true
+      },
+      {
+        "screen": "join-server",
+        "sha256": "5eff052ff0ecb16bc1f1499bb71b5245a3c5bcc05c27d74ff102a8f791180f10",
+        "visually_inspected": true
+      },
+      {
+        "screen": "members-empty",
+        "sha256": "e10324c70e1496c43d313edc41848bdb6cbf7dfaa8e672f942136377acaaf7ee",
+        "visually_inspected": true
+      },
+      {
+        "screen": "members",
+        "sha256": "151faa358b925ac0d8e6429c0e834482fb362e8f4ae7ad8006dbdce23bafbdc9",
+        "visually_inspected": true
+      },
+      {
+        "screen": "new-dm-results",
+        "sha256": "ec979ab15fbeafe2bec01fbb907a6c44cde49a7acce0d58e82ba2f86bc1aa00d",
+        "visually_inspected": true
+      },
+      {
+        "screen": "new-dm",
+        "sha256": "74af3c8127c3db3f7e30f931ec585a40da4e46dc1fb2d0d3993627a2c1698a6e",
+        "visually_inspected": true
+      },
+      {
+        "screen": "notification-settings",
+        "sha256": "b367b3ad9ea5761bb0588421ad0f0179caf1b895fce13dcf3de3c6f92357b80c",
+        "visually_inspected": true
+      },
+      {
+        "screen": "notifications",
+        "sha256": "eae4a16626f4077fe3b5b43d0f3c82870b5e725f01d7f9bf6d0ce2da7a78d360",
+        "visually_inspected": true
+      },
+      {
+        "screen": "pins-empty",
+        "sha256": "cbba07eba0d83ce5b146547ec403da2071960dea5903b043efb8d244807e1eec",
+        "visually_inspected": true
+      },
+      {
+        "screen": "pins",
+        "sha256": "93f660184928f2fab98155485f8976f8fe826692e1f8b6b3544baf14ef2969c7",
+        "visually_inspected": true
+      },
+      {
+        "screen": "privacy",
+        "sha256": "9b321430f42b9a7d9d9fc3983c883930c6077e0a6d71831febdb58509e67ea9e",
+        "visually_inspected": true
+      },
+      {
+        "screen": "profile-long",
+        "sha256": "49fc23d8e4d7da2bf1f0037fb63edb94d1b89f004b5b36978b9dce21d6a5096e",
+        "visually_inspected": true
+      },
+      {
+        "screen": "profile-popup",
+        "sha256": "cd5c348bbbca60d149a387e7e5173248724b34f8d76a2ec16e9e0e7eb71cda24",
+        "visually_inspected": true
+      },
+      {
+        "screen": "profile-settings",
+        "sha256": "9369d3eeceaf4eeaa8540c647b230feebb151abc909863f454171a3ce56d7959",
+        "visually_inspected": true
+      },
+      {
+        "screen": "profile",
+        "sha256": "0049223b35b3a81cef224f55994091b78ca0eb09f24ff7d128db5b821d1e3943",
+        "visually_inspected": true
+      },
+      {
+        "screen": "search-error",
+        "sha256": "aa6c966aa7e36b9dfbb435c27fc8cfb380e5e2779d17aa8eb501c03dfe512932",
+        "visually_inspected": true
+      },
+      {
+        "screen": "search-loading",
+        "sha256": "b087f9d73b6655a2e8ee181ac2d63d40a9cbab4a2b6e73118400b8f944c7c856",
+        "visually_inspected": true
+      },
+      {
+        "screen": "search-results",
+        "sha256": "4c7904d3add8f6e6bf7e81b5fe990de320db6cee35ed3374b858ce18d9110262",
+        "visually_inspected": true
+      },
+      {
+        "screen": "search",
+        "sha256": "2a000855f193e87f810c119844d36579c3ea04ee9c0ac2404e5f13cc53745859",
+        "visually_inspected": true
+      },
+      {
+        "screen": "server-bans",
+        "sha256": "701d946bc6d86e00bee36d178b6c7d80f66d72e64d3feb2b6466b574c75dfd16",
+        "visually_inspected": true
+      },
+      {
+        "screen": "server-invites",
+        "sha256": "7f2fbb82838c23cc9e712c0d05de4b48c684c1ec525edd25d9e46b80d9610d63",
+        "visually_inspected": true
+      },
+      {
+        "screen": "server-members",
+        "sha256": "c17004f8d98d4c105feccabde67d375102e2d14d19c48adaa1f7cefbfbbaa03c",
+        "visually_inspected": true
+      },
+      {
+        "screen": "server-overview",
+        "sha256": "ae0980713e3dea1b6c83f46f0b5df276a7376830ee332a8abd0265fc7081bf7b",
+        "visually_inspected": true
+      },
+      {
+        "screen": "server-roles",
+        "sha256": "642e7d536371d9c28e163c1a2b7916818b2d2163fcec69f9c33d358805441f4f",
+        "visually_inspected": true
+      },
+      {
+        "screen": "server-settings",
+        "sha256": "1d458f08cd9f31860d3fff4ce1c217007649a757013d052997ef8614755ab0b3",
+        "visually_inspected": true
+      },
+      {
+        "screen": "server",
+        "sha256": "12ddffe40ef84a9c9957d05b984667202c52d69250d60b778e1ef424dc40ef50",
+        "visually_inspected": true
+      },
+      {
+        "screen": "settings",
+        "sha256": "73c31c4867c9bfbf1cc31fd4f43588406674262c18ad200b46d7301fc2005f62",
+        "visually_inspected": true
+      },
+      {
+        "screen": "thread",
+        "sha256": "9689f9d5c1e263354d77d9e569e994ab1f6500f8bce6315147f5f9fd1a27bbcc",
+        "visually_inspected": true
+      },
+      {
+        "screen": "username",
+        "sha256": "21fca6d85ca5cb0044bfc89a02d44935747eadab6273ef0a5dfb4ecf2e986839",
+        "visually_inspected": true
+      },
+      {
+        "screen": "video",
+        "sha256": "39cdcef29c8a097066daad206f24de19b905f18cfdb50a1090a34d8e177a2531",
+        "visually_inspected": true
+      }
+    ]
+  }
+}

@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		C10000000000000000000001 /* mood/Vendor/MatrixSDKCrypto/MatrixSDKCrypto.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = C10000000000000000000002 /* mood/Vendor/MatrixSDKCrypto/MatrixSDKCrypto.xcframework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		A1C832A72F51AD9000EFC10E /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,11 +31,31 @@
 		A1C832942F51AD8F00EFC10E /* mood.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = mood.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1C832A62F51AD9000EFC10E /* moodTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = moodTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1C832B02F51AD9000EFC10E /* moodUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = moodUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1C832D02F51AD9000EFC10E /* Config.defaults.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.defaults.xcconfig; sourceTree = "<group>"; };
+		C10000000000000000000002 /* mood/Vendor/MatrixSDKCrypto/MatrixSDKCrypto.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = mood/Vendor/MatrixSDKCrypto/MatrixSDKCrypto.xcframework; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		C10000000000000000000003 /* Exceptions for "mood" folder in "mood" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Vendor/MatrixSDKCrypto/LICENSE,
+				Vendor/MatrixSDKCrypto/MatrixSDKCrypto.xcframework,
+				"Vendor/MatrixSDKCrypto/memory-store.patch",
+				Vendor/MatrixSDKCrypto/README.md,
+				Vendor/MatrixSDKCrypto/SHA256SUMS,
+				Vendor/MatrixSDKCrypto/SHA256SUMS.generated,
+			);
+			target = A1C832932F51AD8F00EFC10E /* mood */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A1C832962F51AD8F00EFC10E /* mood */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				C10000000000000000000003 /* Exceptions for "mood" folder in "mood" target */,
+			);
 			path = mood;
 			sourceTree = "<group>";
 		};
@@ -52,6 +76,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C10000000000000000000001 /* mood/Vendor/MatrixSDKCrypto/MatrixSDKCrypto.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,13 +97,23 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		5043BC9330814C590097F893 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				A1C832D02F51AD9000EFC10E /* Config.defaults.xcconfig */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 		A1C8328B2F51AD8F00EFC10E = {
 			isa = PBXGroup;
 			children = (
+				C10000000000000000000002 /* mood/Vendor/MatrixSDKCrypto/MatrixSDKCrypto.xcframework */,
 				A1C832962F51AD8F00EFC10E /* mood */,
 				A1C832A92F51AD9000EFC10E /* moodTests */,
 				A1C832B32F51AD9000EFC10E /* moodUITests */,
 				A1C832952F51AD8F00EFC10E /* Products */,
+				5043BC9330814C590097F893 /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -390,15 +425,20 @@
 		};
 		A1C832BB2F51AD9000EFC10E /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A1C832D02F51AD9000EFC10E /* Config.defaults.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 9XH7XU2F7P;
+				DEVELOPMENT_TEAM = ABMR854J9L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Mood-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Mood;
+				INFOPLIST_KEY_MoodSupabaseAnonKey = "$(SUPABASE_ANON_KEY)";
+				INFOPLIST_KEY_MoodSupabaseURL = "$(SUPABASE_URL)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -410,6 +450,8 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = Mood.mood;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.demeauxa8.mood;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = Mood.mood.mergePreview;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -420,20 +462,26 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				"TARGETED_DEVICE_FAMILY[sdk=macosx*]" = 6;
 			};
 			name = Debug;
 		};
 		A1C832BC2F51AD9000EFC10E /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A1C832D02F51AD9000EFC10E /* Config.defaults.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				INFOPLIST_KEY_CFBundleDisplayName = Mood;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 9XH7XU2F7P;
+				DEVELOPMENT_TEAM = ABMR854J9L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Mood-Info.plist";
+				INFOPLIST_KEY_MoodSupabaseAnonKey = "$(SUPABASE_ANON_KEY)";
+				INFOPLIST_KEY_MoodSupabaseURL = "$(SUPABASE_URL)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -445,6 +493,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = Mood.mood;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.demeauxa8.mood;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -455,6 +504,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				"TARGETED_DEVICE_FAMILY[sdk=macosx*]" = 6;
 			};
 			name = Release;
 		};

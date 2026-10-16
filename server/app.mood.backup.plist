@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>app.mood.backup</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/Adm/mood-server/scripts/backup.sh</string>
+	</array>
+	<key>StandardErrorPath</key>
+	<string>/Users/Adm/Library/Logs/MoodServer/app.mood.backup.error.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/Adm/Library/Logs/MoodServer/app.mood.backup.log</string>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>4</integer>
+		<key>Minute</key>
+		<integer>15</integer>
+	</dict>
+	<key>Umask</key>
+	<integer>63</integer>
+	<key>WorkingDirectory</key>
+	<string>/Users/Adm/mood-server</string>
+</dict>
+</plist>

@@ -1,0 +1,34 @@
+{
+  "source_commit": "a4885d3460173ecafefbe2017bb52639c4dca407",
+  "date": "2026-10-14",
+  "builds": {
+    "Mac Catalyst": "BUILD SUCCEEDED",
+    "Mood K iPhone": "BUILD SUCCEEDED"
+  },
+  "tests": {
+    "result": "Passed",
+    "totalTestCount": 112,
+    "passedTests": 112,
+    "failedTests": 0,
+    "skippedTests": 0
+  },
+  "xcresult": "build/DerivedData/Logs/Test/Run-mood-2026.10.14_16-17-36-+0200.xcresult",
+  "simulator": {
+    "name": "Mood K iPhone",
+    "id": "383EDCD4-EEA5-4263-9482-6A135645D9F5"
+  },
+  "capture_mode": "uiPreview; deterministic demo states; no authenticated network session",
+  "captures": {
+    "attachment.png": "4c2ecc1829cdbd613579f7d3886bae9b819d78ee7661579ecfd8fdfd410809d7",
+    "chat.png": "421152dcf426e56ab458ccde498f91dad5d06015fba23ed0af77f43302b9c26a",
+    "create-channel.png": "9706f35bdd79e786d3c3f1709b6b650aaa81cac3de64df0ed94554c3ab960bfc",
+    "create-server.png": "a7ada8bd6c1103773bfbdc63c20e7ba1708d3886d05f0ce627380d656fe9feb7",
+    "edit.png": "1fd216a31b071c22c813b1666d822ae03a8b43feaeba365b190a4f16841b567b",
+    "invite.png": "69470eadc065c7a905ff5b9f15fed6b723e6a9ba743e818f64ce6e76441c4284",
+    "join-server.png": "fa7f31635b64acc1f1d102f9e242da833f01856ce8c58580b5833923c26d3800",
+    "mentions.png": "3372a742c69b2fea56aac70f22556705a77dad64458f40463806cb268e808676",
+    "pins.png": "6ffeae2eeccaaf6c6601684f7c62b799f952eaf4b16ba5b7891d0a4814be9c60",
+    "reply.png": "c9d22b34605ed909fc00bddd25f7a2796f11441c070c6a3c719915a401533476",
+    "settings.png": "32872a259a32c080f94944ef9604a5cd4c5f977291048fca9f30e58834886a85"
+  }
+}
