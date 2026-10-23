@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>NSMicrophoneUsageDescription</key><string>Mood utilise le micro pour enregistrer tes messages vocaux.</string>
+<key>NSCameraUsageDescription</key><string>Mood utilise l’appareil photo pour prendre les photos et vidéos que tu choisis d’envoyer.</string>
+<key>NSPhotoLibraryUsageDescription</key><string>Mood accède aux photos et vidéos que tu choisis de partager dans une conversation.</string>
+<key>MoodSupabaseURL</key><string>$(SUPABASE_URL)</string>
+<key>MoodSupabaseAnonKey</key><string>$(SUPABASE_ANON_KEY)</string>
+<key>CFBundleURLTypes</key><array><dict>
+<key>CFBundleURLName</key><string>Mood authentication</string>
+<key>CFBundleURLSchemes</key><array><string>mood</string><string>moodapp</string></array>
+</dict></array>
+</dict></plist>

@@ -1,0 +1,40 @@
+{
+  "verified_at_utc": "2026-10-15T19:24:54.436472+00:00",
+  "source_commit": "0732bab2f4635ece1a84bc1797e2f8bc6996cecd",
+  "test_source_commit": "387765b8162f5c9c3a9144bc6df610a686a16a52",
+  "test_note": "Later commits change disconnected preview fixtures only.",
+  "simulator": {
+    "name": "Mood N1 iPhone",
+    "id": "F2EB95FA-2CC0-4CE3-8AEC-3F6518E3B0DA"
+  },
+  "mac_catalyst_build": "BUILD SUCCEEDED",
+  "iphone_build": "BUILD SUCCEEDED",
+  "swift_testing": {
+    "result": "TEST SUCCEEDED",
+    "passed": 148,
+    "failed": 0,
+    "suites": 27,
+    "conversation_tests": 9
+  },
+  "server_check": {
+    "PASS": 38,
+    "FAIL": 0,
+    "INFO": 1
+  },
+  "disposable_accounts_deactivated": 2,
+  "screenshots_visually_inspected": true,
+  "sha256": {
+    "iphone-conversation.png": "ddf7e8568f9409d0e11d2ff2ea467d076d0aabd593f221b7ba662444990db58b",
+    "iphone-directory.png": "dda114d5884955c7f5034bd80f12a3006aa330f45f61ab9206d813775e3fcc9b",
+    "iphone-forward.png": "cef4999d4615e627245f84c6d7c97a4eaf45e71752bd0b860ab04d8115a10186",
+    "iphone-search.png": "422486da375cbd6c562b93553c2cb814616509f1fc7c08c855864942e83307f2",
+    "iphone-thread.png": "16cd9ca3009030aea158935421da14268a0b6fc1cbd8ae2b524a3b5e695994f5",
+    "server-check.txt": "d89dbc314a43b5bc5435118109c723baa81a67b46302808106c99fd0a991e409"
+  },
+  "limits": [
+    "Demo screenshots do not prove authenticated UI interactions.",
+    "No Mac app launched or Mac visual inspection.",
+    "Text forwarding only; N2 media code unchanged.",
+    "Desktop DM threads use a modal fallback."
+  ]
+}

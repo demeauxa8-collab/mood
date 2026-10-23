@@ -1,0 +1,4 @@
+// Supabase is optional. Keep local credentials in the ignored Config.xcconfig.
+SUPABASE_URL =
+SUPABASE_ANON_KEY =
+#include? "Config.xcconfig"

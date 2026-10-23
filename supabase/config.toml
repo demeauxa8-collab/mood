@@ -1,0 +1,13 @@
+# Supabase CLI settings for this repo. Only the Edge Function section below matters today;
+# every other setting keeps the CLI default. project_id is a local label, not the project ref
+# (the hosted project is jxpgyblzymshyzbkgmat).
+project_id = "mood"
+
+[functions.matrix-session]
+# The function authenticates every caller itself (GET /auth/v1/user with the bearer token), so
+# the gateway's JWT check is switched off on purpose:
+# - an expired or missing token always gets the contract body {"error":"not_authenticated"},
+#   never the gateway's own 401 body;
+# - the gateway check only understands the legacy JWT keys, which Supabase retires at the end
+#   of 2026, and is not needed with the new sb_ API keys / JWT signing keys.
+verify_jwt = false

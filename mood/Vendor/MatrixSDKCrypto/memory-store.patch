@@ -1,0 +1,22 @@
+diff --git a/bindings/matrix-sdk-crypto-ffi/src/machine.rs b/bindings/matrix-sdk-crypto-ffi/src/machine.rs
+index 468ac4c..caf8381 100644
+--- a/bindings/matrix-sdk-crypto-ffi/src/machine.rs
++++ b/bindings/matrix-sdk-crypto-ffi/src/machine.rs
+@@ -224,6 +224,17 @@ impl OlmMachine {
+         Ok(Arc::new(OlmMachine { inner: ManuallyDrop::new(inner), runtime }))
+     }
+ 
++    /// Create a disposable machine using the SDK's official MemoryStore.
++    /// Exposed for offline integration checks; never use for persistent app sessions.
++    #[uniffi::constructor]
++    pub fn new_in_memory(user_id: String, device_id: String) -> Result<Arc<Self>, CryptoStoreError> {
++        let user_id = parse_user_id(&user_id)?;
++        let device_id = device_id.as_str().into();
++        let runtime = Runtime::new().expect("Couldn't create a tokio runtime");
++        let inner = runtime.block_on(InnerMachine::new(&user_id, device_id));
++        Ok(Arc::new(OlmMachine { inner: ManuallyDrop::new(inner), runtime }))
++    }
++
+     /// Get the user ID of the owner of this `OlmMachine`.
+     pub fn user_id(&self) -> String {
+         self.inner.user_id().to_string()

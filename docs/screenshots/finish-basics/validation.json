@@ -1,0 +1,57 @@
+{
+  "source_commit": "27422c38061d397c3c0f0b46ff20c8269bfea912",
+  "simulator": {
+    "name": "Mood L iPhone",
+    "id": "3A979591-99E9-4373-ACC1-D4E6761FBCFB"
+  },
+  "preview_arguments": [
+    "-uiPreview",
+    "-finishBasicsPreview",
+    "-uiPreviewScreen",
+    "<screen>"
+  ],
+  "builds": {
+    "Mac Catalyst": "BUILD SUCCEEDED",
+    "iPhone": "BUILD SUCCEEDED"
+  },
+  "tests": {
+    "result": "Passed",
+    "totalTestCount": 131,
+    "passedTests": 131,
+    "failedTests": 0
+  },
+  "test_result": "build/DerivedData/Logs/Test/Test-mood-2026.10.14_17-13-50-+0200.xcresult",
+  "screenshots": {
+    "iphone-account.png": {
+      "sha256": "31d1a7560b18a6db671fca2212848f3cd979fb9ca6cb6d5fd26745aae4f9bcd2",
+      "visually_inspected": true
+    },
+    "iphone-add-friend.png": {
+      "sha256": "7dc0752f2744ca4e22d9227c5fe0dc80f4b4a091eeacce5fb2560108be236107",
+      "visually_inspected": true
+    },
+    "iphone-invitations.png": {
+      "sha256": "541f05747e099df53ddb16c2e0f06fadec4fcfef81e051c41cafad4977259f6c",
+      "visually_inspected": true
+    },
+    "iphone-mentions.png": {
+      "sha256": "e13e43bc87bb0e3257314436ee5853f9b926e08795c7725875a7262f78c6b867",
+      "visually_inspected": true
+    },
+    "iphone-profile-popup.png": {
+      "sha256": "cb22c796b7ef5d25ffd0011fb7a69f9c4526e7d898f965a030e8625492a543d4",
+      "visually_inspected": true
+    },
+    "iphone-profile.png": {
+      "sha256": "97c3883ab3b217aba553a73cb03b62328518beb36a0b7574ba0ecc0b7b123b35",
+      "visually_inspected": true
+    },
+    "iphone-username-editor.png": {
+      "sha256": "208dfd58e9d668c8d01207db276305891f683107a6e2c603142c37582552e4f5",
+      "visually_inspected": true
+    }
+  },
+  "real_accounts_used": false,
+  "github_published": false,
+  "mac_app_launched": false
+}

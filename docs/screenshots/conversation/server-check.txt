@@ -1,0 +1,39 @@
+INFO — Inscription manuelle app sans jeton — HTTP 401 -
+PASS — UIAA jeton a — HTTP 401 -
+PASS — Mauvais jeton refusé a — HTTP 401 M_FORBIDDEN
+PASS — Inscription a — HTTP 200 -
+PASS — Connexion a — HTTP 200 -
+PASS — Whoami a — HTTP 200 -
+PASS — UIAA jeton b — HTTP 401 -
+PASS — Mauvais jeton refusé b — HTTP 401 M_FORBIDDEN
+PASS — Inscription b — HTTP 200 -
+PASS — Connexion b — HTTP 200 -
+PASS — Whoami b — HTTP 200 -
+PASS — Créer salon privé jetable — HTTP 200 -
+PASS — Rejoindre — HTTP 200 -
+PASS — Envoyer fil — HTTP 200 -
+PASS — Liste threads v1 — HTTP 200 -
+PASS — Repli messages contient fil — HTTP 200 -
+PASS — Sync contient fil — HTTP 200 -
+PASS — Accusé fil — HTTP 200 -
+PASS — Context retrouve racine — HTTP 200 -
+PASS — m.marked_unread écrire True — HTTP 200 -
+PASS — m.marked_unread relire True — HTTP 200 -
+PASS — m.marked_unread écrire False — HTTP 200 -
+PASS — m.marked_unread relire False — HTTP 200 -
+PASS — com.famedly.marked_unread écrire True — HTTP 200 -
+PASS — com.famedly.marked_unread relire True — HTTP 200 -
+PASS — com.famedly.marked_unread écrire False — HTTP 200 -
+PASS — com.famedly.marked_unread relire False — HTTP 200 -
+PASS — Recherche serveur — HTTP 200 -
+PASS — Créer destination transfert — HTTP 200 -
+PASS — Rejoindre destination — HTTP 200 -
+PASS — Destinataire relit transfert — HTTP 200 -
+PASS — Quitter salon jetable — HTTP 200 -
+PASS — Quitter salon jetable — HTTP 200 -
+PASS — Quitter salon jetable — HTTP 200 -
+PASS — Quitter salon jetable — HTTP 200 -
+PASS — Désactivation n1check-a-7986c328f72e4f — HTTP 200 -
+PASS — Connexion compte désactivé refusée — HTTP 403 M_USER_DEACTIVATED
+PASS — Désactivation n1check-b-5db712d5fa9245 — HTTP 200 -
+PASS — Connexion compte désactivé refusée — HTTP 403 M_USER_DEACTIVATED
