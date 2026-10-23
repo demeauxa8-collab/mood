@@ -213,11 +213,10 @@ struct ServerSettingsMenu: View {
         .alert("Quitter « \(server.name) »", isPresented: $showLeaveConfirm) {
             Button("Annuler", role: .cancel) {}
             Button("Quitter le serveur", role: .destructive) {
-                onLeft()
-                Task { await matrixStore.leaveServer(server) }
+                Task { if await matrixStore.leaveServer(server) { onLeft() } }
             }
         } message: {
-            Text("Tu ne pourras plus revenir sans être réinvité.")
+            Text("Tu n’auras plus accès à ses salons. Il te faudra une invitation pour revenir. Les messages déjà envoyés resteront visibles aux autres.")
         }
     }
 }

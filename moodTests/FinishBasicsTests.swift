@@ -83,10 +83,14 @@ extension FinishBasicsTests {
         let client = try #require(SupabaseAuthClient(info: ["MoodSupabaseURL": "https://mood.invalid", "MoodSupabaseAnonKey": "synthetic-public-key"],
             urlSession: URLSession(configuration: config),
             initialSession: SupabaseSession(accessToken: "synthetic-test-value", refreshToken: "synthetic-refresh", expiresIn: 3600,
-                user: SupabaseUser(id: UUID(), email: nil, userMetadata: nil))))
+                user: SupabaseUser(id: UUID(), email: nil, userMetadata: nil)), persistsSession: false))
         try await client.setUsername("available")
         do { try await client.setUsername("taken"); Issue.record("Conflict must throw") }
-        catch { #expect(error.localizedDescription == "Ce nom d'utilisateur est déjà pris") }
+        catch AccountError.usernameTaken {
+            #expect(AccountError.usernameTaken.localizedDescription == "Ce nom d'utilisateur est déjà pris.")
+        } catch {
+            Issue.record("Expected a typed username conflict, received: \(error)")
+        }
     }
 }
 

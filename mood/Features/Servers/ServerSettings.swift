@@ -33,7 +33,7 @@ struct CreateChannelModal: View {
     let server: MoodServer
     @Binding var isPresented: Bool
     var onCreated: (UUID) -> Void = { _ in }
-    @State private var name = ""
+    @State private var name = ["create-channel-error", "create-channel-loading"].contains(MobileUIPreview.screen ?? "") ? "soirée" : ""
     @State private var topic = ""
     @State private var isPrivate = false
     @State private var isWorking = MobileUIPreview.screen == "create-channel-loading"
@@ -66,7 +66,7 @@ struct CreateChannelModal: View {
                     Text("Seules les personnes invitées pourront rejoindre ce salon.")
                         .font(.mood(14)).foregroundStyle(MoodTheme.textSecondary)
                 }.listRowBackground(MoodTheme.inputBg)
-                if let failure { Section { Text(failure).foregroundStyle(MoodTheme.mentionBadge) }.listRowBackground(MoodTheme.inputBg) }
+                if let failure { Section { MoodNotice(title: "Le salon n’a pas été créé", detail: failure, actionTitle: "Réessayer", action: { if cleanedName.isEmpty { self.failure = "Entre un nom de salon pour réessayer." } else { create() } }, secondaryTitle: "Fermer", secondaryAction: { self.failure = nil }) }.listRowBackground(MoodTheme.inputBg) }
                 Section {
                     Button(action: create) {
                         HStack { if isWorking { ProgressView() }; Text(isWorking ? "Création…" : "Créer le salon") }
@@ -141,7 +141,7 @@ struct CreateChannelModal: View {
             .foregroundStyle(MoodTheme.textPrimary)
 
             if let failure {
-                Text(failure).font(.mood(12)).foregroundStyle(MoodTheme.mentionBadge)
+                MoodNotice(title: "Le salon n’a pas été créé", detail: failure, actionTitle: "Réessayer", action: { if cleanedName.isEmpty { self.failure = "Entre un nom de salon pour réessayer." } else { create() } }, secondaryTitle: "Fermer", secondaryAction: { self.failure = nil })
             }
 
             HStack {
@@ -717,7 +717,7 @@ private struct ServerInvitesPane: View {
                 }.listRowBackground(MoodTheme.inputBg)
             }
             Section {
-                Button("Créer un code d’invitation") { Task { await matrixStore.prepareMessagingInvite(for: server) } }
+                Button(matrixStore.isPreparingInvite(for: server) ? "Création…" : "Créer un code d’invitation") { Task { await matrixStore.prepareMessagingInvite(for: server) } }.disabled(matrixStore.isPreparingInvite(for: server))
                     .buttonStyle(MobilePrimaryButtonStyle())
             }.listRowBackground(MoodTheme.mobileSurface).listRowInsets(EdgeInsets())
         }.mobileGroupedList()
@@ -806,7 +806,7 @@ private struct LeaveServerButton: View {
 
     var body: some View {
         Button { confirm = true } label: {
-            Label("Quitter le serveur", systemImage: "rectangle.portrait.and.arrow.right")
+            Label(matrixStore.leavingServers.contains(server.id) ? "Départ en cours…" : "Quitter le serveur", systemImage: "rectangle.portrait.and.arrow.right")
                 .font(.mood(15))
                 .foregroundStyle(MoodTheme.mentionBadge)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -817,11 +817,10 @@ private struct LeaveServerButton: View {
         .alert("Quitter « \(server.name) »", isPresented: $confirm) {
             Button("Annuler", role: .cancel) {}
             Button("Quitter le serveur", role: .destructive) {
-                onLeft()
-                Task { await matrixStore.leaveServer(server) }
+                Task { if await matrixStore.leaveServer(server) { onLeft() } }
             }
         } message: {
-            Text("Tu ne pourras plus revenir sans être réinvité.")
+            Text("Tu n’auras plus accès à ses salons. Il te faudra une invitation pour revenir. Les messages déjà envoyés resteront visibles aux autres.")
         }
     }
 }
@@ -974,6 +973,7 @@ struct ChannelSettingsView: View {
 struct CopyField: View {
     @Environment(\.layoutMode) private var layoutMode
     let value: String
+    var onCopied: () -> Void = {}
     @State private var copied = false
 
     var body: some View {
@@ -987,6 +987,7 @@ struct CopyField: View {
             Spacer()
             Button {
                 UIPasteboard.general.string = value
+                onCopied()
                 copied = true
                 Task {
                     try? await Task.sleep(for: .seconds(2))
@@ -1058,10 +1059,10 @@ struct ServerInviteModal: View {
                             Text(person.name.hasPrefix("@") ? String(person.name.dropFirst().prefix(while: { $0 != ":" })) : person.name)
                                 .fixedSize(horizontal: false, vertical: true)
                             Spacer()
-                            Button(invited.contains(person.id) ? "Invité" : "Inviter") {
+                            Button(invited.contains(person.id) ? "Invité" : (pendingInvitations.contains(person.id) ? "Envoi…" : "Inviter")) {
                                 pendingInvitations.insert(person.id)
                                 Task {
-                                    if await matrixStore.inviteToServer(server, matrixUserId: person.id) { invited.insert(person.id) }
+                                    if await matrixStore.inviteToServer(server, matrixUserId: person.id) { invited.insert(person.id); matrixStore.recordFirstRunInvite(for: server) }
                                     pendingInvitations.remove(person.id)
                                 }
                             }.disabled(invited.contains(person.id) || pendingInvitations.contains(person.id)).frame(minHeight: LayoutMetrics.mobile(44))
@@ -1071,10 +1072,10 @@ struct ServerInviteModal: View {
                 Section("Code d’invitation") {
                     Text("Toute personne avec ce code pourra rejoindre le serveur.").font(.mood(14)).foregroundStyle(MoodTheme.textSecondary)
                     if let link = matrixStore.inviteLink(for: server) {
-                        CopyField(value: String(link.suffix(8)))
+                        CopyField(value: String(link.suffix(8)), onCopied: { matrixStore.recordFirstRunInvite(for: server) })
                         ShareLink(item: link) { Label("Partager le lien", systemImage: "square.and.arrow.up") }.frame(minHeight: LayoutMetrics.mobile(44))
                     } else {
-                        Button("Créer un code") { Task { await matrixStore.prepareMessagingInvite(for: server) } }
+                        Button(matrixStore.isPreparingInvite(for: server) ? "Création…" : "Créer un code") { Task { await matrixStore.prepareMessagingInvite(for: server) } }.disabled(matrixStore.isPreparingInvite(for: server))
                             .frame(minHeight: LayoutMetrics.mobile(44))
                     }
                     MessagingFailureNotice()
@@ -1130,9 +1131,11 @@ struct ServerInviteModal: View {
                                 .lineLimit(1)
                             Spacer()
                             let isInvited = invited.contains(person.id)
-                            Button(isInvited ? "Invité" : "Inviter") {
+                            Button(isInvited ? "Invité" : (pendingInvitations.contains(person.id) ? "Envoi…" : "Inviter")) {
+                                pendingInvitations.insert(person.id)
                                 Task {
-                                    if await matrixStore.inviteToServer(server, matrixUserId: person.id) { invited.insert(person.id) }
+                                    if await matrixStore.inviteToServer(server, matrixUserId: person.id) { invited.insert(person.id); matrixStore.recordFirstRunInvite(for: server) }
+                                    pendingInvitations.remove(person.id)
                                 }
                             }
                             .buttonStyle(.plain)
@@ -1143,7 +1146,7 @@ struct ServerInviteModal: View {
                             .background(isInvited ? Color.clear : MoodTheme.onlineGreen)
                             .overlay(RoundedRectangle(cornerRadius: 4).stroke(isInvited ? MoodTheme.divider : .clear))
                             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                            .disabled(isInvited)
+                            .disabled(isInvited || pendingInvitations.contains(person.id))
                         }
                         .padding(.vertical, 4)
                     }
@@ -1161,9 +1164,9 @@ struct ServerInviteModal: View {
                     .foregroundStyle(MoodTheme.textSecondary)
                 if let link = matrixStore.inviteLink(for: server) {
                     // Discord-like: the code to type in "Rejoindre un serveur", the link, and Share.
-                    CopyField(value: String(link.suffix(8)))
+                    CopyField(value: String(link.suffix(8)), onCopied: { matrixStore.recordFirstRunInvite(for: server) })
                     HStack(spacing: 8) {
-                        CopyField(value: link)
+                        CopyField(value: link, onCopied: { matrixStore.recordFirstRunInvite(for: server) })
                         if let url = URL(string: link) {
                             ShareLink(item: url, message: Text("Rejoins \(server.name) sur Mood")) {
                                 Label("Partager", systemImage: "square.and.arrow.up")
@@ -1181,7 +1184,7 @@ struct ServerInviteModal: View {
                         .font(.mood(11))
                         .foregroundStyle(MoodTheme.textMuted)
                 } else {
-                    Button("Créer un code d’invitation") { Task { await matrixStore.prepareMessagingInvite(for: server) } }
+                    Button(matrixStore.isPreparingInvite(for: server) ? "Création…" : "Créer un code d’invitation") { Task { await matrixStore.prepareMessagingInvite(for: server) } }.disabled(matrixStore.isPreparingInvite(for: server))
                         .font(.mood(14, weight: .semibold))
                         .foregroundStyle(MoodTheme.brandBlue)
                         .buttonStyle(.plain)
@@ -1338,81 +1341,13 @@ final class ServerActions {
 
 // MARK: - Server Welcome
 
-/// Discord's checklist in the first channel of a brand-new server.
-struct ServerWelcomeChecklist: View {
-    @Environment(ServerActions.self) private var actions
-    let server: MoodServer
-
-    var body: some View {
-        VStack(spacing: 16 * LayoutMetrics.scale) {
-            VStack(spacing: 6 * LayoutMetrics.scale) {
-                Text("Bienvenue sur\n\(server.name)")
-                    .font(.mood(28, weight: .bold))
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(MoodTheme.textPrimary)
-                Text("Voici ton tout nouveau serveur. Quelques étapes pour bien démarrer :")
-                    .font(.mood(14))
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(MoodTheme.textSecondary)
-            }
-            VStack(spacing: 8 * LayoutMetrics.scale) {
-                WelcomeStep(icon: "person.2.fill", tint: MoodTheme.brandBlue, label: "Invite tes amis") {
-                    actions.pending = .invite
-                }
-                WelcomeStep(icon: "paintbrush.pointed.fill", tint: MoodTheme.onlineGreen, label: "Personnalise ton serveur avec une icône",
-                            isDone: server.iconURL != nil) {
-                    actions.pending = .openSettings
-                }
-                WelcomeStep(icon: "paperplane.fill", tint: MoodTheme.brandAccent, label: "Envoie ton premier message", isDone: false) {}
-                    .allowsHitTesting(false)
-            }
-        }
-        .frame(maxWidth: 440)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 32 * LayoutMetrics.scale)
-    }
-}
-
-private struct WelcomeStep: View {
-    let icon: String
-    let tint: Color
-    let label: String
-    var isDone = false
-    let action: () -> Void
-    @State private var isHovered = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12 * LayoutMetrics.scale) {
-                Image(systemName: icon)
-                    .font(.mood(18))
-                    .foregroundStyle(tint)
-                    .frame(width: 28 * LayoutMetrics.scale)
-                Text(label)
-                    .font(.mood(15, weight: .semibold))
-                    .foregroundStyle(isDone ? MoodTheme.textSecondary : MoodTheme.textPrimary)
-                Spacer()
-                Image(systemName: isDone ? "checkmark.circle.fill" : "chevron.right")
-                    .font(.mood(isDone ? 18 : 13, weight: .semibold))
-                    .foregroundStyle(isDone ? MoodTheme.onlineGreen : MoodTheme.textSecondary)
-            }
-            .padding(.horizontal, 16 * LayoutMetrics.scale)
-            .frame(height: 56 * LayoutMetrics.scale)
-            .background(isHovered ? MoodTheme.hoverBg : MoodTheme.serverBar)
-            .clipShape(RoundedRectangle(cornerRadius: 8 * LayoutMetrics.scale, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in withAnimation(MoodMotion.hover) { isHovered = hovering } }
-    }
-}
-
-
 /// Sheets must show server errors themselves, since the global banner is behind them.
 private struct MessagingFailureNotice: View {
     @Environment(MatrixStore.self) private var store
     var body: some View {
+        ServerLeaveNotice()
         if let message = store.errorMessage {
-            ErrorBanner(message: message) { store.errorMessage = nil }
+            ErrorBanner(message: message, onRetry: store.retryAction) { store.errorMessage = nil }
         }
     }
 }

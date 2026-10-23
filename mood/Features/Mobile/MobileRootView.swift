@@ -80,7 +80,9 @@ struct MobileRootView: View {
             }
         }
         .background(MoodTheme.channelList)
-
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if chat == nil { ConversationRecoveryNotices() }
+        }
         
         .sheet(isPresented: $showMembers) {
             if case .channel(_, let server) = chat {

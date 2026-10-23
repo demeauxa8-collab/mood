@@ -42,7 +42,10 @@ struct PlayableMedia: View {
                     Label(loading ? "Téléchargement…" : "Lire", systemImage: "play.circle.fill").font(.mood(24))
                 }.disabled(loading)
             }
-            if let error { Text(error).font(.mood(12)).foregroundStyle(MoodTheme.mentionBadge) }
+            if error != nil {
+                MoodNotice(title: "Le média n’a pas pu être ouvert", detail: "Vérifie ta connexion et réessaie. Le message reste dans la conversation.",
+                    actionTitle: "Réessayer", action: { Task { await load() } }, busy: loading)
+            }
         }
         .padding(10 * LayoutMetrics.scale)
         .frame(maxWidth: 400 * LayoutMetrics.scale, alignment: .leading)

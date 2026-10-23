@@ -7,6 +7,7 @@ struct ThreadPanel: View {
     let server: MoodServer?
     @Binding var showPanel: Bool
     @Environment(\.layoutMode) private var layoutMode
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var text = ""
 
     /// iPhone pushes the thread in a navigation stack: the system bar carries the title and back button.
@@ -29,6 +30,7 @@ struct ThreadPanel: View {
                 }.padding(12 * LayoutMetrics.scale)
                 DesktopPixelRule()
             }
+            ConversationRecoveryNotices()
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 12 * LayoutMetrics.scale) {
@@ -40,9 +42,6 @@ struct ThreadPanel: View {
                         }
                         ForEach(replies) { reply in
                             threadRow(reply).id(reply.id)
-                            if reply.sendState == .failed, let roomId {
-                                Button("Réessayer") { store.retryMessage(reply.id, roomId: roomId) }
-                            }
                         }
                     }.padding(compact ? LayoutMetrics.mobile(16) : 12 * LayoutMetrics.scale)
                 }
@@ -77,6 +76,7 @@ struct ThreadPanel: View {
                     .mobileGlassCapsule()
                 }
                 .padding(.horizontal, LayoutMetrics.mobile(16)).padding(.bottom, LayoutMetrics.mobile(8))
+                .messageUndoAccessory()
             } else {
                 HStack {
                     TextField("Répondre au fil", text: $text)
@@ -87,7 +87,7 @@ struct ThreadPanel: View {
                         .disabled(cannotSend)
                 }
                 .font(.mood(14)).padding(12 * LayoutMetrics.scale)
-                .background(MoodTheme.inputBg)
+                .background(MoodTheme.inputBg).messageUndoAccessory()
             }
         }
         .foregroundStyle(MoodTheme.textPrimary)
@@ -109,8 +109,22 @@ struct ThreadPanel: View {
                 Text(message.sender.displayName).font(.mood(compact ? 16 : 13, weight: .semibold))
                 Text(message.timestamp.messageTimestamp).font(.mood(compact ? 12 : 10)).foregroundStyle(MoodTheme.textMuted)
             }
-            Text(message.content + (message.isEdited ? " (modifié)" : "")).font(.mood(compact ? 16 : 14)).textSelection(.enabled)
-            if message.sendState == .sending { Text("Envoi en cours…").font(.mood(compact ? 13 : 11)).foregroundStyle(MoodTheme.textMuted) }
+            Text(message.content + (message.isEdited ? " (modifié)" : "")).font(.mood(compact ? 16 : 14))
+                .foregroundStyle(message.sendState == .failed ? MoodTheme.deliveryFailed : MoodTheme.textPrimary)
+                .opacity(message.sendState == .sending ? 0.5 : 1).textSelection(.enabled)
+            if let roomId { MessageDeliveryStatus(message: message, roomID: roomId) }
+        }
+        .animation(reduceMotion ? nil : MoodMotion.hover, value: message.sendState)
+        .contextMenu {
+            if message.isOwn, let roomId, message.sendState != .sent {
+                if message.sendState == .failed {
+                    Button("Renvoyer") { store.retryMessage(message.id, roomId: roomId) }
+                }
+                Button("Supprimer", role: .destructive) { store.discardUnsentMessage(message.id, roomId: roomId) }
+            } else if message.isOwn, let roomId, let eventID = message.eventId {
+                Button("Supprimer le message", role: .destructive) { store.scheduleMessageDeletion(roomID: roomId, eventID: eventID) }
+            }
+            Button("Copier le texte") { UIPasteboard.general.string = message.content }
         }
     }
 
@@ -233,7 +247,8 @@ struct ConversationMobileSearch: View {
                 case .loading: ProgressView("Recherche en cours…")
                 case .needsTerm: Text("Ajoute un mot à rechercher.")
                 case .unavailable: Text("La recherche n’est pas disponible dans ces conversations.")
-                case .failed: Text("La recherche a échoué."); Button("Réessayer", action: onRetry)
+                case .failed:
+                    MoodNotice(title: "La recherche a échoué", detail: "Vérifie ta connexion, puis réessaie.", actionTitle: "Réessayer", action: onRetry)
                 case .loaded:
                     Text("\(model.resultCount) résultats").foregroundStyle(MoodTheme.textMuted)
                     ForEach(model.hits) { hit in

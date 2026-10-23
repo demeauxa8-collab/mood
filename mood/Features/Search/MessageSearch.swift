@@ -41,6 +41,7 @@ final class MessageSearchModel {
     /// Explicit launch-only fixtures never restore a session or contact a server.
     func prepareMobileUIPreview() {
         guard let screen = MobileUIPreview.screen else { return }
+        if screen == "first-run-search" { query = "soirée"; phase = .loaded }
         if screen == "search-loading" { phase = .loading }
         if screen == "search-error" { phase = .failed("Impossible de charger les résultats. Vérifie ta connexion puis réessaie.") }
         if screen == "search-results", let server = MockData.servers.first,
@@ -256,10 +257,8 @@ struct SearchPanel: View {
                 subtitle: "Le serveur ne peut pas lire leurs messages."
             )
         case .failed(let message):
-            SearchStateMessage(icon: "exclamationmark.triangle", title: "La recherche a échoué", subtitle: message) {
-                Button("Réessayer") { model.submit(store: matrixStore, scope: scope) }
-                    .buttonStyle(SearchActionButtonStyle())
-            }
+            MoodNotice(title: "La recherche a échoué", detail: message,
+                actionTitle: "Réessayer", action: { model.submit(store: matrixStore, scope: scope) })
         case .loaded:
             if model.hits.isEmpty && model.nextBatch == nil {
                 SearchStateMessage(
@@ -316,10 +315,8 @@ struct SearchPanel: View {
             .disabled(model.isLoadingMore)
 
             if let error = model.loadMoreError {
-                Text(error)
-                    .font(.mood(12))
-                    .foregroundStyle(MoodTheme.mentionBadge)
-                    .multilineTextAlignment(.center)
+                MoodNotice(title: "La suite n’a pas été chargée", detail: error,
+                    actionTitle: "Réessayer", action: { model.loadMore(store: matrixStore, scope: scope) })
             }
         }
         .frame(maxWidth: .infinity)

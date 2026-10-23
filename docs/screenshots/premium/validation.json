@@ -1,0 +1,35 @@
+{
+  "branch": "codex/premium-pass",
+  "simulator": {
+    "name": "Mood X iPhone",
+    "udid": "C0052827-E1BA-4ADC-AB64-5778DF4BAA63",
+    "stateAtCompletion": "Shutdown"
+  },
+  "iosBuild": "BUILD SUCCEEDED",
+  "catalystBuild": "BUILD SUCCEEDED",
+  "unitTests": {
+    "passed": 221,
+    "suites": 33,
+    "failed": 0
+  },
+  "uiTests": {
+    "passed": 3,
+    "failed": 0,
+    "accountFree": true
+  },
+  "screenshots": {
+    "count": 23,
+    "allVisuallyInspected": true
+  },
+  "networkTests": "URLProtocol interception; no production outage or real account",
+  "macRuntimeValidation": false,
+  "realDeviceUsed": false,
+  "productionConfigurationChanged": false,
+  "githubActionPerformed": false,
+  "logs": {
+    "ios": "build/premium-logs/ios-delivery.log",
+    "catalyst": "build/premium-logs/catalyst-delivery.log",
+    "unit": "build/premium-logs/tests-delivery.log",
+    "ui": "build/premium-logs/tests-complete.log"
+  }
+}

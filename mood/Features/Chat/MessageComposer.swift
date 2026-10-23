@@ -14,6 +14,7 @@ struct MessageInputBar: View {
     var isDisabled: Bool = false
     @Binding var replyingTo: ChatMessage?
     var mentionMembers: [MentionCandidate] = []
+    var focusRequest: UUID?
     var onSend: (() -> Void)?
     var onAttachFile: ((URL) -> Void)?
     @State private var attachmentError: String?
@@ -23,7 +24,7 @@ struct MessageInputBar: View {
     @State private var importedTypes: [UTType]?
     @FocusState private var composerFocused: Bool
 
-    init(text: Binding<String>, channelName: String, isE2E: Bool, isDirectMessage: Bool = false, typingUsers: [String] = [], isDisabled: Bool = false, replyingTo: Binding<ChatMessage?> = .constant(nil), onSend: (() -> Void)? = nil, onAttachFile: ((URL) -> Void)? = nil, mentionMembers: [MentionCandidate] = []) {
+    init(text: Binding<String>, channelName: String, isE2E: Bool, isDirectMessage: Bool = false, typingUsers: [String] = [], isDisabled: Bool = false, replyingTo: Binding<ChatMessage?> = .constant(nil), onSend: (() -> Void)? = nil, onAttachFile: ((URL) -> Void)? = nil, mentionMembers: [MentionCandidate] = [], focusRequest: UUID? = nil) {
         self._text = text
         self.channelName = channelName
         self.isE2E = isE2E
@@ -34,6 +35,7 @@ struct MessageInputBar: View {
         self.onSend = onSend
         self.onAttachFile = onAttachFile
         self.mentionMembers = mentionMembers
+        self.focusRequest = focusRequest
     }
 
     var body: some View {
@@ -153,7 +155,8 @@ struct MessageInputBar: View {
                         axis: .vertical
                     )
                         .textFieldStyle(.plain)
-                        .desktopComposerFocus(calibrated: calibrated, focus: $composerFocused)
+                        .focused($composerFocused)
+                        .onChange(of: focusRequest) { _, _ in composerFocused = true }
                         .desktopFriendsFont(calibrated ? 16 : 15)
                         .foregroundStyle(MoodTheme.textPrimary)
                         .disabled(isDisabled)

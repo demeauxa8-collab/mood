@@ -44,6 +44,9 @@ struct NewDMSheet: View {
                 }.listRowBackground(MoodTheme.inputBg)
                 Section("Amis") {
                     if isSearching { ProgressView("Recherche…") }
+                    else if query.isEmpty && matrixStore.friends.isEmpty && results.isEmpty {
+                        FriendsFirstRunState { searchFocused = true }
+                    }
                     else if results.isEmpty { Text(emptyStateText).font(.mood(15)).foregroundStyle(MoodTheme.textSecondary).fixedSize(horizontal: false, vertical: true) }
                     ForEach(results, id: \.userId) { user in
                         HStack {
@@ -57,7 +60,7 @@ struct NewDMSheet: View {
                         }
                     }
                 }.listRowBackground(MoodTheme.inputBg)
-                if let error = matrixStore.errorMessage { Section { Text(error).foregroundStyle(MoodTheme.mentionBadge) }.listRowBackground(MoodTheme.inputBg) }
+                if let error = matrixStore.errorMessage { Section { MoodNotice(title: "L’action n’a pas abouti", detail: error, secondaryTitle: "Fermer", secondaryAction: { matrixStore.errorMessage = nil }) }.listRowBackground(MoodTheme.inputBg) }
                 if groupMode {
                     Section {
                         Button(openingUserId == "group" ? "Création…" : "Créer le groupe") {
@@ -93,7 +96,7 @@ struct NewDMSheet: View {
                 }.disabled(selectedUsers.count < 2 || groupName.trimmingCharacters(in: .whitespaces).isEmpty || openingUserId != nil)
             }
             if let error = matrixStore.errorMessage {
-                Text(error).font(.mood(12)).foregroundStyle(MoodTheme.mentionBadge).padding(LayoutMetrics.mobile(12))
+                ErrorBanner(message: error) { matrixStore.errorMessage = nil }.padding(LayoutMetrics.mobile(12))
             }
             searchField
 

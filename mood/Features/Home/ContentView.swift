@@ -85,16 +85,9 @@ struct ContentView: View {
         }
         .background(MoodTheme.chatBackground)
         .preferredColorScheme(.dark)
-        .overlay(alignment: .top) {
-            if let error = matrixStore.errorMessage {
-                ErrorBanner(message: error) {
-                    matrixStore.errorMessage = nil
-                }
-                .id(error)
-                .transition(.opacity)
-            }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if layoutMode == .regular, activeChannel == nil, selectedDM == nil { ConversationRecoveryNotices() }
         }
-        .animation(MoodMotion.popover, value: matrixStore.errorMessage)
         .overlay {
             if showProfilePopup, let user = profileUser {
                 ZStack {
@@ -431,6 +424,14 @@ struct ContentView: View {
                         selectedDM = nil
                     }
                 )
+            } else if conversations.isEmpty && desktopFriendsTab == .online && matrixStore.pendingInvites.isEmpty {
+                Group {
+                    if matrixStore.userId != nil && matrixStore.connection != .connected {
+                        ConversationCacheEmptyState()
+                    } else {
+                        OnboardingHomeEmptyState(onAddFriends: { desktopFriendsTab = .add })
+                    }
+                }.padding(LayoutMetrics.mobile(24))
             } else {
                 FriendsPlaceholderView(
                     selectedTab: $desktopFriendsTab,
@@ -635,49 +636,15 @@ struct ContentView: View {
 
 struct ErrorBanner: View {
     let message: String
+    var onRetry: (() -> Void)? = nil
     let onDismiss: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.mood(13))
-                .foregroundStyle(MoodTheme.mentionBadge)
-
-            Text(message)
-                .font(.mood(13))
-                .foregroundStyle(MoodTheme.textPrimary)
-                .lineLimit(3)
-                .multilineTextAlignment(.leading)
-
-            Spacer(minLength: 8)
-
-            Button(action: onDismiss) {
-                Image(systemName: "xmark")
-                    .font(.mood(11, weight: .semibold))
-                    .foregroundStyle(MoodTheme.textSecondary)
-                    .frame(width: 24, height: 24)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(MoodTheme.popupBg)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(MoodTheme.glassBorder, lineWidth: 0.5)
-        )
-        .popoverElevation()
-        .frame(maxWidth: 480)
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .task {
-            try? await Task.sleep(for: .seconds(5))
-            guard !Task.isCancelled else { return }
-            onDismiss()
-        }
+        MoodNotice(title: "L’action n’a pas abouti", detail: message,
+            actionTitle: onRetry == nil ? nil : "Réessayer", action: onRetry,
+            secondaryTitle: "Fermer", secondaryAction: onDismiss)
     }
+
 }
 
 // MARK: - Empty State
@@ -942,7 +909,9 @@ struct FriendsPlaceholderView: View {
 
     @ViewBuilder
     private var allFriendsSection: some View {
-        if filteredFriends.isEmpty {
+        if FirstRunPolicy.friendsState(total: friends.count, visible: filteredFriends.count, query: searchText) == .empty {
+            FriendsFirstRunState { showAddFriend = true }
+        } else if filteredFriends.isEmpty {
             friendsEmptyState(
                 icon: "magnifyingglass",
                 title: "Aucun résultat",
@@ -970,7 +939,9 @@ struct FriendsPlaceholderView: View {
 
     @ViewBuilder
     private func friendSection(title: String, users: [MoodUser]) -> some View {
-        if users.isEmpty {
+        if FirstRunPolicy.friendsState(total: friends.count, visible: users.count, query: searchText) == .empty {
+            FriendsFirstRunState { showAddFriend = true }
+        } else if users.isEmpty {
             friendsEmptyState(
                 icon: searchText.isEmpty ? "person.2.slash" : "magnifyingglass",
                 title: searchText.isEmpty ? "Personne ici pour le moment" : "Aucun résultat",

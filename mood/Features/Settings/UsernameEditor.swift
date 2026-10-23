@@ -20,7 +20,7 @@ struct UsernameEditor: View {
                         .textInputAutocapitalization(.never).autocorrectionDisabled().font(.mood(16))
                     Text(MoodUsername.rule).font(.mood(14)).foregroundStyle(MoodTheme.textSecondary)
                 }.listRowBackground(MoodTheme.inputBg)
-                if let failure { Section { Text(failure).foregroundStyle(MoodTheme.mentionBadge) }.listRowBackground(MoodTheme.inputBg) }
+                if let failure { Section { MoodNotice(title: "L’action n’a pas abouti", detail: failure, secondaryTitle: "Fermer", secondaryAction: { self.failure = nil }) }.listRowBackground(MoodTheme.inputBg) }
             }.mobileGroupedList()
                 .toolbar { ToolbarItem(placement: .confirmationAction) {
                     Button(saving ? "Enregistrement…" : "Enregistrer") {
@@ -43,7 +43,7 @@ struct UsernameEditor: View {
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
                     .font(.mood(16)).textFieldStyle(.roundedBorder)
                 Text(MoodUsername.rule).font(.mood(13)).foregroundStyle(MoodTheme.textSecondary)
-                if let failure { Text(failure).font(.mood(14)).foregroundStyle(MoodTheme.mentionBadge) }
+                if let failure { MoodNotice(title: "L’action n’a pas abouti", detail: failure, secondaryTitle: "Fermer", secondaryAction: { self.failure = nil }) }
                 Button(saving ? "Enregistrement…" : "Enregistrer") {
                     saving = true
                     failure = nil

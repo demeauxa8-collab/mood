@@ -6,9 +6,28 @@ struct ExtendedProfileEditor: View {
     @State private var draft = ExtendedProfile()
     @State private var saving = false
     @State private var feedback: String?
+    @State private var didSave = false
 
     var body: some View {
         if layoutMode == .compact { mobileBody } else { desktopBody }
+    }
+
+    private func feedbackNotice(_ message: String) -> some View {
+        let retry: (() -> Void)? = didSave ? nil : { save() }
+        return MoodNotice(title: didSave ? "Profil enregistré" : "Le profil n’a pas été enregistré", detail: message,
+            symbol: didSave ? "checkmark.circle" : "exclamationmark.circle",
+            actionTitle: didSave ? nil : "Réessayer", action: retry, busy: saving)
+    }
+
+    private func save() {
+        guard !saving else { return }
+        saving = true
+        feedback = nil
+        Task {
+            didSave = await store.updateExtendedProfile(draft)
+            feedback = didSave ? "Tes changements sont enregistrés." : "Tes saisies sont conservées. Vérifie ta connexion, puis réessaie."
+            saving = false
+        }
     }
 
     private var mobileBody: some View {
@@ -18,15 +37,8 @@ struct ExtendedProfileEditor: View {
                 TextField("Ta bio", text: $draft.bio, axis: .vertical).lineLimit(3...8).font(.mood(16))
                 Text("PRONOMS").font(.mood(12, weight: .semibold)).foregroundStyle(MoodTheme.textSecondary)
                 TextField("Tes pronoms", text: $draft.pronouns).font(.mood(16)).frame(minHeight: LayoutMetrics.mobile(44))
-                Button(saving ? "Enregistrement…" : "Enregistrer la bio") {
-                    Task {
-                        saving = true
-                        let success = await store.updateExtendedProfile(draft)
-                        feedback = success ? "Profil enregistré." : store.errorMessage
-                        saving = false
-                    }
-                }.buttonStyle(MobilePrimaryButtonStyle()).disabled(saving || store.userId == nil)
-                if let feedback { Text(feedback).font(.mood(14)).foregroundStyle(MoodTheme.textSecondary) }
+                Button(saving ? "Enregistrement…" : "Enregistrer la bio") { save() }.buttonStyle(MobilePrimaryButtonStyle()).disabled(saving || store.userId == nil)
+                if let feedback { feedbackNotice(feedback) }
             }
         }.padding(.vertical, LayoutMetrics.mobile(8))
             .task {
@@ -41,15 +53,8 @@ struct ExtendedProfileEditor: View {
                 TextField("Ta bio", text: $draft.bio, axis: .vertical).lineLimit(2...4)
             }
             SettingsSection(title: "PRONOMS") { TextField("Tes pronoms", text: $draft.pronouns) }
-            Button("Enregistrer la bio et les pronoms") {
-                Task {
-                    saving = true
-                    let success = await store.updateExtendedProfile(draft)
-                    feedback = success ? "Profil enregistré." : store.errorMessage
-                    saving = false
-                }
-            }.disabled(saving || store.userId == nil)
-            if let feedback { Text(feedback).font(.mood(12)).foregroundStyle(MoodTheme.textSecondary) }
+            Button("Enregistrer la bio et les pronoms") { save() }.disabled(saving || store.userId == nil)
+            if let feedback { feedbackNotice(feedback) }
             }
         }
         .font(.mood(14)).foregroundStyle(MoodTheme.textPrimary)

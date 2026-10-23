@@ -117,6 +117,22 @@ final class AccountStore {
         try? await loadProfile()
     }
 
+    /// OTP-only onboarding: no password retained for polling or persisted in a draft.
+    func registerForOnboarding(email: String, password: String) async throws {
+        guard !isLoading else { throw AccountError.server("Une demande est déjà en cours.") }
+        guard let client else { throw AccountError.notConfigured }
+        cancelPendingConfirmation()
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            session = try await client.signUp(email: email, password: password)
+            matrixReady = false
+            try? await loadProfile()
+        } catch AccountError.emailConfirmationRequired {
+            pendingConfirmationEmail = email
+        }
+    }
+
     // MARK: - E-mail confirmation
 
     /// Address of a sign-up waiting for its e-mail link. The link can be opened on any device (it
@@ -270,6 +286,7 @@ final class AccountStore {
     }
 
     func signOut() async {
+        OnboardingModel.discardProgress(for: session?.user.id.uuidString)
         cancelPasswordRecovery()
         cancelPendingConfirmation()
         if let client { try? await client.signOut() }
@@ -342,9 +359,9 @@ final class AccountStore {
         try? await loadProfile()
     }
 
-    func confirmSignup(code: String) async throws {
+    func confirmSignup(code: String, email address: String? = nil) async throws {
         guard !isLoading else { return }
-        guard let client, let email = pendingConfirmationEmail else { throw AccountError.invalidResponse }
+        guard let client, let email = address ?? pendingConfirmationEmail else { throw AccountError.invalidResponse }
         isLoading = true
         defer { isLoading = false }
         let confirmed = try await client.verifyEmailCode(email: email, token: code, type: .signup)
@@ -388,6 +405,17 @@ final class AccountStore {
     }
 
     // MARK: - Finish basics
+
+    /// Exact authenticated lookup; saving still arbitrates races and unlinked reserved profiles.
+    func isUsernameAvailable(_ username: String) async throws -> Bool {
+        guard MoodUsername.isValid(username) else { throw AccountError.server(MoodUsername.rule) }
+        guard let client, isSignedIn else { throw AccountError.notConfigured }
+        let owner = try await client.findUser(username: username)
+        guard let owner else { return true }
+        // Provisioning may have linked this profile after OTP loaded the first snapshot.
+        try await loadProfile()
+        return owner == profile?.matrixUserId && profile?.username == username
+    }
 
     func setUsername(_ username: String) async throws {
         guard MoodUsername.isValid(username) else { throw AccountError.server(MoodUsername.rule) }

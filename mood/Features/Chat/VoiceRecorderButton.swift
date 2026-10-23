@@ -5,6 +5,8 @@ import AVFoundation
 /// leave a recorder running. The caller queues the returned file only after a successful release.
 struct VoiceRecorderButton: View {
     let onRecorded: (URL, [Int], Int) -> Void
+    var onPermissionDenied: () -> Void = {}
+    var onFailure: (String) -> Void = { _ in }
     @Environment(\.scenePhase) private var scenePhase
     @State private var recorder: AVAudioRecorder?
     @State private var powers: [Float] = []
@@ -12,7 +14,6 @@ struct VoiceRecorderButton: View {
     @State private var cancelled = false
     @State private var permissionTask: Task<Void, Never>?
     @State private var meterTask: Task<Void, Never>?
-    @State private var error: String?
 
     var body: some View {
         VStack(spacing: 4 * LayoutMetrics.scale) {
@@ -28,18 +29,16 @@ struct VoiceRecorderButton: View {
                     .onEnded { _ in finish(send: !cancelled) })
                 .accessibilityLabel("Maintenir pour enregistrer, glisser à gauche pour annuler")
             if holding { Text(cancelled ? "Relâche pour annuler" : "Glisse à gauche pour annuler").font(.mood(11)).foregroundStyle(MoodTheme.textSecondary) }
-            if let error { Text(error).font(.mood(12)).foregroundStyle(MoodTheme.mentionBadge) }
         }.onDisappear { finish(send: false) }
         .onChange(of: scenePhase) { _, phase in if phase != .active { finish(send: false) } }
     }
     private func begin() {
-        error = nil
         permissionTask = Task { @MainActor in
             let permitted = await withCheckedContinuation { continuation in
                 AVAudioSession.sharedInstance().requestRecordPermission { continuation.resume(returning: $0) }
             }
             guard holding, !Task.isCancelled else { return }
-            guard permitted else { error = "Autorise le microphone dans les réglages pour envoyer un vocal."; return }
+            guard permitted else { onPermissionDenied(); return }
             do {
                 #if !targetEnvironment(macCatalyst)
                 try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
@@ -56,10 +55,10 @@ struct VoiceRecorderButton: View {
                         recording.updateMeters()
                         powers.append(recording.averagePower(forChannel: 0))
                         try? await Task.sleep(for: .milliseconds(50))
-                        if !recording.isRecording { finish(send: false); error = "Limite de 2 minutes atteinte. Réenregistre un vocal plus court."; return }
+                        if !recording.isRecording { finish(send: false); onFailure("Limite de 2 minutes atteinte. Maintiens le micro pour enregistrer un vocal plus court."); return }
                     }
                 }
-            } catch { self.error = "Impossible d’enregistrer : \(error.localizedDescription)" }
+            } catch { onFailure("Le vocal n’a pas pu être enregistré. Maintiens le micro pour réessayer, ou écris ton message.") }
         }
     }
     private func finish(send: Bool) {

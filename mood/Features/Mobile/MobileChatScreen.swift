@@ -8,7 +8,13 @@ struct MobileChatScreen: View {
     let authState: AuthState
     @Binding var showMembers: Bool
     let onBack: () -> Void
+    @Environment(AccountStore.self) private var accountStore
     @State private var text = ""
+    @State private var composerFocusRequest: UUID?
+    @State private var showFirstRunInvite = false
+    @State private var showFirstRunSettings = false
+    @State private var showFirstRunEdit = false
+    @State private var showFirstRunBlock = false
     @State private var previewMessages: [ChatMessage] = []
     @State private var showEmoji = false
     @State private var showImporter = false
@@ -61,10 +67,13 @@ struct MobileChatScreen: View {
     private var conversationContent: some View {
         VStack(spacing: LayoutMetrics.mobile(0)) {
             Rectangle().fill(MoodTheme.divider).frame(height: LayoutMetrics.mobile(0.5))
+            if PremiumPreview.screen != "before" {
+                ConversationRecoveryNotices()
+            }
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: LayoutMetrics.mobile(8)) {
-                        if let roomId, store.hasMoreHistory[roomId] == true {
+                        if let roomId, store.hasMoreHistory[roomId] == true, !store.firstRunHistoryStart(roomId: roomId) {
                             LoadMoreHistoryButton(roomId: roomId, onStart: {
                                 historyAnchor = messages.first { visibleMessageIDs.contains($0.id) }?.id
                             }, onLoaded: {
@@ -75,6 +84,22 @@ struct MobileChatScreen: View {
                                 }
                             }
                         })
+                        }
+                        if store.firstRunHistoryStart(roomId: roomId) || demo {
+                            switch destination {
+                            case .channel(let channel, let server):
+                                FirstRunChannelBeginning(channel: channel, server: server, messages: messages,
+                                    onInvite: { showFirstRunInvite = true }, onSettings: { showFirstRunSettings = true },
+                                    onEdit: { showFirstRunEdit = true }, onCompose: { composerFocusRequest = UUID() })
+                            case .dm(let dm):
+                                DirectMessageBeginningState(user: dm.participant,
+                                    username: demo ? dm.participant.username : accountStore.moodUsername(for: dm.participant, currentUserId: store.userId),
+                                    onBlock: !demo && store.firstRunCanBlock(dm) ? { showFirstRunBlock = true } : nil,
+                                    supportsOfflineDelivery: !encrypted)
+                            }
+                        }
+                        if messages.isEmpty, let roomId, !store.firstRunHistoryStart(roomId: roomId), !demo {
+                            FirstRunHistoryPlaceholder(roomID: roomId)
                         }
                         ForEach(messages) { message in
                             if let roomId, store.newMessagesDivider[roomId] == message.eventId, message.eventId != nil {
@@ -92,9 +117,9 @@ struct MobileChatScreen: View {
                     }.padding(.top, LayoutMetrics.mobile(18))
                 }
                 .contentMargins(.bottom, LayoutMetrics.mobile(16), for: .scrollContent)
-                .defaultScrollAnchor(.bottom)
+                .defaultScrollAnchor(messages.isEmpty ? .top : .bottom)
                 .scrollDismissesKeyboard(.interactively)
-                .onAppear { proxy.scrollTo("bottom", anchor: .bottom) }
+                .onAppear { if !messages.isEmpty { proxy.scrollTo("bottom", anchor: .bottom) } }
                  .onChange(of: messages.last?.id) { _, _ in
                     if isAtBottom || messages.last?.isOwn == true {
                         proxy.scrollTo("bottom", anchor: .bottom)
@@ -106,16 +131,11 @@ struct MobileChatScreen: View {
                 }
                 .jumpToRequestedMessage(roomId: roomId, messages: messages, proxy: proxy)
             }
-            if let error = store.errorMessage {
-                HStack {
-                    Text(error).font(.mood(13))
-                    Spacer()
-                    Button("Fermer") { store.errorMessage = nil }.font(.mood(12))
-                }.padding(LayoutMetrics.mobile(12)).foregroundStyle(MoodTheme.textPrimary)
-                    .background(MoodTheme.inputBg)
-            }
             if encrypted { EncryptedRoomNotice() }
-            composer
+            if PremiumPreview.showsNotice {
+                PremiumPreviewNotices().padding(.horizontal, LayoutMetrics.mobile(16)).padding(.bottom, LayoutMetrics.mobile(8))
+            }
+            composer.messageUndoAccessory()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -147,6 +167,24 @@ struct MobileChatScreen: View {
             }
             if let roomId { store.markAsRead(roomId: roomId) }
         }
+        .task(id: roomId) { if let roomId { await store.loadConversationHistory(roomId: roomId) } }
+        .sheet(isPresented: $showFirstRunInvite) {
+            if let server { ServerInviteModal(server: server, isPresented: $showFirstRunInvite).environment(store).environment(\.layoutMode, .compact) }
+        }
+        .sheet(isPresented: $showFirstRunSettings) {
+            if let server { ServerSettingsView(server: server, isPresented: $showFirstRunSettings).environment(store).environment(\.layoutMode, .compact) }
+        }
+        .sheet(isPresented: $showFirstRunEdit) {
+            if case .channel(let channel, let server) = destination {
+                ChannelSettingsView(channel: channel, server: server, isPresented: $showFirstRunEdit).environment(store).environment(\.layoutMode, .compact)
+            }
+        }
+        .alert("Bloquer cette personne ?", isPresented: $showFirstRunBlock) {
+            Button("Annuler", role: .cancel) {}
+            Button("Bloquer", role: .destructive) {
+                if case .dm(let dm) = destination, let id = dm.participant.matrixId { Task { await store.setBlocked(id, blocked: true) } }
+            }
+        } message: { Text("Tu ne verras plus ses messages.") }
         .task(id: showPins) { if showPins, let roomId { await store.loadMessagingPins(roomId: roomId) } }
         .onChange(of: isAtBottom) { _, value in if value, let roomId { store.markAsRead(roomId: roomId) } }
         .onChange(of: text) { _, value in
@@ -219,14 +257,19 @@ struct MobileChatScreen: View {
                             Image(systemName: "chevron.right").font(.mood(12))
                         }
                         HStack(spacing: LayoutMetrics.mobile(5)) {
-                            if server != nil {
+                            if store.connection != .connected {
+                                Image(systemName: store.connection == .offline ? "wifi.slash" : "exclamationmark.circle")
+                                Text(store.connection == .serverUnavailable ? "Mood injoignable" : store.connection.title)
+                            } else if server != nil {
                                 Circle().fill(MoodTheme.onlineGreen).frame(width: LayoutMetrics.mobile(7), height: LayoutMetrics.mobile(7))
                             } else if case .dm(let dm) = destination {
                                 StatusIndicator(status: dm.participant.status, size: LayoutMetrics.mobile(8))
                             }
-                            if let server {
-                                Text("En ligne - \(server.members.filter { $0.status == .online }.count)")
-                            } else if case .dm(let dm) = destination { Text(dm.participant.status.rawValue) }
+                            if store.connection == .connected {
+                                if let server {
+                                    Text("En ligne - \(server.members.filter { $0.status == .online }.count)")
+                                } else if case .dm(let dm) = destination { Text(dm.participant.status.rawValue) }
+                            }
                         }.font(.mood(12)).foregroundStyle(MoodTheme.textMuted)
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }.buttonStyle(.plain)
@@ -267,7 +310,8 @@ struct MobileChatScreen: View {
                 text: $text, replyingTo: $replyingTo,
                 members: demo ? MessagingPreview.members : server?.members.compactMap { member in
                     member.matrixId.map { MentionCandidate(userId: $0, displayName: member.displayName) }
-                } ?? []
+                } ?? [],
+                focusRequest: composerFocusRequest
             )
             .id((store.userId ?? "demo") + composerRoomKey)
             .onKeyPress(.upArrow) {

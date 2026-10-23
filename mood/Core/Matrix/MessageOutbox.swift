@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import Observation
 
 // MARK: - Outgoing Message
 
@@ -144,16 +145,20 @@ nonisolated struct OutboxQueue: Codable, Equatable, Sendable {
 /// `Application Support/Mood/outbox.json` (+ `outbox-files/` for attachments), written atomically
 /// on every change. The previous UserDefaults storage is migrated once.
 @MainActor
-final class MessageOutbox {
+@Observable final class MessageOutbox {
     struct Snapshot: Codable {
         static let currentVersion = 1
         var version = Snapshot.currentVersion
         var queue: OutboxQueue
+        var failed: [OutgoingMessage]? = nil
+        var ownerID: String? = nil
     }
 
     static let legacyDefaultsKey = "mood.outbox"
 
     private(set) var queue = OutboxQueue()
+    private(set) var failed: [OutgoingMessage] = []
+    private(set) var ownerID: String?
     private let fileURL: URL?
     let filesDirectory: URL?
 
@@ -175,6 +180,8 @@ final class MessageOutbox {
            let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data),
            snapshot.version == Snapshot.currentVersion {
             queue = snapshot.queue
+            failed = snapshot.failed ?? []
+            ownerID = snapshot.ownerID
         }
         if let migrated = Self.migrateLegacy(from: defaults) {
             for message in migrated { queue.enqueue(message) }
@@ -202,6 +209,13 @@ final class MessageOutbox {
 
     // MARK: Queue
 
+    /// A different account never inherits another person's pending messages or attachments.
+    func adopt(ownerID: String) {
+        if let previous = self.ownerID, previous != ownerID { removeAll() }
+        self.ownerID = ownerID
+        persist()
+    }
+
     func next(in roomId: String) -> OutgoingMessage? { queue.next(in: roomId) }
     func message(txnId: String) -> OutgoingMessage? { queue.message(txnId: txnId) }
     var roomIds: [String] { queue.roomIds }
@@ -225,11 +239,31 @@ final class MessageOutbox {
 
     func removeAll() {
         queue.removeAll()
+        failed = []
         persist()
         if let filesDirectory {
             try? FileManager.default.removeItem(at: filesDirectory)
             try? FileManager.default.createDirectory(at: filesDirectory, withIntermediateDirectories: true)
         }
+    }
+
+    func retainFailed(_ message: OutgoingMessage) {
+        queue.remove(txnId: message.txnId)
+        failed.removeAll { $0.txnId == message.txnId }
+        failed.append(message)
+        persist()
+    }
+
+    func retryFailed(_ message: OutgoingMessage) {
+        failed.removeAll { $0.txnId == message.txnId }
+        queue.enqueue(message)
+        persist()
+    }
+
+    func removeFailed(txnId: String, deleteFiles: Bool = false) {
+        if deleteFiles, let item = failed.first(where: { $0.txnId == txnId }) { self.deleteFiles(of: item) }
+        failed.removeAll { $0.txnId == txnId }
+        persist()
     }
 
     // MARK: Attachment files
@@ -248,7 +282,7 @@ final class MessageOutbox {
     private func removeOrphanFiles() {
         guard let filesDirectory,
               let names = try? FileManager.default.contentsOfDirectory(atPath: filesDirectory.path) else { return }
-        let referenced = Set(queue.messages.flatMap { $0.attachment?.localFiles ?? [] })
+        let referenced = Set((queue.messages + failed).flatMap { $0.attachment?.localFiles ?? [] })
         for name in names where !referenced.contains(name) {
             try? FileManager.default.removeItem(at: filesDirectory.appendingPathComponent(name))
         }
@@ -257,7 +291,7 @@ final class MessageOutbox {
     // MARK: Persistence
 
     private func persist() {
-        guard let fileURL, let data = try? JSONEncoder().encode(Snapshot(queue: queue)) else { return }
+        guard let fileURL, let data = try? JSONEncoder().encode(Snapshot(queue: queue, failed: failed, ownerID: ownerID)) else { return }
         // Synchronous and atomic: two quick sends must never be written out of order.
         // Readable before first unlock so a background flush can still use it.
         try? data.write(to: fileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
@@ -266,25 +300,31 @@ final class MessageOutbox {
 
 // MARK: - Network Reachability
 
-@MainActor
+@Observable @MainActor
 final class NetworkReachability {
     private let monitor = NWPathMonitor()
     private(set) var isConnected = true
     var onReconnect: (() -> Void)?
+    var onChange: ((Bool) -> Void)?
 
-    init() {
+    init(monitoring: Bool = true, initiallyConnected: Bool = true) {
+        isConnected = initiallyConnected
+        guard monitoring else { return }
         monitor.pathUpdateHandler = { [weak self] path in
             let connected = path.status == .satisfied
             Task { @MainActor in
-                guard let self else { return }
-                let wasConnected = self.isConnected
-                self.isConnected = connected
-                if connected && !wasConnected {
-                    self.onReconnect?()
-                }
+                self?.update(isConnected: connected)
             }
         }
         monitor.start(queue: DispatchQueue(label: "mood.reachability"))
+    }
+
+    /// Shared by NWPathMonitor and deterministic reachability tests.
+    func update(isConnected connected: Bool) {
+        let wasConnected = isConnected
+        isConnected = connected
+        onChange?(connected)
+        if connected && !wasConnected { onReconnect?() }
     }
 
     deinit {

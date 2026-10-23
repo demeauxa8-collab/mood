@@ -772,7 +772,7 @@ struct ProfileContent: View {
         List {
             Section("Nom d’affichage") {
                 TextField("Ton nom", text: $displayName, axis: .vertical).lineLimit(1...3)
-                if let saveError { Text(saveError).font(.mood(14)).foregroundStyle(MoodTheme.mentionBadge) }
+                if let saveError { MoodNotice(title: "Le profil n’a pas été enregistré", detail: saveError, secondaryTitle: "Fermer", secondaryAction: { self.saveError = nil }) }
             }.listRowBackground(MoodTheme.inputBg)
             Section("Avatar") {
                 HStack(spacing: LayoutMetrics.mobile(16)) {
@@ -817,9 +817,7 @@ struct ProfileContent: View {
                             .stroke(MoodTheme.glassBorder, lineWidth: 0.5)
                     )
                 if let saveError {
-                    Text(saveError)
-                        .font(.desktopReferenceSystem(size: 12))
-                        .foregroundStyle(MoodTheme.mentionBadge)
+                    MoodNotice(title: "Le profil n’a pas été enregistré", detail: saveError, secondaryTitle: "Fermer", secondaryAction: { self.saveError = nil })
                 }
             }
 
@@ -1104,10 +1102,7 @@ struct NotificationsContent: View {
                            subtitle: "Une bannière à chaque nouveau message, sauf dans la conversation que tu regardes.",
                            isOn: enabled)
             if matrixStore.notificationAuthorization == .denied {
-                Text("Mood n’a pas l’autorisation du système. Autorise les notifications pour Mood dans les réglages, puis réactive cette option.")
-                    .font(.desktopReferenceSystem(size: 12))
-                    .foregroundStyle(MoodTheme.mentionBadge)
-                    .fixedSize(horizontal: false, vertical: true)
+                MoodPermissionNotice(permission: .notifications)
             }
             SettingsToggle(title: "Sons", subtitle: "Jouer un son avec chaque notification.", isOn: sounds)
             SettingsToggle(title: "Pastille sur l’icône",

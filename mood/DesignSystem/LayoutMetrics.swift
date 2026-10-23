@@ -30,6 +30,8 @@ enum LayoutMetrics {
     static let desktopTitleBarHeight: CGFloat = 33 * scale
     static let workspaceCornerRadius: CGFloat = 12 * scale
 
+    static let onboardingCardWidth: CGFloat = 480 * scale
+
     // Server rail
     static let serverBarWidth: CGFloat = 72 * scale
     static let serverIconSize: CGFloat = 40 * scale

@@ -13,7 +13,10 @@ struct MediaComposer: View {
     @Binding var replyingTo: ChatMessage?
     var members: [MentionCandidate] = []
     var typingUsers: [String] = []
+    var focusRequest: UUID? = nil
+    @FocusState private var composerFocused: Bool
     @State private var files: [URL] = []
+    @State private var microphoneDenied = false
     @State private var error: String?
     @State private var sending = false
     @State private var picking = false
@@ -34,7 +37,13 @@ struct MediaComposer: View {
                 Text(typingUsers.joined(separator: ", ") + " est en train d’écrire…")
                     .font(.mood(11)).foregroundStyle(MoodTheme.textMuted)
             }
-            if let error { Text(error).font(.mood(12)).foregroundStyle(MoodTheme.mentionBadge) }
+            if microphoneDenied { MoodPermissionNotice(permission: .microphone) }
+            if let error {
+                MoodNotice(title: "L’envoi attend ton aide", detail: error,
+                    actionTitle: "Choisir un fichier", action: { picking = true },
+                    secondaryTitle: "Fermer", secondaryAction: { self.error = nil })
+            }
+            if sending { ProgressView("Préparation de ton message…").font(.mood(13)) }
             if !files.isEmpty {
                 ScrollView(.horizontal) {
                     HStack {
@@ -134,6 +143,8 @@ struct MediaComposer: View {
     private var textField: some View {
         TextField(placeholder, text: $text, axis: .vertical)
             .textFieldStyle(.plain).lineLimit(1...5)
+            .focused($composerFocused)
+            .onChange(of: focusRequest) { _, _ in composerFocused = true }
             .onSubmit(send)
             .onKeyPress(.return, phases: .down) { press in
                 if press.modifiers.contains(.shift) { text += "\n" } else { send() }
@@ -156,9 +167,10 @@ struct MediaComposer: View {
     }
 
     private var voiceButton: some View {
-        VoiceRecorderButton { url, waveform, duration in
+        VoiceRecorderButton(onRecorded: { url, waveform, duration in
+            microphoneDenied = false
             Task { await store.sendVoice(roomId: roomID, fileURL: url, waveform: waveform, duration: duration) }
-        }
+        }, onPermissionDenied: { microphoneDenied = true }, onFailure: { error = $0 })
     }
 
     /// iPhone: the original Liquid Glass capsule (+, field, emoji, send arrow when there is something to
@@ -207,6 +219,7 @@ struct MediaComposer: View {
     private func send() {
         guard !disabled, !sending, store.validateOutgoingText(text), !files.isEmpty || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         sending = true
+        error = nil
         let urls = files, body = text, reply = replyingTo?.eventId ?? replyEventID, room = roomID, owner = account
         Task { @MainActor in
             let success = await store.sendAttachments(roomId: room, urls: urls, text: body, replyToEventId: reply)

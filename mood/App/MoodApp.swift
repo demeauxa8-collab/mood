@@ -33,7 +33,9 @@ struct moodApp: App {
                         return try await client.findUser(username: name)
                     }
                     // UI preview mode opens directly on the deterministic mock data.
-                    if AccountAuthPreview.enabled {
+                    if OnboardingPreview.enabled {
+                        // The isolated onboarding review never restores credentials or contacts a service.
+                    } else if AccountAuthPreview.enabled {
                         accountStore.prepareAuthPreview()
                         authState.currentScreen = AccountAuthPreview.screen == "signup" ? .signup : .login
                     } else if AccountAuthPreview.isTesting {
@@ -43,9 +45,17 @@ struct moodApp: App {
                         authState.isDemoMode = true
                         authState.isLoggedIn = true
                     } else if await accountStore.restore() {
+                        OnboardingLifecycle.bootstrap(restoredAccountID: accountStore.session?.user.id.uuidString,
+                                                      restoredEmail: accountStore.session?.user.email)
                         authState.isLoggedIn = true
                     } else if !accountStore.isConfigured {
-                        if await matrixStore.restoreSession() { authState.isLoggedIn = true }
+                        if await matrixStore.restoreSession() {
+                            OnboardingLifecycle.bootstrap(restoredAccountID: matrixStore.userId)
+                            authState.isLoggedIn = true
+                        }
+                    }
+                    if !OnboardingPreview.enabled && !AccountAuthPreview.isTesting && !AccountAuthPreview.enabled && !ProcessInfo.processInfo.arguments.contains("-uiPreview") {
+                        OnboardingLifecycle.bootstrap(restoredAccountID: nil)
                     }
                     // The splash only covers session restore — no fixed delay.
                     showSplash = false
@@ -89,6 +99,7 @@ struct RootView: View {
     var authState: AuthState
     var matrixStore: MatrixStore
     @Bindable var accountStore: AccountStore
+    @State private var onboarding: OnboardingModel?
     @State private var serverActions = ServerActions()
     @State private var modalHost = WindowModalHost()
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -99,13 +110,19 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            if let screen = ConversationPreview.screen {
+            if OnboardingPreview.enabled {
+                OnboardingReviewScreen(mode: layoutMode)
+            } else if let screen = PremiumPreview.screen {
+                PremiumPreviewScreen(screen: screen)
+            } else if let screen = ConversationPreview.screen {
                 ConversationPreviewScreen(screen: screen)
             } else if accountStore.isRecoveringPassword {
                 PasswordRecoveryView(authState: authState)
                     .environment(accountStore).environment(\.layoutMode, layoutMode)
                     .disabled(AccountAuthPreview.enabled)
-            } else if authState.isLoggedIn && accountStore.isSignedIn && !accountStore.matrixReady {
+            } else if let onboarding, !onboarding.didFinish {
+                OnboardingView(model: onboarding, mode: layoutMode)
+            } else if authState.isLoggedIn && accountStore.isSignedIn && !accountStore.matrixReady && matrixStore.userId == nil {
                 MoodConnectionView(accountStore: accountStore, matrixStore: matrixStore, authState: authState)
                     .environment(accountStore)
                     .environment(\.layoutMode, layoutMode)
@@ -130,6 +147,25 @@ struct RootView: View {
                 SplashScreen()
             }
         }
+        .onChange(of: onboarding?.didFinish) { _, finished in
+            if finished == true { authState.isLoggedIn = accountStore.isSignedIn }
+        }
+        .task(id: showSplash) {
+            guard !showSplash else { return }
+            configureOnboarding()
+        }
+        .onChange(of: accountStore.session?.user.id) { oldID, newID in
+            if oldID != nil, oldID != newID {
+                OnboardingModel.discardProgress(for: oldID?.uuidString)
+                onboarding = nil
+            }
+            // Sign-in/OTP actions adopt their account themselves; do not replace a busy model.
+            if newID != nil, let onboarding, onboarding.accountID == nil, onboarding.step == .confirmation {
+                Task { await onboarding.acceptConfirmedSession() }
+                return
+            }
+            if onboarding?.isBusy != true { configureOnboarding() }
+        }
         .alert("Rejoindre ce serveur ?", isPresented: Binding(
             get: { matrixStore.pendingMessagingInvite != nil },
             set: { if !$0 { matrixStore.pendingMessagingInvite = nil } }
@@ -142,6 +178,7 @@ struct RootView: View {
             }
         }
         .onOpenURL { url in
+            guard !OnboardingPreview.enabled else { return }
             if ConversationPolicy.target(url) != nil {
                 matrixStore.openConversationLink(url)
                 return
@@ -153,11 +190,29 @@ struct RootView: View {
             guard url.scheme == "mood", url.host == "auth-callback" else { return }
             Task {
                 await accountStore.completeEmailCallback(url)
-                authState.isLoggedIn = accountStore.isSignedIn
+                if accountStore.isSignedIn, let onboarding, onboarding.accountID == nil {
+                    await onboarding.acceptConfirmedSession()
+                } else {
+                    authState.isLoggedIn = accountStore.isSignedIn
+                }
             }
         }
         .preferredColorScheme(MoodTheme.shared.theme == .light ? .light : .dark)
     }
+
+    private func configureOnboarding() {
+        guard !showSplash, !OnboardingPreview.enabled, !AccountAuthPreview.isTesting, !AccountAuthPreview.enabled,
+              ConversationPreview.screen == nil, !authState.isDemoMode,
+              !ProcessInfo.processInfo.arguments.contains("-uiPreview") else { return }
+        // Keep a legacy Matrix-only session usable when the Mood account service is absent.
+        if authState.isLoggedIn && !accountStore.isSignedIn && matrixStore.userId != nil { return }
+        let id = accountStore.session?.user.id.uuidString
+        if let id, OnboardingModel.isComplete(for: id) { onboarding = nil; return }
+        if let onboarding, onboarding.accountID == id { return }
+        let actions = OnboardingAdapter(services: .live(account: accountStore, matrix: matrixStore))
+        onboarding = OnboardingModel(actions: actions, userID: id)
+    }
+
 }
 
 // MARK: - Splash Screen
