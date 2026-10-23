@@ -15,6 +15,7 @@ struct ChatArea: View {
     /// Opens another channel of the server (a search result that lives elsewhere); nil where search is unavailable.
     var onOpenChannel: ((Channel) -> Void)? = nil
     @State private var messageText = ""
+    @State private var composerFocusRequest: UUID?
     @State private var showMemberList = true
     @State private var showSearch = false
     @State private var search = MessageSearchModel()
@@ -98,6 +99,7 @@ struct ChatArea: View {
 
             HStack(spacing: 0) {
                 VStack(spacing: 0) {
+                    ConversationRecoveryNotices()
                     // Pinned messages panel
                     if showPinnedMessages {
                         PinnedMessagesPanel(
@@ -121,7 +123,8 @@ struct ChatArea: View {
                         replyingTo: $replyingTo,
                         activeThread: $activeThread,
                         showThreadPanel: $showThreadPanel,
-                        editRequest: $editRequest
+                        editRequest: $editRequest,
+                        onCompose: { composerFocusRequest = UUID() }
                     )
 
                     if isEncrypted {
@@ -146,8 +149,10 @@ struct ChatArea: View {
                         onAttachFile: attach,
                         mentionMembers: server.members.compactMap { member in
                             member.matrixId.map { MentionCandidate(userId: $0, displayName: member.displayName) }
-                        }
+                        },
+                        focusRequest: composerFocusRequest
                     )
+                    .messageUndoAccessory()
                     .onKeyPress(.upArrow) {
                         guard let id = MessagingServerPolicy.lastEditable(messages, draft: messageText) else { return .ignored }
                         editRequest = id
@@ -519,6 +524,7 @@ struct HeaderSearchField: View {
 
 struct MessageList: View {
     @Environment(MatrixStore.self) private var matrixStore
+    @Environment(AuthState.self) private var authState
     let messages: [ChatMessage]
     let channel: Channel
     let server: MoodServer
@@ -529,16 +535,11 @@ struct MessageList: View {
     @Binding var activeThread: ChatMessage?
     @Binding var showThreadPanel: Bool
     @Binding var editRequest: UUID?
+    let onCompose: () -> Void
     @Environment(ServerActions.self) private var serverActions
     @State private var isAtBottom = true
     @State private var visibleMessageIDs: Set<UUID> = []
     @State private var historyAnchor: UUID?
-
-    /// Discord shows its setup checklist in the first channel of a new, still empty server.
-    private var isFirstChannelOfServer: Bool {
-        roomId != nil && server.categories.first?.channels.first?.id == channel.id
-            && server.categories.flatMap(\.channels).count <= 1
-    }
 
     private var dividerEventId: String? {
         roomId.flatMap { matrixStore.newMessagesDivider[$0] }
@@ -553,7 +554,7 @@ struct MessageList: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    if hasMoreHistory, let roomId {
+                    if hasMoreHistory, !matrixStore.firstRunHistoryStart(roomId: roomId), let roomId {
                         LoadMoreHistoryButton(roomId: roomId, onStart: {
                             historyAnchor = messages.first { visibleMessageIDs.contains($0.id) }?.id
                         }, onLoaded: {
@@ -564,54 +565,21 @@ struct MessageList: View {
                                 }
                             }
                         })
-                    } else if messages.isEmpty, isFirstChannelOfServer {
-                        ServerWelcomeChecklist(server: server)
-                    } else {
-                        // Welcome — uniquement au vrai début du channel
-                        VStack(alignment: .leading, spacing: 10 * LayoutMetrics.scale) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .fill(MoodTheme.brandAccent.opacity(0.12))
-                                    .frame(width: 56 * LayoutMetrics.scale, height: 56 * LayoutMetrics.scale)
-                                Image(systemName: channel.icon)
-                                    .font(.mood(26))
-                                    .foregroundStyle(MoodTheme.brandAccent)
-                            }
-
-                            Text("Bienvenue dans #\(channel.name) !")
-                                .font(.mood(28, weight: .bold))
-                                .foregroundStyle(MoodTheme.textPrimary)
-
-                            Text("C'est le début du salon #\(channel.name).")
-                                .foregroundStyle(MoodTheme.textSecondary)
-                                .font(.mood(15))
-
-                            if roomId != nil {
-                                Button {
-                                    serverActions.pending = .editChannel(channel.id)
-                                } label: {
-                                    Label("Modifier le salon", systemImage: "pencil")
-                                        .font(.mood(13, weight: .medium))
-                                        .foregroundStyle(MoodTheme.textPrimary)
-                                        .padding(.horizontal, 10 * LayoutMetrics.scale)
-                                        .padding(.vertical, 6 * LayoutMetrics.scale)
-                                        .background(MoodTheme.serverBar)
-                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16 * LayoutMetrics.scale)
-                        .padding(.top, 24 * LayoutMetrics.scale)
-                        .padding(.bottom, 16 * LayoutMetrics.scale)
+                    } else if matrixStore.firstRunHistoryStart(roomId: roomId) || (roomId == nil && authState.isDemoMode) {
+                        FirstRunChannelBeginning(channel: channel, server: server, messages: messages,
+                            onInvite: { serverActions.pending = .invite },
+                            onSettings: { serverActions.pending = .openSettings },
+                            onEdit: { serverActions.pending = .editChannel(channel.id) },
+                            onCompose: onCompose)
                     }
 
                     DesktopPixelRule()
                         .padding(.horizontal, 16)
                         .padding(.bottom, 6)
 
-                    if messages.isEmpty {
+                    if messages.isEmpty, let roomId, !matrixStore.firstRunHistoryStart(roomId: roomId) {
+                        FirstRunHistoryPlaceholder(roomID: roomId)
+                    } else if messages.isEmpty {
                         Text("Aucun message pour l'instant. Dis bonjour 👋")
                             .font(.mood(13))
                             .foregroundStyle(MoodTheme.textSecondary)
@@ -660,8 +628,8 @@ struct MessageList: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            .defaultScrollAnchor(.bottom)
-            .onAppear { proxy.scrollTo("bottom", anchor: .bottom) }
+            .defaultScrollAnchor(messages.isEmpty ? .top : .bottom)
+            .onAppear { if !messages.isEmpty { proxy.scrollTo("bottom", anchor: .bottom) } }
             .onChange(of: messages.last?.id) { _, _ in
                 // Like Discord: follow new messages only when already at the bottom,
                 // or when the new message is mine.
@@ -715,6 +683,7 @@ struct JumpToPresentBar: View {
 // MARK: - Message Row
 
 struct MessageRow: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.desktopFriendsCalibration) private var calibrated
     @Environment(MatrixStore.self) private var matrixStore
     let message: ChatMessage
@@ -889,7 +858,7 @@ struct MessageRow: View {
                     HStack(spacing: 0) {
                         MarkdownText(text: message.content)
                             .desktopFriendsFont(calibrated ? 16 : 14)
-                            .foregroundStyle(MoodTheme.textPrimary)
+                            .foregroundStyle(message.sendState == .failed ? MoodTheme.deliveryFailed : MoodTheme.textPrimary)
                             .textSelection(.enabled)
 
                         if message.isEdited {
@@ -898,48 +867,11 @@ struct MessageRow: View {
                                 .foregroundStyle(MoodTheme.textMuted)
                         }
 
-                        if message.sendState == .sending {
-                            ProgressView()
-                                .scaleEffect(0.5)
-                                .frame(width: 16 * LayoutMetrics.scale, height: 16 * LayoutMetrics.scale)
-                                .padding(.leading, 6)
-                        }
                     }
-                    .opacity(message.sendState == .sending ? 0.55 : 1)
+                    .opacity(message.sendState == .sending ? 0.5 : 1)
                     }
 
-                    if message.sendState == .failed {
-                        HStack(spacing: 6 * LayoutMetrics.scale) {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .font(.mood(11))
-                                .foregroundStyle(MoodTheme.mentionBadge)
-
-                            Text("Échec de l'envoi")
-                                .font(.mood(11))
-                                .foregroundStyle(MoodTheme.mentionBadge)
-
-                            if let roomId {
-                                Button {
-                                    matrixStore.retryMessage(message.id, roomId: roomId)
-                                } label: {
-                                    Text("Réessayer")
-                                        .font(.mood(11, weight: .semibold))
-                                        .foregroundStyle(MoodTheme.brandBlue)
-                                }
-                                .buttonStyle(.plain)
-
-                                Button {
-                                    matrixStore.discardUnsentMessage(message.id, roomId: roomId)
-                                } label: {
-                                    Text("Supprimer")
-                                        .font(.mood(11, weight: .semibold))
-                                        .foregroundStyle(MoodTheme.mentionBadge)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.top, 2)
-                    }
+                    if let roomId { MessageDeliveryStatus(message: message, roomID: roomId) }
 
                     if let url = MediaLinkPreview.firstURL(in: message.content) {
                         MediaLinkPreviewCard(url: url)
@@ -989,7 +921,7 @@ struct MessageRow: View {
                                     .stroke(MoodTheme.glassBorder, lineWidth: 0.5)
                             )
                         }
-                    }
+                    }.opacity(message.sendState == .sending ? 0.5 : 1)
 
                     // Link embed
                     if let embed = message.linkEmbed {
@@ -1099,7 +1031,7 @@ struct MessageRow: View {
                 Spacer()
 
                 // Actions hover
-                if isHovered {
+                if isHovered, target != nil {
                     HStack(spacing: 1) {
                         ActionButton(icon: "hand.thumbsup", action: { react("👍") }).help("Réaction rapide 👍")
                         ActionButton(icon: "face.smiling", action: { showReactionPicker = true })
@@ -1198,6 +1130,7 @@ struct MessageRow: View {
                 .fill(isHovered ? MoodTheme.messageHover : Color.clear)
         )
         .padding(.horizontal, 4)
+        .animation(reduceMotion ? nil : MoodMotion.hover, value: message.sendState)
         .onHover { hovering in isHovered = hovering }
         .onChange(of: editRequest.wrappedValue, initial: true) { _, requested in
             guard requested == message.id else { return }
@@ -1229,22 +1162,26 @@ struct MessageRow: View {
             EmojiPicker(isPresented: $showReactionPicker) { emoji in react(emoji) }
         }
         .contextMenu {
-            conversationActions
-            Button("Réaction rapide 👍") { react("👍") }
-            Button { showReactionPicker = true } label: { Label("Ajouter une réaction", systemImage: "face.smiling") }
-            if message.isOwn {
-                Button(action: startEditing) { Label("Modifier le message", systemImage: "pencil") }
+            if target != nil {
+                conversationActions
+                Button("Réaction rapide 👍") { react("👍") }
+                Button { showReactionPicker = true } label: { Label("Ajouter une réaction", systemImage: "face.smiling") }
+                if message.isOwn {
+                    Button(action: startEditing) { Label("Modifier le message", systemImage: "pencil") }
+                }
+                if let onReply { Button(action: onReply) { Label("Répondre", systemImage: "arrowshape.turn.up.left") } }
+                Button(action: togglePin) { Label(message.isPinned ? "Désépingler" : "Épingler le message", systemImage: message.isPinned ? "pin.slash" : "pin") }
+                Button(action: copyLink) { Label("Copier le lien du message", systemImage: "link") }
+                if message.isOwn {
+                    Button(role: .destructive) { showDeleteConfirm = true } label: { Label("Supprimer le message", systemImage: "trash") }
+                }
             }
-            Button { onReply?() } label: { Label("Répondre", systemImage: "arrowshape.turn.up.left") }
-            Divider()
-            Button(action: togglePin) { Label(message.isPinned ? "Désépingler" : "Épingler le message", systemImage: message.isPinned ? "pin.slash" : "pin") }
-            Button {
-                UIPasteboard.general.string = message.content
-            } label: { Label("Copier le texte", systemImage: "doc.on.doc") }
-            Button(action: copyLink) { Label("Copier le lien du message", systemImage: "link") }
-            if message.isOwn {
-                Divider()
-                Button(role: .destructive) { showDeleteConfirm = true } label: { Label("Supprimer le message", systemImage: "trash") }
+            if !message.content.isEmpty {
+                Button { UIPasteboard.general.string = message.content } label: { Label("Copier le texte", systemImage: "doc.on.doc") }
+            }
+            if message.sendState != .sent, let roomId {
+                if message.sendState == .failed { Button("Renvoyer") { matrixStore.retryMessage(message.id, roomId: roomId) } }
+                Button("Supprimer", role: .destructive) { matrixStore.discardUnsentMessage(message.id, roomId: roomId) }
             }
         }
         .alert("Supprimer le message", isPresented: $showDeleteConfirm) {
@@ -1254,7 +1191,7 @@ struct MessageRow: View {
                 Task { await matrixStore.deleteMessage(roomId: target.roomId, eventId: target.eventId) }
             }
         } message: {
-            Text("Es-tu sûr de vouloir supprimer ce message ? Cette action est irréversible.")
+            Text("Il disparaîtra pour tout le monde. Tu auras 5 secondes pour annuler.")
         }
     }
 }

@@ -45,11 +45,14 @@ struct MobileDMListView: View {
                             .foregroundStyle(MoodTheme.textPrimary).padding(LayoutMetrics.mobile(12))
                         ForEach(store.pendingInvites) { invite in MobilePendingInviteRow(invite: invite) }
                     }
-                    if let error = store.errorMessage {
-                        Text(error).font(.mood(13)).foregroundStyle(MoodTheme.mentionBadge)
-                            .padding(LayoutMetrics.mobile(12))
-                    }
-                    if filtered.isEmpty {
+                    if conversations.isEmpty && search.isEmpty {
+                        if store.userId != nil && store.connection != .connected {
+                            ConversationCacheEmptyState()
+                        } else {
+                            OnboardingHomeEmptyState(onAddFriends: { showNewDM = true })
+                                .frame(minHeight: LayoutMetrics.mobile(400))
+                        }
+                    } else if filtered.isEmpty {
                         ContentUnavailableView("Aucune conversation", systemImage: "bubble.left.and.bubble.right")
                             .padding(.top, LayoutMetrics.mobile(50))
                     }

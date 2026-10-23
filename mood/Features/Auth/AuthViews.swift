@@ -264,11 +264,8 @@ struct LoginView: View {
     @ViewBuilder
     private var loginErrorMessage: some View {
         if let error = errorMessage ?? accountStore.errorMessage {
-            Text(error)
-                .font(.mood( 12))
-                .foregroundStyle(MoodTheme.mentionBadge)
-                .multilineTextAlignment(.leading)
-                .padding(.bottom, layoutMode == .compact ? 0 : 8)
+            MoodNotice(title: "La connexion n’a pas abouti", detail: error,
+                secondaryTitle: "Fermer", secondaryAction: { errorMessage = nil; accountStore.errorMessage = nil })
         }
     }
 

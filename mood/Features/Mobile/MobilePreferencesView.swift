@@ -84,7 +84,7 @@ struct MobilePreferencesView: View {
                     settingLabel("Notifications", "Pour les nouvelles conversations et les messages non lus.")
                 }
                 if store.notificationAuthorization == .denied {
-                    Text("Autorise les notifications dans les réglages iPhone, puis réactive cette option.").font(.mood(14)).foregroundStyle(MoodTheme.mentionBadge)
+                    MoodPermissionNotice(permission: .notifications)
                 }
                 Toggle("Sons", isOn: Binding(get: { preferences.soundsEnabled }, set: { value in store.updatePreferences { $0.soundsEnabled = value } }))
                 Toggle("Pastille sur l’icône", isOn: Binding(get: { preferences.badgeEnabled }, set: { value in Task { await store.setBadgeEnabled(value) } }))
@@ -117,8 +117,8 @@ struct MobilePreferencesView: View {
                 case .idle, .loading: ProgressView("Chargement…")
                 case .loaded: Text("Aucun appareil à afficher.")
                 case .failed:
-                    Text("Impossible de charger les appareils.").foregroundStyle(MoodTheme.mentionBadge)
-                    Button("Réessayer") { Task { await store.refreshDevices() } }
+                    MoodNotice(title: "Les appareils n’ont pas été chargés", detail: "Vérifie ta connexion, puis réessaie.",
+                        actionTitle: "Réessayer", action: { Task { await store.refreshDevices() } })
                 }
             } else {
                 ForEach(store.devices) { device in

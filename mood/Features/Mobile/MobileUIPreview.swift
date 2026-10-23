@@ -17,7 +17,7 @@ enum MobileUIPreview {
               args.indices.contains(index + 1) else { return nil }
         return args[index + 1]
     }
-    static let sheets: Set<String> = ["server-settings", "create-channel", "edit-channel", "invite", "members", "pins", "pins-empty", "thread", "search", "emoji", "attachments", "username", "group-dm", "create-server-form", "server-overview", "server-roles", "server-members", "server-invites", "server-bans", "account-credentials", "discord-import", "profile-long", "members-empty", "attachment-draft", "video", "audio", "create-channel-error", "create-channel-loading", "search-error", "search-loading", "search-results", "new-dm-results"]
+    static let sheets: Set<String> = FirstRunPreview.screens.union(["server-settings", "create-channel", "edit-channel", "invite", "members", "pins", "pins-empty", "thread", "search", "emoji", "attachments", "username", "group-dm", "create-server-form", "server-overview", "server-roles", "server-members", "server-invites", "server-bans", "account-credentials", "discord-import", "profile-long", "members-empty", "attachment-draft", "video", "audio", "create-channel-error", "create-channel-loading", "search-error", "search-loading", "search-results", "new-dm-results"])
 }
 
 struct MobileUIPreviewSheet: View {
@@ -33,6 +33,7 @@ struct MobileUIPreviewSheet: View {
     var body: some View {
         Group {
             switch screen {
+            case let route where FirstRunPreview.screens.contains(route): FirstRunPreviewScreen(screen: route)
             case "server-settings", "server-overview", "server-roles", "server-members", "server-invites", "server-bans": ServerSettingsView(server: server, isPresented: $presented)
             case "create-channel", "create-channel-error", "create-channel-loading": CreateChannelModal(server: server, isPresented: $presented)
             case "edit-channel": ChannelSettingsView(channel: channel, server: server, isPresented: $presented)

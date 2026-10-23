@@ -16,7 +16,8 @@ class MatrixStore {
     var messagesByRoom: [String: [ChatMessage]] = [:]
 
     var isLoading = false
-    var errorMessage: String?
+    var errorMessage: String? { didSet { retryAction = nil } }
+    var retryAction: (() -> Void)?
 
     // Typing indicators: roomId -> [displayName]
     var typingUsersByRoom: [String: [String]] = [:]
@@ -76,6 +77,8 @@ class MatrixStore {
     // Outbox (file hors-ligne) — per-room delivery lanes live in "Messaging pipeline" below
     private let outbox: MessageOutbox
     private let reachability: NetworkReachability
+    private let creationRecovery: CreationRecovery
+    private var activeCreations: Set<CreationIdentity> = []
     private var failedOutgoing: [String: OutgoingMessage] = [:] // txnId -> message pour retry manuel
 
     // Pagination
@@ -131,12 +134,19 @@ class MatrixStore {
 
     // MARK: - Init
 
-    init(homeserver: String = "matrix.org") {
-        self.client = MatrixClient(homeserver: homeserver)
-        self.outbox = MessageOutbox()
-        self.reachability = NetworkReachability()
+    init(homeserver: String = "matrix.org", client: MatrixClient? = nil,
+         outbox: MessageOutbox? = nil, reachability: NetworkReachability? = nil,
+         creationRecovery: CreationRecovery? = nil) {
+        self.client = client ?? MatrixClient(homeserver: homeserver)
+        self.outbox = outbox ?? MessageOutbox()
+        self.reachability = reachability ?? NetworkReachability()
+        self.creationRecovery = creationRecovery ?? CreationRecovery()
         self.reachability.onReconnect = { [weak self] in
-            self?.flushOutbox()
+            self?.retryConnection()
+        }
+        self.reachability.onChange = { [weak self] connected in
+            guard let self else { return }
+            if !connected { self.rememberWaitingMessages() }
         }
         configureNotifications()
     }
@@ -168,6 +178,8 @@ class MatrixStore {
         client.setHomeserver(homeserver)
         client.setAccessToken(accessToken)
         self.userId = userId
+        serviceConnection = .connecting
+        outbox.adopt(ownerID: userId)
         saveCredentials(token: accessToken, userId: userId, homeserver: homeserver)
         UserDefaults.standard.set(deviceId, forKey: "mood.matrix.active_device_id")
         syncToken = nil
@@ -212,15 +224,19 @@ class MatrixStore {
     }
 
     func logout() {
+        if let userId { UserDefaults.standard.removeObject(forKey: "mood.onboarding.pendingServer.\(userId)") }
         let clientRef = client
         Task { try? await clientRef.logout() } // best effort
         clearLocalSession()
     }
 
     private func clearLocalSession() {
+        if let userId { creationRecovery.clear(owner: userId) }
+        activeCreations = []
         syncTask?.cancel()
         syncTask = nil
         syncGeneration += 1
+        resetConversationRecovery()
         resetMessagingPipeline()
         resetMessagingServersUI()
         resetFinishBasics()
@@ -295,9 +311,8 @@ class MatrixStore {
         do {
             self.userId = try await client.whoami()
         } catch let error as MatrixClient.MatrixError where error.isUnknownToken {
-            clearCredentials()
-            UserDefaults.standard.removeObject(forKey: Self.syncTokenKey)
-            return false
+            self.userId = storedUserId
+            serviceConnection = .sessionExpired
         } catch {
             // Erreur réseau : hors ligne ≠ déconnecté, on garde la session
             self.userId = storedUserId
@@ -309,7 +324,9 @@ class MatrixStore {
         syncToken = nil
         UserDefaults.standard.removeObject(forKey: Self.syncTokenKey)
         restoreFromCache(userId: self.userId ?? storedUserId)
+        outbox.adopt(ownerID: self.userId ?? storedUserId)
         restoreOutboxEchoes()
+        if serviceConnection == .sessionExpired { return true }
         Task { await buildCurrentUser(userId: self.userId ?? storedUserId) }
         startSyncLoop()
         flushOutbox()
@@ -363,6 +380,132 @@ class MatrixStore {
         }
     }
 
+    // MARK: - Conversation recovery
+
+    #if DEBUG
+    /// Only hosted tests can install a synthetic in-memory identity. No credentials or cache are written.
+    func preparePremiumTransportTestSession() {
+        precondition(AccountAuthPreview.isTesting)
+        userId = "@premium-test:example.invalid"
+        currentUser = MockData.currentUser
+        serviceConnection = .connected
+        restoreOutboxEchoes()
+    }
+    #endif
+
+    private(set) var serviceConnection: ConversationConnection = .connecting
+    var connection: ConversationConnection {
+        ConversationConnection.resolve(networkAvailable: reachability.isConnected, service: serviceConnection)
+    }
+    var pendingMessageCount: Int { outbox.pending.count }
+    func pendingMessageCount(roomID: String) -> Int { outbox.pending.filter { $0.roomId == roomID }.count }
+    private(set) var recoveredDeliveryCount = 0
+    private var waitingTransactions: Set<String> = []
+    @ObservationIgnored private var recoveryNoticeTask: Task<Void, Never>?
+    private(set) var pendingDeletions: [DeferredMessageDeletion] = []
+    private(set) var committingDeletions: [DeferredMessageDeletion] = []
+    private(set) var deletionFailure: DeferredMessageDeletion?
+    @ObservationIgnored private var deletionTasks: [UUID: Task<Void, Never>] = [:]
+    @ObservationIgnored private var deletionCommitTasks: [UUID: Task<Void, Never>] = [:]
+    private(set) var isRetryingConnection = false
+    @ObservationIgnored private var connectionRetryTask: Task<Void, Never>?
+
+    func retryConnection() {
+        guard userId != nil, connection != .sessionExpired, !isRetryingConnection else { return }
+        isRetryingConnection = true
+        serviceConnection = .connecting
+        startSyncLoop()
+        flushOutbox()
+        connectionRetryTask?.cancel()
+        connectionRetryTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            self?.isRetryingConnection = false
+        }
+    }
+
+    private func rememberWaitingMessages() {
+        waitingTransactions.formUnion(outbox.pending.map(\.txnId))
+    }
+
+    private func recordRecoveredDelivery(_ txnID: String) {
+        guard waitingTransactions.remove(txnID) != nil else { return }
+        recoveredDeliveryCount += 1
+        recoveryNoticeTask?.cancel()
+        recoveryNoticeTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            self?.recoveredDeliveryCount = 0
+        }
+    }
+
+    func isDeletionPending(_ message: ChatMessage, roomID: String) -> Bool {
+        (pendingDeletions + committingDeletions).contains { $0.roomID == roomID && $0.eventID == message.eventId }
+    }
+
+    func scheduleMessageDeletion(roomID: String, eventID: String) {
+        guard !(pendingDeletions + committingDeletions).contains(where: { $0.roomID == roomID && $0.eventID == eventID }) else { return }
+        let deletion = DeferredMessageDeletion(roomID: roomID, eventID: eventID)
+        deletionFailure = nil
+        pendingDeletions.append(deletion)
+        deletionTasks[deletion.id] = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(DeferredMessageDeletion.gracePeriod))
+            guard let self, !Task.isCancelled else { return }
+            await self.commitMessageDeletion(deletion, now: Date())
+        }
+    }
+
+    func undoMessageDeletion(_ id: UUID) {
+        deletionTasks.removeValue(forKey: id)?.cancel()
+        pendingDeletions.removeAll { $0.id == id }
+    }
+
+    /// Also callable with a controlled clock by contract tests. No request before the deadline.
+    func commitMessageDeletion(_ deletion: DeferredMessageDeletion, now: Date) async {
+        guard deletion.isDue(at: now), pendingDeletions.contains(deletion) else { return }
+        pendingDeletions.removeAll { $0.id == deletion.id }
+        committingDeletions.append(deletion)
+        deletionTasks.removeValue(forKey: deletion.id)?.cancel()
+        // The request outlives the undo timer (which has just been cancelled).
+        let owner = userId
+        let task = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                self.deletionCommitTasks[deletion.id] = nil
+                self.committingDeletions.removeAll { $0.id == deletion.id }
+            }
+            do {
+                try await self.client.redactEvent(roomId: deletion.roomID, eventId: deletion.eventID)
+                guard !Task.isCancelled, self.userId == owner else { return }
+                self.applyRedaction(of: deletion.eventID, roomId: deletion.roomID)
+                self.rebuildUIModels()
+            } catch {
+                guard !Task.isCancelled, self.userId == owner else { return }
+                self.deletionFailure = deletion
+            }
+        }
+        deletionCommitTasks[deletion.id] = task
+        await task.value
+    }
+
+    func dismissDeletionFailure() { deletionFailure = nil }
+
+    private func resetConversationRecovery() {
+        deletionTasks.values.forEach { $0.cancel() }
+        deletionCommitTasks.values.forEach { $0.cancel() }
+        deletionTasks = [:]
+        deletionCommitTasks = [:]
+        pendingDeletions = []
+        committingDeletions = []
+        deletionFailure = nil
+        serviceConnection = .connecting
+        waitingTransactions = []
+        recoveredDeliveryCount = 0
+        recoveryNoticeTask?.cancel()
+        connectionRetryTask?.cancel()
+        isRetryingConnection = false
+    }
+
     // MARK: - Sync Loop
 
     private func startSyncLoop() {
@@ -381,6 +524,7 @@ class MatrixStore {
                     let response = try await self.client.sync(since: self.syncToken, timeout: isFirstSync ? 0 : 30000)
                     guard !Task.isCancelled, generation == self.syncGeneration else { return }
 
+                    self.serviceConnection = .connected
                     self.processSyncResponse(response)
                     self.handleSyncForNotifications(response, isInitialSync: self.syncToken == nil)
                     self.syncToken = response.nextBatch
@@ -404,6 +548,8 @@ class MatrixStore {
                         self.handleSessionExpired()
                         return
                     }
+                    self.serviceConnection = .serverUnavailable
+                    self.rememberWaitingMessages()
                     let jitter = Double.random(in: 0...(backoff * 0.25))
                     try? await Task.sleep(for: .seconds(backoff + jitter))
                     guard !Task.isCancelled, generation == self.syncGeneration else { return }
@@ -414,8 +560,15 @@ class MatrixStore {
     }
 
     private func handleSessionExpired() {
-        logout()
-        errorMessage = "Session expirée, reconnecte-toi"
+        // Keep cached conversations and the durable queue. Explicit sign-out still wipes them.
+        serviceConnection = .sessionExpired
+        syncTask?.cancel()
+        syncTask = nil
+        for lane in outboxLanes.values { lane.task.cancel() }
+        outboxLanes = [:]
+        outboxRetryTask?.cancel()
+        outboxRetryTask = nil
+        rememberWaitingMessages()
     }
 
     // MARK: - Process Sync Response
@@ -769,6 +922,8 @@ class MatrixStore {
             messagesByRoom[roomId]?.remove(at: idx)
             if let failed = failedOutgoing.removeValue(forKey: txn) { outbox.deleteFiles(of: failed) }
             outbox.remove(txnId: txn)
+            outbox.removeFailed(txnId: txn)
+            recordRecoveredDelivery(txn)
             uploadProgress.removeValue(forKey: txn)
             if let message = makeMessage(from: event, roomId: roomId, overrideId: localId) {
                 insertSorted(message, roomId: roomId)
@@ -1255,6 +1410,7 @@ class MatrixStore {
             mentionUserIds: mentions,
             mentionsRoom: formatted.mentionsRoom
         ))
+        if connection != .connected { rememberWaitingMessages() }
         flushOutbox()
     }
 
@@ -1277,7 +1433,7 @@ class MatrixStore {
         }
         list[idx].sendState = .sending
         messagesByRoom[roomId] = list
-        outbox.enqueue(item)
+        outbox.retryFailed(item)
         flushOutbox()
     }
 
@@ -1290,7 +1446,7 @@ class MatrixStore {
 
     /// Starts a delivery lane for every room with something queued (rooms already running are left alone).
     private func flushOutbox() {
-        guard userId != nil, reachability.isConnected else { return }
+        guard userId != nil, reachability.isConnected, serviceConnection != .sessionExpired else { return }
         for roomId in outbox.roomIds where outboxLanes[roomId] == nil {
             startOutboxLane(roomId: roomId)
         }
@@ -1311,7 +1467,7 @@ class MatrixStore {
             if outboxLanes[roomId]?.id == laneId { outboxLanes[roomId] = nil }
         }
         while let item = outbox.next(in: roomId) {
-            guard !Task.isCancelled, reachability.isConnected, userId != nil else { return }
+            guard !Task.isCancelled, reachability.isConnected, userId != nil, serviceConnection != .sessionExpired else { return }
             let result = await deliver(item)
             guard !Task.isCancelled else { return }
 
@@ -1319,15 +1475,18 @@ class MatrixStore {
             case .sent:
                 outboxRetryDelay = Self.outboxRetryBaseDelay
                 outbox.remove(txnId: item.txnId)
+                recordRecoveredDelivery(item.txnId)
                 rebuildUIModels()
             case .failed(let reason):
                 let latest = outbox.message(txnId: item.txnId) ?? item // keeps an upload already done
-                outbox.remove(txnId: item.txnId, deleteFiles: false)
+                outbox.retainFailed(latest)
                 failedOutgoing[item.txnId] = latest
                 uploadProgress.removeValue(forKey: item.txnId)
                 setSendState(.failed, txnId: item.txnId, roomId: item.roomId)
                 if let reason { errorMessage = reason }
             case .unreachable:
+                serviceConnection = .serverUnavailable
+                rememberWaitingMessages()
                 scheduleOutboxRetry()
                 return
             case .cancelled:
@@ -1443,7 +1602,7 @@ class MatrixStore {
 
     // Recrée les échos locaux des messages encore en file au démarrage
     private func restoreOutboxEchoes() {
-        for item in outbox.pending {
+        for item in outbox.pending + outbox.failed {
             let exists = messagesByRoom[item.roomId]?.contains(where: { $0.txnId == item.txnId }) ?? false
             guard !exists else { continue }
             let echo = makeLocalEcho(roomId: item.roomId, body: item.body, txnId: item.txnId,
@@ -1451,6 +1610,10 @@ class MatrixStore {
                                      attachment: item.attachment)
             if let root = item.threadRootEventId { conversationRoots[item.txnId] = root }
             insertSorted(echo, roomId: item.roomId)
+            if outbox.failed.contains(where: { $0.txnId == item.txnId }) {
+                failedOutgoing[item.txnId] = item
+                setSendState(.failed, txnId: item.txnId, roomId: item.roomId)
+            }
             // A queued attachment shows its upload card (0 % while it waits), with its ✕.
             if item.attachment != nil, uploadProgress[item.txnId] == nil { uploadProgress[item.txnId] = 0 }
         }
@@ -1478,13 +1641,7 @@ class MatrixStore {
     }
 
     func deleteMessage(roomId: String, eventId: String) async {
-        do {
-            try await client.redactEvent(roomId: roomId, eventId: eventId)
-            applyRedaction(of: eventId, roomId: roomId)
-            rebuildUIModels()
-        } catch {
-            self.errorMessage = "Suppression échouée : \(error.localizedDescription)"
-        }
+        scheduleMessageDeletion(roomID: roomId, eventID: eventId)
     }
 
     func sendReaction(roomId: String, eventId: String, emoji: String) async {
@@ -1862,16 +2019,22 @@ class MatrixStore {
         }
     }
 
-    func leaveRoom(_ roomId: String) async {
+    @discardableResult
+    func leaveRoom(_ roomId: String) async -> Bool {
+        let owner = userId
         do {
             try await client.leaveRoom(roomId)
+            guard userId == owner else { return false }
             rooms.removeAll { $0.roomId == roomId }
             messagesByRoom.removeValue(forKey: roomId)
             backPaginationTokens.removeValue(forKey: roomId)
             hasMoreHistory.removeValue(forKey: roomId)
             rebuildUIModels()
+            return true
         } catch {
-            self.errorMessage = "Impossible de quitter : \(error.localizedDescription)"
+            guard userId == owner else { return false }
+            self.errorMessage = "Tu n’as pas pu quitter cette conversation. Vérifie ta connexion, puis réessaie."
+            return false
         }
     }
 
@@ -2111,6 +2274,39 @@ class MatrixStore {
         room(roomId(for: server))?.topic ?? ""
     }
 
+    /// These decisions read existing room state only; they never provision or contact a service.
+    func firstRunHistoryStart(roomId: String?) -> Bool {
+        guard let roomId else { return false }
+        return FirstRunPolicy.hasReachedBeginning(
+            hasMoreHistory: hasMoreHistory[roomId], hasPaginationCursor: backPaginationTokens[roomId] != nil,
+            conversationComplete: conversationHistoryComplete.contains(roomId),
+            loading: conversationLoading.contains(roomId))
+    }
+
+    func firstRunCanEditChannel(_ channel: Channel) -> Bool {
+        guard let room = room(roomId(for: channel)), let userId else { return false }
+        let content = room.powerLevelsContent
+        let level = room.powerLevels[userId] ?? content["users_default"]?.intValue ?? 0
+        let events = content["events"]?.dictValue ?? [:]
+        return FirstRunPolicy.canEditChannel(userLevel: level, stateDefault: content["state_default"]?.intValue,
+            nameLevel: events["m.room.name"]?.intValue, topicLevel: events["m.room.topic"]?.intValue)
+    }
+
+    func firstRunScope(for server: MoodServer) -> ServerWelcomeScope? {
+        guard let userId, let serverId = roomId(for: server) else { return nil }
+        return ServerWelcomeScope(account: userId, server: serverId)
+    }
+
+    func firstRunCanBlock(_ conversation: DMConversation) -> Bool {
+        guard let peer = conversation.participant.matrixId, peer != userId, !isGroupDM(conversation) else { return false }
+        return !ignoredUserIds.contains(peer)
+    }
+
+    func recordFirstRunInvite(for server: MoodServer) {
+        guard let scope = firstRunScope(for: server), ServerWelcomeProgress.shared.started(scope) else { return }
+        ServerWelcomeProgress.shared.complete(.invite, in: scope)
+    }
+
     /// My power level in the space: 100 admin, 50 moderator, 0 member.
     func myPowerLevel(in server: MoodServer) -> Int {
         guard let space = room(roomId(for: server)), let userId else { return 0 }
@@ -2235,11 +2431,29 @@ class MatrixStore {
     }
 
     /// Discord's "Quitter le serveur": leave every channel of the space, then the space.
-    func leaveServer(_ server: MoodServer) async {
-        for channel in server.categories.flatMap(\.channels) {
-            if let roomId = roomId(for: channel) { await leaveRoom(roomId) }
+    private(set) var leavingServers: Set<UUID> = []
+
+    @discardableResult
+    func leaveServer(_ server: MoodServer) async -> Bool {
+        guard let owner = userId, let spaceID = roomId(for: server) else {
+            errorMessage = "Reconnecte-toi pour quitter ce serveur."
+            return false
         }
-        if let spaceId = roomId(for: server) { await leaveRoom(spaceId) }
+        guard !leavingServers.contains(server.id) else { return false }
+        leavingServers.insert(server.id)
+        errorMessage = nil
+        defer { leavingServers.remove(server.id) }
+        let channelIDs = server.categories.flatMap(\.channels).compactMap { roomId(for: $0) }
+        for id in channelIDs + [spaceID] where rooms.contains(where: { $0.roomId == id }) {
+            guard userId == owner else { return false }
+            guard await leaveRoom(id) else {
+                guard userId == owner else { return false }
+                errorMessage = "Tu n’as pas pu quitter tous les salons. Certains peuvent déjà avoir été quittés. Réessaie pour terminer."
+                retryAction = { [weak self] in Task { await self?.leaveServer(server) } }
+                return false
+            }
+        }
+        return true
     }
 
     func roomId(for channel: Channel) -> String? {
@@ -2263,7 +2477,7 @@ class MatrixStore {
     /// Pins live in room state and can change from any device, so they are applied at read time.
     private func timeline(roomId: String) -> [ChatMessage] {
         let pinned = Set(rooms.first(where: { $0.roomId == roomId })?.pinnedEventIds ?? [])
-        var messages = computeGrouping((messagesByRoom[roomId] ?? []).filter { conversationRoot(of: $0) == nil })
+        var messages = computeGrouping((messagesByRoom[roomId] ?? []).filter { conversationRoot(of: $0) == nil && !isDeletionPending($0, roomID: roomId) })
         for index in messages.indices {
             messages[index].threadInfo = nil
             if let id = messages[index].eventId {
@@ -2957,6 +3171,8 @@ class MatrixStore {
             outbox.remove(txnId: txnId)
         }
         if let failed = failedOutgoing.removeValue(forKey: txnId) { outbox.deleteFiles(of: failed) }
+        outbox.removeFailed(txnId: txnId, deleteFiles: true)
+        waitingTransactions.remove(txnId)
         uploadProgress.removeValue(forKey: txnId)
         messagesByRoom[roomId]?.removeAll { $0.id == localId }
         rebuildUIModels()
@@ -3351,6 +3567,10 @@ class MatrixStore {
     private var joiningMessagingSpaces: Set<String> = []
     var pendingMessagingInvite: String?
 
+    func isPreparingInvite(for server: MoodServer) -> Bool {
+        roomId(for: server).map { generatingMessagingInvites.contains($0) } ?? false
+    }
+
     func prepareMessagingInvite(for server: MoodServer) async {
         guard let id = roomId(for: server), messagingInvites[id] == nil, !generatingMessagingInvites.contains(id) else { return }
         generatingMessagingInvites.insert(id)
@@ -3382,26 +3602,85 @@ class MatrixStore {
 
     private func createMessagingServer(name: String, isPublic: Bool) async -> UUID? {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty, let id = await createSpace(name: name) else { return nil }
+        guard !name.isEmpty, let owner = userId else { return nil }
+        let identity = CreationIdentity(kind: .server, arguments: [name, String(isPublic)])
+        guard activeCreations.insert(identity).inserted else { return nil }
+        defer { activeCreations.remove(identity) }
+        let id: String
+        if let existing = creationRecovery.remoteID(for: identity, owner: owner) { id = existing }
+        else {
+            guard let created = await createSpace(name: name), userId == owner else { return nil }
+            id = created
+            creationRecovery.record(id, for: identity, owner: owner)
+        }
         if isPublic {
             do { try await client.setStateEvent(roomId: id, type: "m.room.join_rules", content: ["join_rule": "public"]) }
-            catch { errorMessage = "Le serveur a été créé, mais sa visibilité publique n’a pas pu être appliquée."; return nil }
+            catch { errorMessage = "Le serveur existe déjà, mais sa visibilité n’a pas été appliquée. \(error.localizedDescription) Un réessai reprendra le même serveur."; return nil }
         }
+        guard userId == owner else { return nil }
         await refreshMessagingRoom(id)
-        guard await createMessagingChannel(spaceId: id, name: "général", topic: "", isPrivate: false) != nil else { return nil }
+        guard userId == owner,
+              await createMessagingChannel(spaceId: id, name: "général", topic: "", isPrivate: false) != nil else {
+            if userId == owner { errorMessage = "Le serveur existe déjà, mais son premier salon n’est pas prêt. \(errorMessage ?? "Vérifie ta connexion.") Un réessai reprendra au même endroit." }
+            return nil
+        }
+        guard userId == owner else { return nil }
+        creationRecovery.finish(identity, owner: owner)
         return stableUUID(from: id)
     }
 
+    /// Resume a partially-created template instead of creating another space on retry.
+    func createOnboardingServer(name: String, template: OnboardingTemplate) async -> UUID? {
+        guard let userId else { return nil }
+        let key = "mood.onboarding.pendingServer.\(userId)"
+        let defaults = UserDefaults.standard
+        let pending = defaults.dictionary(forKey: key) as? [String: String]
+        let spaceId: String
+        if let pending, pending["name"] == name, pending["template"] == template.rawValue, let saved = pending["id"] {
+            spaceId = saved
+        } else {
+            guard let created = await createSpace(name: name) else { return nil }
+            spaceId = created
+            defaults.set(["id": created, "name": name, "template": template.rawValue], forKey: key)
+        }
+        await refreshMessagingRoom(spaceId)
+        for child in room(spaceId)?.spaceChildren ?? [] { await refreshMessagingRoom(child) }
+        for channelName in template.channelNames {
+            let children = room(spaceId)?.spaceChildren ?? []
+            if children.contains(where: { room($0)?.name == channelName }) { continue }
+            guard await createMessagingChannel(spaceId: spaceId, name: channelName, topic: "", isPrivate: false) != nil else { return nil }
+        }
+        defaults.removeObject(forKey: key)
+        return stableUUID(from: spaceId)
+    }
+
     private func createMessagingChannel(spaceId: String, name: String, topic: String, isPrivate: Bool) async -> UUID? {
+        guard let owner = userId else { return nil }
+        let identity = CreationIdentity(kind: .channel, arguments: [spaceId, name, topic, String(isPrivate)])
+        guard activeCreations.insert(identity).inserted else { return nil }
+        defer { activeCreations.remove(identity) }
         do {
-            let id = try await client.createMessagingChannel(spaceId: spaceId, name: name, topic: topic, isPrivate: isPrivate,
-                powerLevels: room(spaceId)?.powerLevelsContent.mapValues(\.jsonObject) ?? [:]).roomId
+            let id: String
+            if let existing = creationRecovery.remoteID(for: identity, owner: owner) { id = existing }
+            else {
+                id = try await client.createMessagingChannel(spaceId: spaceId, name: name, topic: topic, isPrivate: isPrivate,
+                    powerLevels: room(spaceId)?.powerLevelsContent.mapValues(\.jsonObject) ?? [:]).roomId
+                guard userId == owner else { return nil }
+                creationRecovery.record(id, for: identity, owner: owner)
+            }
             try await client.setStateEvent(roomId: spaceId, type: "m.space.child", stateKey: id,
                 content: ["via": ["mood.local"], "order": MessagingServerPolicy.order(room(spaceId)?.spaceChildren.count ?? 0)])
+            guard userId == owner else { return nil }
             await refreshMessagingRoom(id)
             await refreshMessagingRoom(spaceId)
+            guard userId == owner else { return nil }
+            creationRecovery.finish(identity, owner: owner)
             return stableUUID(from: id)
-        } catch { errorMessage = "Création du salon échouée : \(error.localizedDescription)"; return nil }
+        } catch {
+            guard userId == owner else { return nil }
+            errorMessage = "Le salon n’est pas prêt. \(error.localizedDescription) Tu peux réessayer pour reprendre sa préparation."
+            return nil
+        }
     }
 
     func joinServerChannels(_ spaceId: String) async {
@@ -3702,7 +3981,7 @@ class MatrixStore {
     }
 
     func conversationReplies(roomId: String, root: String) -> [ChatMessage] {
-        computeGrouping((messagesByRoom[roomId] ?? []).filter { conversationRoot(of: $0) == root })
+        computeGrouping((messagesByRoom[roomId] ?? []).filter { conversationRoot(of: $0) == root && !isDeletionPending($0, roomID: roomId) })
     }
 
     func conversationThreads(roomId: String) -> [ChatMessage] {
@@ -3812,6 +4091,62 @@ class MatrixStore {
             timestamp: Date(timeIntervalSince1970: Double(event.originServerTs ?? 0) / 1000), isGrouped: false, isSystemMessage: true, eventId: id)
     }
 
+    /// Disconnected fixtures exercise the shipping views and queue controls, never a real account.
+    func preparePremiumPreview(screen: String) {
+        let server = MockData.servers[0]
+        let channel = server.categories.flatMap(\.channels).first { $0.type == .text }!
+        stableIdReverse[channel.id] = PremiumPreview.roomID
+        servers = [server]
+        currentUser = MockData.currentUser
+        serviceConnection = switch screen {
+        case "offline", "recovered": .offline
+        case "unreachable": .serverUnavailable
+        case "session": .sessionExpired
+        case "loading": .connecting
+        default: .connected
+        }
+        var first = ChatMessage(id: UUID(), sender: MockData.users[1], content: "On se retrouve à 20 h ?", timestamp: Date().addingTimeInterval(-120), isGrouped: false, eventId: "$premium-1")
+        first.isOwn = false
+        var own = ChatMessage(id: UUID(), sender: MockData.currentUser,
+            content: "Oui ! Je vous rejoins avec les photos.", timestamp: Date().addingTimeInterval(-30), isGrouped: false,
+            sendState: ["offline", "unreachable", "failed", "recovered"].contains(screen) ? .sending : .sent,
+            eventId: ["offline", "unreachable", "failed", "recovered"].contains(screen) ? nil : "$premium-own", txnId: "premium-own")
+        own.isOwn = true
+        messagesByRoom[PremiumPreview.roomID] = screen == "empty" ? [] : [first, own]
+        conversationHistoryComplete.insert(PremiumPreview.roomID)
+        hasMoreHistory[PremiumPreview.roomID] = false
+        if own.sendState == .sending {
+            let queued = OutgoingMessage(txnId: "premium-own", roomId: PremiumPreview.roomID, body: own.content,
+                replyToEventId: nil, threadRootEventId: nil, createdAt: own.timestamp)
+            if screen == "failed" {
+                outbox.retainFailed(queued)
+                failedOutgoing[queued.txnId] = queued
+                setSendState(.failed, txnId: queued.txnId, roomId: queued.roomId)
+            } else { outbox.enqueue(queued) }
+        }
+        if ["offline", "unreachable", "recovered"].contains(screen) {
+            var second = ChatMessage(id: UUID(), sender: MockData.currentUser, content: "Je garde aussi une place pour toi.",
+                timestamp: Date().addingTimeInterval(-10), isGrouped: true, sendState: .sending, txnId: "premium-second")
+            second.isOwn = true
+            messagesByRoom[PremiumPreview.roomID, default: []].append(second)
+            outbox.enqueue(OutgoingMessage(txnId: "premium-second", roomId: PremiumPreview.roomID, body: second.content,
+                replyToEventId: nil, threadRootEventId: nil, createdAt: second.timestamp))
+            rememberWaitingMessages()
+        }
+        if screen == "undo" { scheduleMessageDeletion(roomID: PremiumPreview.roomID, eventID: "$premium-own") }
+    }
+
+    /// A visual fixture changes the real delivery states; no network or production session is used.
+    func resumePremiumPreview() {
+        guard PremiumPreview.screen == "recovered", userId == nil else { return }
+        serviceConnection = .connected
+        for item in outbox.pending {
+            confirmEcho(txnId: item.txnId, roomId: item.roomId, eventId: "$preview-" + item.txnId)
+            recordRecoveredDelivery(item.txnId)
+            outbox.remove(txnId: item.txnId)
+        }
+    }
+
     // MARK: - Media & composer (N2)
 
     func mediaVoiceWaveform(roomId: String, eventId: String) async -> [Int] {
@@ -3841,6 +4176,7 @@ class MatrixStore {
             uploadProgress[txnId] = 0
             outbox.enqueue(message)
             rebuildUIModels()
+            if connection != .connected { rememberWaitingMessages() }
             flushOutbox()
         } catch { errorMessage = error.localizedDescription }
     }
@@ -3895,6 +4231,7 @@ class MatrixStore {
             }
             clearNewMessagesDivider(roomId: roomId)
             rebuildUIModels()
+            if connection != .connected { rememberWaitingMessages() }
             flushOutbox()
             return true
         } catch {

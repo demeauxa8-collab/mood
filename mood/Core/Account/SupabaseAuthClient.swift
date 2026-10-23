@@ -39,10 +39,11 @@ struct DiscordIdentity: Codable, Sendable {
 }
 
 enum AccountError: LocalizedError {
-    case notConfigured, invalidResponse, server(String), noMatrixLink, emailConfirmationRequired
+    case notConfigured, invalidResponse, server(String), noMatrixLink, emailConfirmationRequired, usernameTaken
     var errorDescription: String? {
         switch self {
         case .emailConfirmationRequired: "Confirme ton e-mail, puis reviens dans Mood."
+        case .usernameTaken: "Ce nom d'utilisateur est déjà pris."
         case .notConfigured: "Supabase n'est pas configuré."
         case .invalidResponse: "Réponse invalide du serveur."
         case .server(let message): message
@@ -317,10 +318,12 @@ final class SupabaseAuthClient: NSObject, ASWebAuthenticationPresentationContext
         guard let http = response as? HTTPURLResponse else { throw AccountError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
             if path == "functions/v1/matrix-session" { throw MoodProvisioningError.http(http.statusCode) }
-            if method == "PATCH", path.hasPrefix("rest/v1/profiles"),
-               let friendly = MoodUsername.updateError(status: http.statusCode,
-                    code: (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["code"] as? String) {
-                throw AccountError.server(friendly)
+            if method == "PATCH", path.hasPrefix("rest/v1/profiles") {
+                let code = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["code"] as? String
+                if http.statusCode == 409 || code == "23505" { throw AccountError.usernameTaken }
+                if let friendly = MoodUsername.updateError(status: http.statusCode, code: code) {
+                    throw AccountError.server(friendly)
+                }
             }
             let message = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["msg"] as? String ?? (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["message"] as? String ?? "Erreur Supabase (\(http.statusCode))."
             let code = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["code"] as? String

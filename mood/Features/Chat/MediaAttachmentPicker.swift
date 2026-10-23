@@ -31,26 +31,27 @@ struct MediaAttachmentPicker: View {
                     List {
                         Section { choices }.listRowBackground(MoodTheme.inputBg)
                         if busy { Section { ProgressView("Préparation…") }.listRowBackground(MoodTheme.inputBg) }
-                        if let error { Section { Text(error).foregroundStyle(MoodTheme.mentionBadge) }.listRowBackground(MoodTheme.inputBg) }
+                        if let error { Section { importFailure(error) }.listRowBackground(MoodTheme.inputBg) }
                     }.mobileGroupedList()
                 }
             } else {
                 VStack(alignment: .leading, spacing: 6 * LayoutMetrics.scale) {
                     HStack(spacing: 12 * LayoutMetrics.scale) { choices }.font(.mood(13)).disabled(busy)
                     if busy { ProgressView("Préparation…").font(.mood(12)) }
-                    if let error { Text(error).font(.mood(12)).foregroundStyle(MoodTheme.mentionBadge) }
+                    if let error { importFailure(error) }
                 }
             }
         }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
             switch result {
             case .success(let urls): onFiles(urls)
-            case .failure(let failure): error = failure.localizedDescription
+            case .failure: error = "Ce fichier n’a pas pu être ouvert. Choisis-en un autre ; ton message est conservé."
             }
         }
         .onChange(of: selections) { _, items in
             guard !items.isEmpty else { return }
             busy = true
+            error = nil
             Task { @MainActor in
                 var files: [URL] = []
                 for item in items {
@@ -59,11 +60,17 @@ struct MediaAttachmentPicker: View {
                         files.append(file.url)
                     } catch { self.error = "Impossible d’importer un média. Réessaie depuis la photothèque." }
                 }
-                onFiles(files)
+                if error == nil { onFiles(files) }
                 selections = []; busy = false
             }
         }
         .sheet(isPresented: $camera) { MediaCamera { onFiles([$0]); camera = false } }
+    }
+
+    private func importFailure(_ message: String) -> some View {
+        MoodNotice(title: "Le média n’a pas été ajouté", detail: message,
+            actionTitle: "Choisir un fichier", action: { importing = true },
+            secondaryTitle: "Fermer", secondaryAction: { error = nil })
     }
 
     @ViewBuilder private var choices: some View {

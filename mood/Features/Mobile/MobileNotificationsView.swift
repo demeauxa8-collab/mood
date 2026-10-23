@@ -18,7 +18,9 @@ struct MobileNotificationsView: View {
             Text("Notifications").font(.mood(17, weight: .bold)).foregroundStyle(MoodTheme.textPrimary)
                 .frame(maxWidth: .infinity).frame(height: LayoutMetrics.mobile(48)).background(MoodTheme.serverBar)
             Rectangle().fill(MoodTheme.divider).frame(height: LayoutMetrics.mobile(1))
-            if store.inboxMentions.isEmpty && mentionedChannels.isEmpty && conversations.allSatisfy({ $0.unreadCount == 0 }) {
+            if store.inboxMentions.isEmpty && mentionedChannels.isEmpty && conversations.allSatisfy({ $0.unreadCount == 0 }) && store.userId != nil && store.connection != .connected {
+                ConversationCacheEmptyState().frame(maxHeight: .infinity)
+            } else if store.inboxMentions.isEmpty && mentionedChannels.isEmpty && conversations.allSatisfy({ $0.unreadCount == 0 }) {
                 VStack(spacing: LayoutMetrics.mobile(12)) {
                     Image(systemName: "bell.slash").font(.mood(36)).foregroundStyle(MoodTheme.textMuted)
                     Text("Rien de nouveau").font(.mood(17, weight: .semibold)).foregroundStyle(MoodTheme.textPrimary)

@@ -83,12 +83,13 @@ struct ServerSidebarView: View {
                             mentionCount: server.mentionCount,
                             onMarkRead: { matrixStore.markServerAsRead(server) },
                             onLeave: {
-                                if selectedServer?.id == server.id {
-                                    selectedServer = nil
-                                    selectedChannel = nil
-                                    showDMs = true
+                                Task {
+                                    if await matrixStore.leaveServer(server), selectedServer?.id == server.id {
+                                        selectedServer = nil
+                                        selectedChannel = nil
+                                        showDMs = true
+                                    }
                                 }
-                                Task { await matrixStore.leaveServer(server) }
                             }
                         ) {
                             selectedServer = server
@@ -235,7 +236,7 @@ struct SidebarIcon: View {
             Button("Annuler", role: .cancel) {}
             Button("Quitter", role: .destructive) { onLeave?() }
         } message: {
-            Text("Es-tu sûr de vouloir quitter ce serveur ?")
+            Text("Tu n’auras plus accès à ses salons. Il te faudra une invitation pour revenir. Les messages déjà envoyés resteront visibles aux autres.")
         }
     }
 }
@@ -301,12 +302,14 @@ struct CreateServerModal: View {
     }
 
     @ViewBuilder
-    private var failureText: some View {
+    private func failureNotice(_ message: String) -> some View {
+        MoodNotice(title: "Le serveur n’a pas été ouvert", detail: message,
+            actionTitle: "Réessayer", action: { if step == 2 { joinServer() } else { createServer() } }, busy: isWorking)
+    }
+
+    @ViewBuilder private var failureText: some View {
         if let failure {
-            Text(failure)
-                .font(.mood(12))
-                .foregroundStyle(MoodTheme.mentionBadge)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            failureNotice(failure)
         }
     }
 
@@ -364,7 +367,7 @@ struct CreateServerModal: View {
                             .buttonStyle(MobilePrimaryButtonStyle()).disabled(isWorking || inviteLink.trimmingCharacters(in: .whitespaces).isEmpty)
                     }.listRowBackground(MoodTheme.mobileSurface).listRowInsets(EdgeInsets())
                 }
-                if let failure { Section { Text(failure).foregroundStyle(MoodTheme.mentionBadge) }.listRowBackground(MoodTheme.inputBg) }
+                if let failure { Section { failureNotice(failure) }.listRowBackground(MoodTheme.inputBg) }
             }.mobileGroupedList().disabled(isWorking)
         }
         .onAppear {

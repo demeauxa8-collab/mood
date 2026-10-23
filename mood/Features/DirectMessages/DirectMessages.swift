@@ -88,7 +88,9 @@ struct DMListView: View {
                     .padding(.top, (calibrated ? 5 : 7) * LayoutMetrics.scale)
                     .padding(.bottom, (calibrated ? 3 : 4) * LayoutMetrics.scale)
 
-                    if conversations.isEmpty {
+                    if conversations.isEmpty && matrixStore.userId != nil && matrixStore.connection != .connected {
+                        ConversationCacheEmptyState()
+                    } else if conversations.isEmpty {
                         VStack(spacing: 8 * LayoutMetrics.scale) {
                             Image(systemName: "bubble.left.and.bubble.right")
                                 .font(.mood(24))
@@ -286,6 +288,7 @@ struct DMChatArea: View {
     @State private var showInlineProfile = false
     @State private var typingTask: Task<Void, Never>?
     @State private var isTyping = false
+    @State private var showFirstRunBlock = false
 
     private var messages: [ChatMessage] {
         let storeMessages = matrixStore.messages(forDM: conversation)
@@ -376,6 +379,7 @@ struct DMChatArea: View {
 
             HStack(spacing: 0) {
                 VStack(spacing: 0) {
+                    ConversationRecoveryNotices()
                     // Pinned messages panel
                     if showPinnedMessages {
                         PinnedMessagesPanel(
@@ -389,49 +393,20 @@ struct DMChatArea: View {
                     ScrollView {
                         ScrollViewReader { proxy in
                             LazyVStack(spacing: 0) {
-                        if calibrated {
-                            VStack(alignment: .leading, spacing: 6) {
-                                AvatarGlyph(user: conversation.participant).font(.mood(50))
-                                    .frame(width: 80, height: 80).background(MoodTheme.glassBg).clipShape(Circle())
-                                CalibratedDesktopText(value: conversation.participant.displayName, size: 32, weight: .bold,
-                                    glyphBackground: MoodTheme.chatBackground)
-                                CalibratedDesktopText(value: matrixStore.userId == nil ? conversation.participant.username : conversation.participant.displayName, size: 24, weight: .regular,
-                                    glyphBackground: MoodTheme.chatBackground)
-                                Text("Ceci est le début de l’historique de tes messages privés avec \(conversation.participant.displayName).")
-                                    .desktopFriendsFont(16).foregroundStyle(MoodTheme.textPrimary)
-                                    .padding(.top, 8)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16).padding(.top, 60).padding(.bottom, 24)
-                        } else {
-                        VStack(spacing: 10 * LayoutMetrics.scale) {
-                            AvatarGlyph(user: conversation.participant)
-                                .font(.mood(50))
-                                .frame(width: 80 * LayoutMetrics.scale, height: 80 * LayoutMetrics.scale)
-                                .background(MoodTheme.glassBg)
-                                .clipShape(Circle())
-
-                            Text(conversation.participant.displayName)
-                                .font(.mood(20, weight: .bold))
-                                .foregroundStyle(MoodTheme.textPrimary)
-
-                            if let username = accountStore.moodUsername(for: conversation.participant, currentUserId: matrixStore.userId) {
-                                Text(username).font(.mood(13)).foregroundStyle(MoodTheme.textSecondary)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 28 * LayoutMetrics.scale)
-                        }
-
-                                DesktopPixelRule()
-                                    .padding(.horizontal, 16)
-                                    .padding(.bottom, 6)
-
-                                if hasMoreHistory, let roomId {
+                                if hasMoreHistory, !matrixStore.firstRunHistoryStart(roomId: roomId), let roomId {
                                     LoadMoreHistoryButton(roomId: roomId)
+                                } else if matrixStore.firstRunHistoryStart(roomId: roomId) || (roomId == nil && authState.isDemoMode) {
+                                    DirectMessageBeginningState(user: conversation.participant,
+                                        username: authState.isDemoMode && matrixStore.userId == nil ? conversation.participant.username
+                                            : accountStore.moodUsername(for: conversation.participant, currentUserId: matrixStore.userId),
+                                        onBlock: matrixStore.firstRunCanBlock(conversation) ? { showFirstRunBlock = true } : nil,
+                                        supportsOfflineDelivery: !isEncrypted)
+                                    DesktopPixelRule().padding(.horizontal, 16 * LayoutMetrics.scale)
                                 }
 
-                                if messages.isEmpty {
+                                if messages.isEmpty, let roomId, !matrixStore.firstRunHistoryStart(roomId: roomId) {
+                                    FirstRunHistoryPlaceholder(roomID: roomId)
+                                } else if messages.isEmpty {
                                     Text("Aucun message pour l'instant. Dis bonjour 👋")
                                         .desktopFriendsFont(calibrated ? 16 : 13)
                                         .foregroundStyle(MoodTheme.textSecondary)
@@ -476,7 +451,7 @@ struct DMChatArea: View {
                         replyingTo: $replyingTo,
                         onSend: sendCurrentMessage,
                         onAttachFile: attach
-                    )
+                    ).messageUndoAccessory()
                 }
 
                 if showSearch, layoutMode == .regular {
@@ -506,6 +481,13 @@ struct DMChatArea: View {
             resetKey: conversation.id,
             onClose: closeSearch
         )
+        .task(id: roomId) { if let roomId { await matrixStore.loadConversationHistory(roomId: roomId) } }
+        .alert("Bloquer cette personne ?", isPresented: $showFirstRunBlock) {
+            Button("Annuler", role: .cancel) {}
+            Button("Bloquer", role: .destructive) {
+                if let id = conversation.participant.matrixId { Task { await matrixStore.setBlocked(id, blocked: true) } }
+            }
+        } message: { Text("Tu ne verras plus ses messages.") }
         .onAppear { markConversationAsRead() }
         .onChange(of: conversation.id) { _, _ in markConversationAsRead() }
         .onChange(of: messageText) { _, newValue in

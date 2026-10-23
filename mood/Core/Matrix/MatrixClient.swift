@@ -371,12 +371,22 @@ class MatrixClient {
 
         var errorDescription: String? {
             switch self {
-            case .invalidURL: return "URL invalide"
-            case .httpError(let code, _, let msg, _): return "Erreur \(code) : \(msg)"
-            case .decodingError(let err): return "Erreur de décodage : \(err.localizedDescription)"
-            case .notAuthenticated: return "Non authentifié"
-            case .networkError(let err): return "Erreur réseau : \(err.localizedDescription)"
-            case .registrationIncomplete: return "Inscription en cours (étapes supplémentaires requises)"
+            case .invalidURL: return "Cette adresse n’est pas valide. Vérifie-la et réessaie."
+            case .httpError(let code, let reason, _, _):
+                if reason == "M_UNKNOWN_TOKEN" { return "Ta session a expiré. Reconnecte-toi pour continuer." }
+                switch code {
+                case 401: return "La connexion a été refusée. Vérifie tes informations et réessaie."
+                case 403: return "Cette action n’est pas autorisée. Vérifie tes droits ou demande à un responsable du serveur."
+                case 404: return "Cet élément n’est plus disponible. Reviens à la conversation pour continuer."
+                case 413: return "Ce fichier est trop lourd. Choisis un fichier plus petit."
+                case 429: return "Mood reçoit trop de demandes. Patiente un instant, puis réessaie."
+                case 500...599: return "Mood est momentanément injoignable. Tes messages en attente restent ici. Réessaie dans un instant."
+                default: return "L’action a été refusée. Vérifie ta saisie, puis réessaie."
+                }
+            case .decodingError: return "La réponse de Mood n’a pas pu être lue. Réessaie dans un instant."
+            case .notAuthenticated: return "Reconnecte-toi à Mood pour continuer."
+            case .networkError: return "Impossible de joindre Mood. Vérifie ta connexion, puis réessaie."
+            case .registrationIncomplete: return "L’inscription attend une confirmation. Termine la vérification pour continuer."
             }
         }
     }

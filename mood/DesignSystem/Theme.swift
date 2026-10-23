@@ -370,6 +370,9 @@ enum MoodTheme {
 
     static var brandBlue: Color { Color(hex: "5865f2") }
 
+    /// Failed delivery uses a readable, softer red against the conversation surface.
+    static var deliveryFailed: Color { shared.theme == .light ? Color(hex: "b4232a") : Color(hex: "f28b8d") }
+
     static var mentionBadge: Color { Color(hex: "da373c") }
 
     static var statusIdle: Color { Color(hex: "f0b232") }
